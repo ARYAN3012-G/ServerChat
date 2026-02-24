@@ -3,6 +3,7 @@ import authReducer from './authSlice';
 import chatReducer from './chatSlice';
 import uiReducer from './uiSlice';
 import gameReducer from './gameSlice';
+import serverReducer from './serverSlice';
 
 export const store = configureStore({
     reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
         chat: chatReducer,
         ui: uiReducer,
         game: gameReducer,
+        server: serverReducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({

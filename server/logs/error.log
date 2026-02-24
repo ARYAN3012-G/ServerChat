@@ -13,3 +13,33 @@
 {"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:31:08"}
 {"level":"error","message":"Presence disconnect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:36:35"}
 {"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:36:39"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:40:41"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:40:41"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:40:42"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:40:42"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:43:22"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:44:25"}
+{"level":"error","message":"Presence disconnect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:44:46"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:45:25"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:49:45"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:49:45"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:49:46"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:49:46"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:49:46"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:28"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:28"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:29"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:29"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:50:29"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:42"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:42"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:43"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:43"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:50:43"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:51:02"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:51:02"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:51:04"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:51:04"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:51:05"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:51:05"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:51:05"}

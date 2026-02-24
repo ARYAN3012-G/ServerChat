@@ -41,6 +41,7 @@ app.use(morgan('combined', {
 
 // API Routes
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/servers', require('./routes/serverRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/channels', require('./routes/channelRoutes'));
 app.use('/api/messages', require('./routes/messageRoutes'));

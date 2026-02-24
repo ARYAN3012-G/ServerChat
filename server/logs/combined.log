@@ -63,3 +63,93 @@
 {"level":"info","message":"::1 - - [24/Feb/2026:11:08:43 +0000] \"GET /api/health HTTP/1.1\" 200 54 \"-\" \"Mozilla/5.0 (Windows NT; Windows NT 10.0; en-IN) WindowsPowerShell/5.1.26100.7705\"","service":"serverchat","timestamp":"2026-02-24 16:38:43"}
 {"level":"info","message":"::1 - - [24/Feb/2026:11:08:58 +0000] \"POST /api/auth/register HTTP/1.1\" 201 909 \"-\" \"Mozilla/5.0 (Windows NT; Windows NT 10.0; en-IN) WindowsPowerShell/5.1.26100.7705\"","service":"serverchat","timestamp":"2026-02-24 16:38:58"}
 {"level":"info","message":"::1 - - [24/Feb/2026:11:09:16 +0000] \"POST /api/auth/login HTTP/1.1\" 200 909 \"-\" \"Mozilla/5.0 (Windows NT; Windows NT 10.0; en-IN) WindowsPowerShell/5.1.26100.7705\"","service":"serverchat","timestamp":"2026-02-24 16:39:16"}
+{"level":"info","message":"⚡ Socket.io initialized","service":"serverchat","timestamp":"2026-02-24 16:40:40"}
+{"level":"info","message":"🚀 ServerChat API running on port 5000","service":"serverchat","timestamp":"2026-02-24 16:40:41"}
+{"level":"info","message":"📡 Environment: development","service":"serverchat","timestamp":"2026-02-24 16:40:41"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:40:41"}
+{"level":"info","message":"✅ MongoDB connected: localhost","service":"serverchat","timestamp":"2026-02-24 16:40:41"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:40:41"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:40:42"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:40:42"}
+{"level":"warn","message":"⚠️ Redis connection failed, running without Redis","service":"serverchat","timestamp":"2026-02-24 16:40:42"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:11:46 +0000] \"POST /api/auth/login HTTP/1.1\" 200 909 \"-\" \"Mozilla/5.0 (Windows NT; Windows NT 10.0; en-IN) WindowsPowerShell/5.1.26100.7705\"","service":"serverchat","timestamp":"2026-02-24 16:41:46"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:11:46 +0000] \"GET /api/auth/me HTTP/1.1\" 200 483 \"-\" \"Mozilla/5.0 (Windows NT; Windows NT 10.0; en-IN) WindowsPowerShell/5.1.26100.7705\"","service":"serverchat","timestamp":"2026-02-24 16:41:46"}
+{"level":"info","message":"🔌 User connected: Aryan (699d848dea14264162b65073)","service":"serverchat","timestamp":"2026-02-24 16:43:22"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:13:22 +0000] \"GET /api/auth/me HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:43:22"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:43:22"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:13:22 +0000] \"GET /api/auth/me HTTP/1.1\" 200 493 \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:43:22"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:13:22 +0000] \"GET /api/channels/me HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:43:22"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:13:22 +0000] \"GET /api/messages/channel/699d84e5ea14264162b65095 HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:43:22"}
+{"level":"debug","message":"Aryan joined channel 699d84e5ea14264162b65095","service":"serverchat","timestamp":"2026-02-24 16:43:22"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:14:10 +0000] \"GET /api/auth/me HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:44:10"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:14:10 +0000] \"GET /api/auth/me HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:44:10"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:14:24 +0000] \"POST /api/auth/login HTTP/1.1\" 200 914 \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:44:24"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:14:25 +0000] \"GET /api/auth/me HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:44:25"}
+{"level":"info","message":"🔌 User connected: Aryan (699d848dea14264162b65073)","service":"serverchat","timestamp":"2026-02-24 16:44:25"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:44:25"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:14:25 +0000] \"GET /api/channels/me HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:44:25"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:14:25 +0000] \"GET /api/auth/me HTTP/1.1\" 200 493 \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:44:25"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:14:25 +0000] \"GET /api/channels/me HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:44:25"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:14:25 +0000] \"GET /api/messages/channel/699d84e5ea14264162b65095 HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:44:25"}
+{"level":"debug","message":"Aryan joined channel 699d84e5ea14264162b65095","service":"serverchat","timestamp":"2026-02-24 16:44:25"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:14:25 +0000] \"GET /api/messages/channel/699d84e5ea14264162b65095 HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:44:25"}
+{"level":"debug","message":"Aryan joined channel 699d84e5ea14264162b65095","service":"serverchat","timestamp":"2026-02-24 16:44:25"}
+{"level":"info","message":"🔌 User disconnected: Aryan - client namespace disconnect","service":"serverchat","timestamp":"2026-02-24 16:44:46"}
+{"level":"error","message":"Presence disconnect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:44:46"}
+{"level":"info","message":"🔌 User connected: Aryan (699d848dea14264162b65073)","service":"serverchat","timestamp":"2026-02-24 16:45:25"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:15:25 +0000] \"GET /api/auth/me HTTP/1.1\" 200 494 \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:45:25"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:45:25"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:15:25 +0000] \"GET /api/auth/me HTTP/1.1\" 200 493 \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:45:25"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:15:25 +0000] \"GET /api/channels/me HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:45:25"}
+{"level":"info","message":"::1 - - [24/Feb/2026:11:15:25 +0000] \"GET /api/messages/channel/699d84e5ea14264162b65095 HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0\"","service":"serverchat","timestamp":"2026-02-24 16:45:25"}
+{"level":"debug","message":"Aryan joined channel 699d84e5ea14264162b65095","service":"serverchat","timestamp":"2026-02-24 16:45:25"}
+{"level":"info","message":"⚡ Socket.io initialized","service":"serverchat","timestamp":"2026-02-24 16:49:44"}
+{"level":"info","message":"🚀 ServerChat API running on port 5000","service":"serverchat","timestamp":"2026-02-24 16:49:45"}
+{"level":"info","message":"📡 Environment: development","service":"serverchat","timestamp":"2026-02-24 16:49:45"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:49:45"}
+{"level":"info","message":"✅ MongoDB connected: localhost","service":"serverchat","timestamp":"2026-02-24 16:49:45"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:49:45"}
+{"level":"info","message":"🔌 User connected: Aryan (699d848dea14264162b65073)","service":"serverchat","timestamp":"2026-02-24 16:49:45"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:49:46"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:49:46"}
+{"level":"warn","message":"⚠️ Redis connection failed, running without Redis","service":"serverchat","timestamp":"2026-02-24 16:49:46"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:49:46"}
+{"level":"info","message":"⚡ Socket.io initialized","service":"serverchat","timestamp":"2026-02-24 16:50:28"}
+{"level":"info","message":"🚀 ServerChat API running on port 5000","service":"serverchat","timestamp":"2026-02-24 16:50:28"}
+{"level":"info","message":"📡 Environment: development","service":"serverchat","timestamp":"2026-02-24 16:50:28"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:28"}
+{"level":"info","message":"✅ MongoDB connected: localhost","service":"serverchat","timestamp":"2026-02-24 16:50:28"}
+{"level":"info","message":"🔌 User connected: Aryan (699d848dea14264162b65073)","service":"serverchat","timestamp":"2026-02-24 16:50:28"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:28"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:29"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:29"}
+{"level":"warn","message":"⚠️ Redis connection failed, running without Redis","service":"serverchat","timestamp":"2026-02-24 16:50:29"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:50:29"}
+{"level":"info","message":"⚡ Socket.io initialized","service":"serverchat","timestamp":"2026-02-24 16:50:41"}
+{"level":"info","message":"🚀 ServerChat API running on port 5000","service":"serverchat","timestamp":"2026-02-24 16:50:42"}
+{"level":"info","message":"📡 Environment: development","service":"serverchat","timestamp":"2026-02-24 16:50:42"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:42"}
+{"level":"info","message":"✅ MongoDB connected: localhost","service":"serverchat","timestamp":"2026-02-24 16:50:42"}
+{"level":"info","message":"🔌 User connected: Aryan (699d848dea14264162b65073)","service":"serverchat","timestamp":"2026-02-24 16:50:42"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:42"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:43"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:50:43"}
+{"level":"warn","message":"⚠️ Redis connection failed, running without Redis","service":"serverchat","timestamp":"2026-02-24 16:50:43"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:50:43"}
+{"level":"info","message":"⚡ Socket.io initialized","service":"serverchat","timestamp":"2026-02-24 16:51:02"}
+{"level":"info","message":"🚀 ServerChat API running on port 5000","service":"serverchat","timestamp":"2026-02-24 16:51:02"}
+{"level":"info","message":"📡 Environment: development","service":"serverchat","timestamp":"2026-02-24 16:51:02"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:51:02"}
+{"level":"info","message":"✅ MongoDB connected: localhost","service":"serverchat","timestamp":"2026-02-24 16:51:02"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:51:02"}
+{"level":"info","message":"⚡ Socket.io initialized","service":"serverchat","timestamp":"2026-02-24 16:51:04"}
+{"level":"info","message":"🚀 ServerChat API running on port 5000","service":"serverchat","timestamp":"2026-02-24 16:51:04"}
+{"level":"info","message":"📡 Environment: development","service":"serverchat","timestamp":"2026-02-24 16:51:04"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:51:04"}
+{"level":"info","message":"✅ MongoDB connected: localhost","service":"serverchat","timestamp":"2026-02-24 16:51:04"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:51:04"}
+{"level":"info","message":"🔌 User connected: Aryan (699d848dea14264162b65073)","service":"serverchat","timestamp":"2026-02-24 16:51:04"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:51:05"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-02-24 16:51:05"}
+{"level":"warn","message":"⚠️ Redis connection failed, running without Redis","service":"serverchat","timestamp":"2026-02-24 16:51:05"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-24 16:51:05"}

@@ -21,6 +21,10 @@ const channelSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    server: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Server',
+    },
     icon: {
         url: { type: String, default: '' },
         publicId: { type: String, default: '' },
