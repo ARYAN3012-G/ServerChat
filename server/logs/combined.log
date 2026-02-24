@@ -1,0 +1,3 @@
+{"level":"info","message":"⚡ Socket.io initialized","service":"serverchat","timestamp":"2026-02-24 16:19:55"}
+{"level":"info","message":"🚀 ServerChat API running on port 5000","service":"serverchat","timestamp":"2026-02-24 16:19:56"}
+{"level":"info","message":"📡 Environment: development","service":"serverchat","timestamp":"2026-02-24 16:19:56"}
