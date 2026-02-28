@@ -87,3 +87,104 @@ exports.searchMessages = async (req, res, next) => {
         next(error);
     }
 };
+
+// Send a message via REST
+exports.sendMessage = async (req, res, next) => {
+    try {
+        const { channelId } = req.params;
+        const { content, type = 'text' } = req.body;
+
+        const message = await Message.create({
+            content, type,
+            sender: req.user._id,
+            channel: channelId,
+        });
+
+        const populated = await message.populate('sender', 'username avatar status');
+        await Channel.findByIdAndUpdate(channelId, {
+            lastMessage: message._id,
+            lastActivity: new Date(),
+        });
+
+        res.status(201).json({ message: populated });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Edit a message
+exports.editMessage = async (req, res, next) => {
+    try {
+        const { messageId } = req.params;
+        const { content } = req.body;
+
+        const message = await Message.findById(messageId);
+        if (!message) return res.status(404).json({ message: 'Message not found' });
+        if (message.sender.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Can only edit your own messages' });
+        }
+
+        message.content = content;
+        message.isEdited = true;
+        message.editedAt = new Date();
+        await message.save();
+
+        const populated = await message.populate('sender', 'username avatar status');
+        res.json({ message: populated });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Delete a message (soft delete)
+exports.deleteMessage = async (req, res, next) => {
+    try {
+        const { messageId } = req.params;
+        const message = await Message.findById(messageId);
+        if (!message) return res.status(404).json({ message: 'Message not found' });
+
+        if (message.sender.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
+        message.isDeleted = true;
+        message.deletedAt = new Date();
+        await message.save();
+
+        res.json({ message: 'Message deleted' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Toggle reaction on a message
+exports.toggleReaction = async (req, res, next) => {
+    try {
+        const { messageId } = req.params;
+        const { emoji } = req.body;
+
+        const message = await Message.findById(messageId);
+        if (!message) return res.status(404).json({ message: 'Message not found' });
+
+        const existingReaction = message.reactions.find(r => r.emoji === emoji);
+        if (existingReaction) {
+            const userIdx = existingReaction.users.indexOf(req.user._id);
+            if (userIdx > -1) {
+                existingReaction.users.splice(userIdx, 1);
+                if (existingReaction.users.length === 0) {
+                    message.reactions = message.reactions.filter(r => r.emoji !== emoji);
+                }
+            } else {
+                existingReaction.users.push(req.user._id);
+            }
+        } else {
+            message.reactions.push({ emoji, users: [req.user._id] });
+        }
+
+        await message.save();
+        const populated = await message.populate('sender', 'username avatar status');
+        res.json({ message: populated });
+    } catch (error) {
+        next(error);
+    }
+};
