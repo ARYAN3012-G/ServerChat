@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiHash, FiVolume2, FiVideo, FiPlus, FiSettings, FiUsers, FiSearch, FiLogOut, FiSun, FiMoon, FiPlay, FiMusic, FiChevronDown, FiX, FiCopy, FiCheck, FiCompass } from 'react-icons/fi';
+import { FiHash, FiVolume2, FiVideo, FiPlus, FiSettings, FiUsers, FiSearch, FiLogOut, FiSun, FiMoon, FiPlay, FiMusic, FiChevronDown, FiX, FiCopy, FiCheck, FiCompass, FiTrash2 } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
 import { setChannels, setCurrentChannel, setMessages } from '../../redux/chatSlice';
@@ -29,6 +29,9 @@ export default function ChannelsPage() {
     const [inviteCode, setInviteCode] = useState('');
     const [copied, setCopied] = useState(false);
     const [serverError, setServerError] = useState('');
+    const [showCreateChannel, setShowCreateChannel] = useState(false);
+    const [newChannelName, setNewChannelName] = useState('');
+    const [newChannelType, setNewChannelType] = useState('text');
     const messagesEndRef = useRef(null);
 
     const { sendMessage, joinChannel } = useSocket();
@@ -113,6 +116,37 @@ export default function ChannelsPage() {
             navigator.clipboard.writeText(currentServer.inviteCode);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
+    const handleCreateChannel = async () => {
+        if (!newChannelName.trim() || !currentServer) return;
+        try {
+            const { data } = await api.post('/channels', {
+                name: newChannelName.toLowerCase().replace(/\s+/g, '-'),
+                type: newChannelType,
+                serverId: currentServer._id,
+            });
+            // Refresh server to get updated channels
+            const { data: serverDetail } = await api.get(`/servers/${currentServer._id}`);
+            dispatch(setCurrentServer(serverDetail));
+            setShowCreateChannel(false);
+            setNewChannelName('');
+            setNewChannelType('text');
+        } catch (error) {
+            console.error('Failed to create channel:', error);
+        }
+    };
+
+    const handleDeleteChannel = async (channelId) => {
+        if (!confirm('Delete this channel? All messages will be lost.')) return;
+        try {
+            await api.delete(`/channels/${channelId}`);
+            const { data: serverDetail } = await api.get(`/servers/${currentServer._id}`);
+            dispatch(setCurrentServer(serverDetail));
+            if (currentChannel?._id === channelId) dispatch(setCurrentChannel(null));
+        } catch (error) {
+            console.error('Failed to delete channel:', error);
         }
     };
 
@@ -240,7 +274,7 @@ export default function ChannelsPage() {
                             <div>
                                 <div className="flex items-center justify-between px-1 mb-1">
                                     <span className="text-xs font-semibold text-dark-400 uppercase tracking-wide">Text Channels</span>
-                                    <FiPlus className="w-4 h-4 text-dark-400 cursor-pointer hover:text-white transition-colors" />
+                                    <FiPlus onClick={() => { setNewChannelType('text'); setShowCreateChannel(true); }} className="w-4 h-4 text-dark-400 cursor-pointer hover:text-white transition-colors" />
                                 </div>
                                 {textChannels.map((channel) => (
                                     <motion.div
@@ -251,7 +285,9 @@ export default function ChannelsPage() {
                                             ${currentChannel?._id === channel._id ? 'bg-dark-600 text-white' : 'text-dark-300'}`}
                                     >
                                         <FiHash className="w-5 h-5 text-dark-400 flex-shrink-0" />
-                                        <span className="text-sm truncate">{channel.name}</span>
+                                        <span className="text-sm truncate flex-1">{channel.name}</span>
+                                        <FiTrash2 onClick={(e) => { e.stopPropagation(); handleDeleteChannel(channel._id); }}
+                                            className="w-3.5 h-3.5 text-dark-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" />
                                     </motion.div>
                                 ))}
                             </div>
@@ -259,16 +295,18 @@ export default function ChannelsPage() {
                             <div>
                                 <div className="flex items-center justify-between px-1 mb-1">
                                     <span className="text-xs font-semibold text-dark-400 uppercase tracking-wide">Voice Channels</span>
-                                    <FiPlus className="w-4 h-4 text-dark-400 cursor-pointer hover:text-white transition-colors" />
+                                    <FiPlus onClick={() => { setNewChannelType('voice'); setShowCreateChannel(true); }} className="w-4 h-4 text-dark-400 cursor-pointer hover:text-white transition-colors" />
                                 </div>
                                 {voiceChannels.map((channel) => (
                                     <motion.div
                                         key={channel._id}
                                         whileHover={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
-                                        className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-dark-300 hover:text-white"
+                                        className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-dark-300 hover:text-white group"
                                     >
                                         <FiVolume2 className="w-5 h-5 text-dark-400 flex-shrink-0" />
-                                        <span className="text-sm truncate">{channel.name}</span>
+                                        <span className="text-sm truncate flex-1">{channel.name}</span>
+                                        <FiTrash2 onClick={(e) => { e.stopPropagation(); handleDeleteChannel(channel._id); }}
+                                            className="w-3.5 h-3.5 text-dark-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" />
                                     </motion.div>
                                 ))}
                             </div>
@@ -550,6 +588,54 @@ export default function ChannelsPage() {
                                     className="px-6 py-2 bg-primary-500 text-white rounded-md text-sm font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     Join Server
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Create Channel Modal */}
+            <AnimatePresence>
+                {showCreateChannel && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+                        onClick={() => setShowCreateChannel(false)}>
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-dark-700 rounded-xl w-[440px] overflow-hidden shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}>
+                            <div className="p-6 text-center">
+                                <h2 className="text-2xl font-bold mb-2">Create Channel</h2>
+                                <p className="text-dark-300 text-sm">in {currentServer?.name}</p>
+                            </div>
+                            <div className="px-6 pb-2 space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-dark-300 uppercase tracking-wide">Channel Type</label>
+                                    <div className="flex gap-2 mt-2">
+                                        <button onClick={() => setNewChannelType('text')}
+                                            className={`flex-1 flex items-center gap-2 p-3 rounded-lg border transition-all ${newChannelType === 'text' ? 'border-primary-500 bg-primary-500/10 text-white' : 'border-dark-600 text-dark-400 hover:border-dark-500'}`}>
+                                            <FiHash className="w-5 h-5" /> Text
+                                        </button>
+                                        <button onClick={() => setNewChannelType('voice')}
+                                            className={`flex-1 flex items-center gap-2 p-3 rounded-lg border transition-all ${newChannelType === 'voice' ? 'border-primary-500 bg-primary-500/10 text-white' : 'border-dark-600 text-dark-400 hover:border-dark-500'}`}>
+                                            <FiVolume2 className="w-5 h-5" /> Voice
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-dark-300 uppercase tracking-wide">Channel Name</label>
+                                    <div className="mt-2 flex items-center bg-dark-900 rounded-md px-3">
+                                        {newChannelType === 'text' ? <FiHash className="w-4 h-4 text-dark-400" /> : <FiVolume2 className="w-4 h-4 text-dark-400" />}
+                                        <input type="text" value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)}
+                                            placeholder="new-channel" className="flex-1 bg-transparent py-2.5 px-2 text-sm outline-none text-white placeholder-dark-500" autoFocus />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-4 bg-dark-800 flex justify-between items-center mt-4">
+                                <button onClick={() => setShowCreateChannel(false)} className="text-sm text-dark-300 hover:text-white transition-colors">Cancel</button>
+                                <button onClick={handleCreateChannel} disabled={!newChannelName.trim()}
+                                    className="px-6 py-2 bg-primary-500 text-white rounded-md text-sm font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                    Create Channel
                                 </button>
                             </div>
                         </motion.div>

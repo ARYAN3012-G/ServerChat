@@ -1,23 +1,33 @@
 const Channel = require('../models/Channel');
 const Message = require('../models/Message');
+const Server = require('../models/Server');
 const { getIO } = require('../sockets');
 
 // Create channel
 exports.createChannel = async (req, res, next) => {
     try {
-        const { name, description, type = 'text', isPrivate = false, category } = req.body;
+        const { name, description, type = 'text', isPrivate = false, category, serverId } = req.body;
 
-        const channel = await Channel.create({
-            name,
-            description,
-            type,
-            isPrivate,
-            category,
+        const channelData = {
+            name, description, type, isPrivate, category,
             owner: req.user._id,
             members: [{ user: req.user._id, role: 'owner' }],
-        });
+        };
+        if (serverId) channelData.server = serverId;
+
+        const channel = await Channel.create(channelData);
+
+        if (serverId) {
+            await Server.findByIdAndUpdate(serverId, { $push: { channels: channel._id } });
+        }
 
         const populated = await channel.populate('members.user', 'username avatar status');
+
+        const io = getIO();
+        if (io && serverId) {
+            io.to(`server:${serverId}`).emit('channel:created', { channel: populated });
+        }
+
         res.status(201).json({ channel: populated });
     } catch (error) {
         next(error);
@@ -114,17 +124,24 @@ exports.updateChannel = async (req, res, next) => {
 exports.deleteChannel = async (req, res, next) => {
     try {
         const channel = await Channel.findById(req.params.id);
-
-        if (!channel) {
-            return res.status(404).json({ message: 'Channel not found' });
-        }
+        if (!channel) return res.status(404).json({ message: 'Channel not found' });
 
         if (channel.owner.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Not authorized' });
         }
 
+        // Remove from server
+        if (channel.server) {
+            await Server.findByIdAndUpdate(channel.server, { $pull: { channels: channel._id } });
+        }
+
         await Message.deleteMany({ channel: channel._id });
         await Channel.findByIdAndDelete(req.params.id);
+
+        const io = getIO();
+        if (io && channel.server) {
+            io.to(`server:${channel.server}`).emit('channel:deleted', { channelId: channel._id });
+        }
 
         res.json({ message: 'Channel deleted' });
     } catch (error) {
