@@ -3,6 +3,7 @@
 import { Provider } from 'react-redux';
 import { store } from '../redux/store';
 import { Toaster } from 'react-hot-toast';
+import { NotificationProvider } from '../components/NotificationProvider';
 import './globals.css';
 
 export default function RootLayout({ children }) {
@@ -18,7 +19,9 @@ export default function RootLayout({ children }) {
             </head>
             <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased">
                 <Provider store={store}>
-                    {children}
+                    <NotificationProvider>
+                        {children}
+                    </NotificationProvider>
                     <Toaster
                         position="top-right"
                         toastOptions={{
