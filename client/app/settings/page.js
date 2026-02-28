@@ -2,204 +2,161 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSelector, useDispatch } from 'react-redux';
-import { motion } from 'framer-motion';
-import { FiArrowLeft, FiUser, FiLock, FiBell, FiMonitor, FiLogOut, FiSave, FiSun, FiMoon, FiShield } from 'react-icons/fi';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FiArrowLeft, FiUser, FiLock, FiMoon, FiBell, FiSave, FiCheck, FiCamera } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
-import { toggleTheme } from '../../redux/uiSlice';
 import api from '../../services/api';
 
 export default function SettingsPage() {
     const router = useRouter();
-    const dispatch = useDispatch();
-    const { user, logout } = useAuth();
-    const { theme } = useSelector((s) => s.ui);
+    const { user, isAuthenticated, loading } = useAuth();
+    const [tab, setTab] = useState('account');
+    const [username, setUsername] = useState('');
+    const [bio, setBio] = useState('');
+    const [customStatus, setCustomStatus] = useState('');
+    const [currentPw, setCurrentPw] = useState('');
+    const [newPw, setNewPw] = useState('');
+    const [confirmPw, setConfirmPw] = useState('');
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState('');
+    const [notifSettings, setNotifSettings] = useState({ messages: true, friends: true, mentions: true, sounds: true });
 
-    const [activeTab, setActiveTab] = useState('profile');
-    const [profile, setProfile] = useState({ username: '', email: '', bio: '', customStatus: '' });
-    const [passwords, setPasswords] = useState({ current: '', newPassword: '', confirm: '' });
-    const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState({ type: '', text: '' });
-
-    useEffect(() => {
-        if (user) {
-            setProfile({ username: user.username || '', email: user.email || '', bio: user.bio || '', customStatus: user.customStatus || '' });
-        }
-    }, [user]);
+    useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
+    useEffect(() => { if (user) { setUsername(user.username || ''); setBio(user.bio || ''); setCustomStatus(user.customStatus || ''); } }, [user]);
 
     const handleSaveProfile = async () => {
-        setSaving(true); setMessage({ type: '', text: '' });
-        try {
-            await api.put('/users/profile', { username: profile.username, bio: profile.bio, customStatus: profile.customStatus });
-            setMessage({ type: 'success', text: 'Profile updated!' });
-        } catch (e) {
-            setMessage({ type: 'error', text: e.response?.data?.message || 'Failed to update' });
-        } finally { setSaving(false); }
+        setError(''); setSaved(false);
+        try { await api.put('/users/profile', { username, bio, customStatus }); setSaved(true); setTimeout(() => setSaved(false), 2000); }
+        catch (e) { setError(e.response?.data?.message || 'Failed'); }
     };
 
     const handleChangePassword = async () => {
-        if (passwords.newPassword !== passwords.confirm) {
-            setMessage({ type: 'error', text: 'Passwords do not match' }); return;
-        }
-        setSaving(true); setMessage({ type: '', text: '' });
-        try {
-            await api.put('/users/password', { currentPassword: passwords.current, newPassword: passwords.newPassword });
-            setMessage({ type: 'success', text: 'Password changed!' });
-            setPasswords({ current: '', newPassword: '', confirm: '' });
-        } catch (e) {
-            setMessage({ type: 'error', text: e.response?.data?.message || 'Failed' });
-        } finally { setSaving(false); }
+        if (newPw !== confirmPw) { setError('Passwords do not match'); return; }
+        setError(''); setSaved(false);
+        try { await api.put('/auth/password', { currentPassword: currentPw, newPassword: newPw }); setCurrentPw(''); setNewPw(''); setConfirmPw(''); setSaved(true); setTimeout(() => setSaved(false), 2000); }
+        catch (e) { setError(e.response?.data?.message || 'Failed'); }
     };
 
     const tabs = [
-        { id: 'profile', label: 'My Account', icon: FiUser },
+        { id: 'account', label: 'My Account', icon: FiUser },
         { id: 'security', label: 'Security', icon: FiLock },
-        { id: 'appearance', label: 'Appearance', icon: FiMonitor },
+        { id: 'appearance', label: 'Appearance', icon: FiMoon },
         { id: 'notifications', label: 'Notifications', icon: FiBell },
     ];
 
+    if (loading) return <div className="flex h-screen items-center justify-center bg-dark-900"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
+
     return (
-        <div className="flex h-screen bg-dark-800 text-white">
+        <div className="flex h-screen bg-dark-900 text-white overflow-hidden">
             {/* Sidebar */}
-            <div className="w-56 bg-dark-800 border-r border-dark-900 flex flex-col">
-                <div className="h-12 px-4 flex items-center border-b border-dark-900">
-                    <button onClick={() => router.push('/channels')} className="flex items-center gap-2 text-dark-300 hover:text-white transition-colors text-sm">
-                        <FiArrowLeft className="w-4 h-4" /> Back
-                    </button>
+            <div className="w-56 bg-dark-800 border-r border-white/5 flex flex-col">
+                <div className="p-4 border-b border-white/5">
+                    <button onClick={() => router.push('/channels')} className="flex items-center gap-2 text-white/40 hover:text-white text-sm transition-colors mb-4"><FiArrowLeft className="w-4 h-4" /> Back to Chat</button>
+                    <h2 className="text-lg font-bold">Settings</h2>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2">
-                    <p className="text-xs font-semibold text-dark-400 uppercase tracking-wide px-3 py-2">User Settings</p>
+                <div className="flex-1 p-2 space-y-1">
                     {tabs.map(t => (
-                        <button key={t.id} onClick={() => { setActiveTab(t.id); setMessage({ type: '', text: '' }); }}
-                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors mb-0.5 ${activeTab === t.id ? 'bg-dark-600 text-white' : 'text-dark-300 hover:text-white hover:bg-dark-700'}`}>
+                        <button key={t.id} onClick={() => { setTab(t.id); setError(''); setSaved(false); }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === t.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
                             <t.icon className="w-4 h-4" /> {t.label}
                         </button>
                     ))}
-                    <div className="border-t border-dark-700 mt-4 pt-2">
-                        <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors">
-                            <FiLogOut className="w-4 h-4" /> Log Out
-                        </button>
-                    </div>
                 </div>
             </div>
 
-            {/* Main content */}
-            <div className="flex-1 overflow-y-auto">
-                <div className="max-w-2xl mx-auto p-8">
-                    {message.text && (
-                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-                            className={`mb-4 p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-discord-green/20 text-discord-green' : 'bg-red-500/20 text-red-400'}`}>
-                            {message.text}
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-10 max-w-2xl">
+                <AnimatePresence mode="wait">
+                    {/* ACCOUNT */}
+                    {tab === 'account' && (
+                        <motion.div key="account" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                            <h3 className="text-2xl font-bold mb-8">My Account</h3>
+                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8">
+                                <div className="flex items-center gap-5 mb-8 pb-8 border-b border-white/5">
+                                    <div className="relative group">
+                                        <div className="w-20 h-20 rounded-full bg-indigo-500/60 flex items-center justify-center text-3xl font-bold">{user?.username?.[0]?.toUpperCase() || '?'}</div>
+                                        <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"><FiCamera className="w-5 h-5" /></div>
+                                    </div>
+                                    <div><p className="text-xl font-bold">{user?.username}</p><p className="text-sm text-white/30">{user?.email}</p></div>
+                                </div>
+                                <div className="space-y-5">
+                                    <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Username</label>
+                                        <input value={username} onChange={(e) => setUsername(e.target.value)} className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" /></div>
+                                    <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Bio</label>
+                                        <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} placeholder="Tell us about yourself" className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all resize-none placeholder-white/20" /></div>
+                                    <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Custom Status</label>
+                                        <input value={customStatus} onChange={(e) => setCustomStatus(e.target.value)} placeholder="What are you up to?" className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all placeholder-white/20" /></div>
+                                </div>
+                                {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
+                                <button onClick={handleSaveProfile} className="mt-6 flex items-center gap-2 px-6 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/20">
+                                    {saved ? <><FiCheck className="w-4 h-4" /> Saved!</> : <><FiSave className="w-4 h-4" /> Save Changes</>}
+                                </button>
+                            </div>
                         </motion.div>
                     )}
 
-                    {activeTab === 'profile' && (
-                        <div>
-                            <h2 className="text-xl font-bold mb-6">My Account</h2>
-                            <div className="bg-dark-700 rounded-xl p-6 space-y-5">
-                                <div className="flex items-center gap-4 mb-6">
-                                    <div className="w-20 h-20 rounded-full bg-primary-500 flex items-center justify-center text-3xl font-bold">
-                                        {user?.username?.[0]?.toUpperCase() || '?'}
-                                    </div>
-                                    <div>
-                                        <p className="text-lg font-bold">{user?.username}</p>
-                                        <p className="text-dark-400 text-sm">{user?.email}</p>
-                                        <button className="mt-2 text-xs text-primary-400 hover:underline">Change Avatar</button>
-                                    </div>
+                    {/* SECURITY */}
+                    {tab === 'security' && (
+                        <motion.div key="security" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                            <h3 className="text-2xl font-bold mb-8">Security</h3>
+                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8">
+                                <h4 className="text-lg font-semibold mb-5">Change Password</h4>
+                                <div className="space-y-4">
+                                    <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Current Password</label>
+                                        <input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" /></div>
+                                    <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">New Password</label>
+                                        <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" /></div>
+                                    <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Confirm Password</label>
+                                        <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" /></div>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-dark-300 uppercase tracking-wide">Username</label>
-                                    <input type="text" value={profile.username} onChange={(e) => setProfile({ ...profile, username: e.target.value })}
-                                        className="mt-2 w-full bg-dark-900 rounded-md px-3 py-2.5 text-sm outline-none text-white focus:ring-2 focus:ring-primary-500 transition-all" />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-dark-300 uppercase tracking-wide">Email</label>
-                                    <input type="email" value={profile.email} disabled className="mt-2 w-full bg-dark-900 rounded-md px-3 py-2.5 text-sm outline-none text-dark-400 cursor-not-allowed" />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-dark-300 uppercase tracking-wide">Bio</label>
-                                    <textarea value={profile.bio} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} rows={3}
-                                        placeholder="Tell everyone about yourself" className="mt-2 w-full bg-dark-900 rounded-md px-3 py-2.5 text-sm outline-none text-white focus:ring-2 focus:ring-primary-500 transition-all resize-none" />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-dark-300 uppercase tracking-wide">Custom Status</label>
-                                    <input type="text" value={profile.customStatus} onChange={(e) => setProfile({ ...profile, customStatus: e.target.value })}
-                                        placeholder="What are you up to?" className="mt-2 w-full bg-dark-900 rounded-md px-3 py-2.5 text-sm outline-none text-white focus:ring-2 focus:ring-primary-500 transition-all" />
-                                </div>
-                                <button onClick={handleSaveProfile} disabled={saving}
-                                    className="flex items-center gap-2 px-6 py-2.5 bg-primary-500 text-white rounded-md text-sm font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors">
-                                    <FiSave className="w-4 h-4" /> {saving ? 'Saving...' : 'Save Changes'}
+                                {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
+                                <button onClick={handleChangePassword} className="mt-6 flex items-center gap-2 px-6 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/20">
+                                    {saved ? <><FiCheck className="w-4 h-4" /> Updated!</> : <><FiLock className="w-4 h-4" /> Change Password</>}
                                 </button>
                             </div>
-                        </div>
+                        </motion.div>
                     )}
 
-                    {activeTab === 'security' && (
-                        <div>
-                            <h2 className="text-xl font-bold mb-6">Security</h2>
-                            <div className="bg-dark-700 rounded-xl p-6 space-y-5">
-                                <h3 className="font-semibold flex items-center gap-2"><FiShield className="w-5 h-5" /> Change Password</h3>
-                                <div>
-                                    <label className="text-xs font-bold text-dark-300 uppercase tracking-wide">Current Password</label>
-                                    <input type="password" value={passwords.current} onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
-                                        className="mt-2 w-full bg-dark-900 rounded-md px-3 py-2.5 text-sm outline-none text-white" />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-dark-300 uppercase tracking-wide">New Password</label>
-                                    <input type="password" value={passwords.newPassword} onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
-                                        className="mt-2 w-full bg-dark-900 rounded-md px-3 py-2.5 text-sm outline-none text-white" />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-dark-300 uppercase tracking-wide">Confirm New Password</label>
-                                    <input type="password" value={passwords.confirm} onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
-                                        className="mt-2 w-full bg-dark-900 rounded-md px-3 py-2.5 text-sm outline-none text-white" />
-                                </div>
-                                <button onClick={handleChangePassword} disabled={saving || !passwords.current || !passwords.newPassword}
-                                    className="flex items-center gap-2 px-6 py-2.5 bg-primary-500 text-white rounded-md text-sm font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors">
-                                    <FiLock className="w-4 h-4" /> {saving ? 'Changing...' : 'Change Password'}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'appearance' && (
-                        <div>
-                            <h2 className="text-xl font-bold mb-6">Appearance</h2>
-                            <div className="bg-dark-700 rounded-xl p-6">
-                                <h3 className="font-semibold mb-4">Theme</h3>
+                    {/* APPEARANCE */}
+                    {tab === 'appearance' && (
+                        <motion.div key="appearance" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                            <h3 className="text-2xl font-bold mb-8">Appearance</h3>
+                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8">
+                                <h4 className="text-lg font-semibold mb-5">Theme</h4>
                                 <div className="flex gap-4">
-                                    <button onClick={() => theme !== 'dark' && dispatch(toggleTheme())}
-                                        className={`flex-1 p-6 rounded-xl border-2 transition-all ${theme === 'dark' ? 'border-primary-500 bg-dark-900' : 'border-dark-600 hover:border-dark-500'}`}>
-                                        <FiMoon className="w-8 h-8 mx-auto mb-3" />
-                                        <p className="text-sm font-medium text-center">Dark</p>
-                                    </button>
-                                    <button onClick={() => theme !== 'light' && dispatch(toggleTheme())}
-                                        className={`flex-1 p-6 rounded-xl border-2 transition-all ${theme === 'light' ? 'border-primary-500 bg-dark-600' : 'border-dark-600 hover:border-dark-500'}`}>
-                                        <FiSun className="w-8 h-8 mx-auto mb-3" />
-                                        <p className="text-sm font-medium text-center">Light</p>
-                                    </button>
+                                    <div className="flex-1 p-5 rounded-xl border-2 border-indigo-500 bg-indigo-500/10 cursor-pointer text-center">
+                                        <div className="w-16 h-10 bg-dark-900 rounded-lg mx-auto mb-3 border border-white/10" />
+                                        <p className="text-sm font-semibold">Dark</p>
+                                        <p className="text-xs text-indigo-300 mt-1">Active</p>
+                                    </div>
+                                    <div className="flex-1 p-5 rounded-xl border border-white/10 cursor-not-allowed opacity-40 text-center">
+                                        <div className="w-16 h-10 bg-white rounded-lg mx-auto mb-3 border border-gray-200" />
+                                        <p className="text-sm font-semibold">Light</p>
+                                        <p className="text-xs text-white/30 mt-1">Coming soon</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        </motion.div>
                     )}
 
-                    {activeTab === 'notifications' && (
-                        <div>
-                            <h2 className="text-xl font-bold mb-6">Notifications</h2>
-                            <div className="bg-dark-700 rounded-xl p-6 space-y-4">
-                                {['Enable Desktop Notifications', 'Enable Message Sounds', 'Enable Friend Request Notifications', 'Show Message Preview in Notifications'].map((label, i) => (
-                                    <div key={i} className="flex items-center justify-between py-2">
-                                        <span className="text-sm">{label}</span>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" defaultChecked className="sr-only peer" />
-                                            <div className="w-11 h-6 bg-dark-500 peer-checked:bg-primary-500 rounded-full transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] peer-checked:after:translate-x-5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
-                                        </label>
+                    {/* NOTIFICATIONS */}
+                    {tab === 'notifications' && (
+                        <motion.div key="notifications" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                            <h3 className="text-2xl font-bold mb-8">Notifications</h3>
+                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8 space-y-5">
+                                {Object.entries(notifSettings).map(([key, val]) => (
+                                    <div key={key} className="flex items-center justify-between py-2">
+                                        <div><p className="font-medium capitalize">{key}</p><p className="text-sm text-white/30">{key === 'messages' ? 'Get notified for new messages' : key === 'friends' ? 'Friend request notifications' : key === 'mentions' ? '@mention alerts' : 'Notification sounds'}</p></div>
+                                        <button onClick={() => setNotifSettings(s => ({ ...s, [key]: !val }))}
+                                            className={`w-12 h-7 rounded-full transition-all duration-200 ${val ? 'bg-indigo-500' : 'bg-white/10'}`}>
+                                            <div className={`w-5 h-5 bg-white rounded-full transition-transform duration-200 ml-1 ${val ? 'translate-x-5' : ''}`} />
+                                        </button>
                                     </div>
                                 ))}
                             </div>
-                        </div>
+                        </motion.div>
                     )}
-                </div>
+                </AnimatePresence>
             </div>
         </div>
     );
