@@ -103,3 +103,5 @@
 {"level":"error","message":"Presence disconnect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-28 18:41:52"}
 {"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-28 18:42:02"}
 {"level":"error","message":"Presence disconnect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-28 18:43:35"}
+{"level":"error","message":"Presence connect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-28 18:50:47"}
+{"level":"error","message":"Presence disconnect error: Connection is closed.","service":"serverchat","timestamp":"2026-02-28 18:50:52"}

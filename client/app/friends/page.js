@@ -29,8 +29,8 @@ export default function FriendsPage() {
         catch (e) { setAddStatus({ type: 'error', msg: e.response?.data?.message || 'Failed' }); }
     };
 
-    const handleAccept = async (id) => { try { await api.post(`/friends/accept/${id}`); fetchFriends(); fetchRequests(); } catch (e) { console.error(e); } };
-    const handleReject = async (id) => { try { await api.post(`/friends/reject/${id}`); fetchRequests(); } catch (e) { console.error(e); } };
+    const handleAccept = async (id) => { try { await api.put(`/friends/accept/${id}`); fetchFriends(); fetchRequests(); } catch (e) { console.error(e); } };
+    const handleReject = async (id) => { try { await api.put(`/friends/reject/${id}`); fetchRequests(); } catch (e) { console.error(e); } };
     const handleRemove = async (id) => { if (!confirm('Remove friend?')) return; try { await api.delete(`/friends/${id}`); fetchFriends(); } catch (e) { console.error(e); } };
 
     const tabs = [

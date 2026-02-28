@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUsers, FiShield, FiSearch, FiBarChart2, FiAlertTriangle, FiTrash2, FiTrendingUp } from 'react-icons/fi';
+import { FiArrowLeft, FiUsers, FiShield, FiSearch, FiBarChart2, FiAlertTriangle, FiTrendingUp } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 
@@ -21,14 +21,13 @@ export default function AdminPage() {
     const fetchStats = async () => { try { const { data } = await api.get('/admin/dashboard'); setStats(data); } catch (e) { console.error(e); } };
     const fetchUsers = async () => { try { const { data } = await api.get('/admin/users'); setUsers(data.users || data || []); } catch (e) { console.error(e); } };
 
-    const handleBanUser = async (userId) => {
-        if (!confirm('Ban this user?')) return;
-        try { await api.post(`/admin/ban/${userId}`); fetchUsers(); } catch (e) { console.error(e); }
-    };
-
-    const handleDeleteUser = async (userId) => {
-        if (!confirm('Delete this user permanently?')) return;
-        try { await api.delete(`/admin/users/${userId}`); fetchUsers(); } catch (e) { console.error(e); }
+    const handleBanUser = async (userId, isBanned) => {
+        if (!confirm(isBanned ? 'Unban this user?' : 'Ban this user?')) return;
+        try {
+            const endpoint = isBanned ? `/admin/unban/${userId}` : `/admin/ban/${userId}`;
+            await api.post(endpoint);
+            fetchUsers();
+        } catch (e) { console.error(e); }
     };
 
     const filteredUsers = users.filter(u => (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) || (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()));
@@ -138,10 +137,7 @@ export default function AdminPage() {
                                                 </td>
                                                 <td className="px-6 py-3 text-sm text-white/30">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}</td>
                                                 <td className="px-6 py-3 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <button onClick={() => handleBanUser(u._id)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 transition-colors">{u.isBanned ? 'Unban' : 'Ban'}</button>
-                                                        <button onClick={() => handleDeleteUser(u._id)} className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-colors"><FiTrash2 className="w-3.5 h-3.5" /></button>
-                                                    </div>
+                                                    <button onClick={() => handleBanUser(u._id, u.isBanned)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${u.isBanned ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border-amber-500/20'}`}>{u.isBanned ? 'Unban' : 'Ban'}</button>
                                                 </td>
                                             </motion.tr>
                                         ))}
