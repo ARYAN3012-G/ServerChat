@@ -4,19 +4,18 @@ import { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiHash, FiVolume2, FiPlus, FiSettings, FiUsers, FiSearch, FiLogOut, FiSun, FiMoon, FiPlay, FiMusic, FiChevronDown, FiCopy, FiCheck, FiCompass, FiTrash2, FiEdit2, FiSmile } from 'react-icons/fi';
+import { FiHash, FiVolume2, FiPlus, FiSettings, FiUsers, FiSearch, FiLogOut, FiChevronDown, FiCopy, FiCheck, FiCompass, FiTrash2, FiEdit2, FiSmile, FiShield } from 'react-icons/fi';
+import { IoGameControllerOutline } from 'react-icons/io5';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
 import { setChannels, setCurrentChannel, setMessages } from '../../redux/chatSlice';
 import { setServers, setCurrentServer, addServer } from '../../redux/serverSlice';
-import { toggleTheme } from '../../redux/uiSlice';
 import api from '../../services/api';
 
 export default function ChannelsPage() {
     const dispatch = useDispatch();
     const router = useRouter();
     const { user, isAuthenticated, logout } = useAuth();
-    const { theme } = useSelector((s) => s.ui);
     const { channels, currentChannel, messages } = useSelector((s) => s.chat);
     const { servers, currentServer } = useSelector((s) => s.server);
 
@@ -39,6 +38,14 @@ export default function ChannelsPage() {
     const quickEmojis = ['👍', '❤️', '😂', '🎉', '😮', '😢', '🔥', '👏'];
 
     const { sendMessage, joinChannel } = useSocket();
+
+    // Redirect if not authenticated
+    useEffect(() => {
+        if (!isAuthenticated && typeof window !== 'undefined') {
+            const token = localStorage.getItem('token');
+            if (!token) router.push('/login');
+        }
+    }, [isAuthenticated]);
 
     useEffect(() => { if (isAuthenticated) fetchServers(); }, [isAuthenticated]);
 
@@ -82,7 +89,7 @@ export default function ChannelsPage() {
             dispatch(addServer(data));
             dispatch(setCurrentServer(data));
             setShowCreateServer(false); setNewServerName(''); setNewServerDesc('');
-        } catch (e) { setServerError(e.response?.data?.message || 'Failed'); }
+        } catch (e) { setServerError(e.response?.data?.message || 'Failed to create server'); }
     };
 
     const handleJoinServer = async () => {
@@ -93,7 +100,7 @@ export default function ChannelsPage() {
             dispatch(addServer(data));
             dispatch(setCurrentServer(data));
             setShowJoinServer(false); setJoinCode('');
-        } catch (e) { setServerError(e.response?.data?.message || 'Failed'); }
+        } catch (e) { setServerError(e.response?.data?.message || 'Failed to join server'); }
     };
 
     const handleSelectServer = async (server) => {
@@ -176,6 +183,12 @@ export default function ChannelsPage() {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
     };
 
+    // FIXED: Logout with redirect
+    const handleLogout = () => {
+        logout();
+        router.push('/');
+    };
+
     const textChannels = channels.filter(c => c.type === 'text');
     const voiceChannels = channels.filter(c => c.type === 'voice');
 
@@ -183,11 +196,17 @@ export default function ChannelsPage() {
         <div className="flex h-screen bg-dark-800 text-white overflow-hidden">
             {/* Server Sidebar */}
             <div className="w-[72px] bg-dark-900 flex flex-col items-center py-3 gap-2 overflow-y-auto scrollbar-none">
-                <motion.div whileHover={{ borderRadius: '35%' }} className="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center text-primary-400 hover:text-white hover:bg-primary-500 cursor-pointer transition-all" title="Direct Messages">
-                    <FiHash className="w-6 h-6" />
+                {/* FIXED: DM/Friends button */}
+                <motion.div whileHover={{ borderRadius: '35%' }}
+                    onClick={() => router.push('/friends')}
+                    className="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center text-primary-400 hover:text-white hover:bg-primary-500 cursor-pointer transition-all"
+                    title="Friends & DMs">
+                    <FiUsers className="w-6 h-6" />
                 </motion.div>
+
                 <div className="w-8 h-0.5 bg-dark-700 rounded-full mx-auto" />
 
+                {/* Server icons */}
                 {servers.map((server) => (
                     <motion.div key={server._id} whileHover={{ borderRadius: '35%' }} onClick={() => handleSelectServer(server)}
                         className={`w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all text-sm font-bold ${currentServer?._id === server._id ? 'bg-primary-500 text-white rounded-[35%]' : 'bg-dark-700 text-dark-300 hover:text-white hover:bg-primary-500'}`}
@@ -197,21 +216,39 @@ export default function ChannelsPage() {
                 ))}
 
                 <div className="w-8 h-0.5 bg-dark-700 rounded-full mx-auto" />
-                <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => { setShowCreateServer(true); setServerError(''); }}
-                    className="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center text-discord-green hover:text-white hover:bg-discord-green cursor-pointer transition-all" title="Create a Server">
+
+                {/* FIXED: Create Server */}
+                <motion.div whileHover={{ borderRadius: '35%' }}
+                    onClick={() => { setShowCreateServer(true); setServerError(''); }}
+                    className="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center text-discord-green hover:text-white hover:bg-discord-green cursor-pointer transition-all"
+                    title="Create a Server">
                     <FiPlus className="w-6 h-6" />
                 </motion.div>
-                <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => { setShowJoinServer(true); setServerError(''); }}
-                    className="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center text-dark-300 hover:text-white hover:bg-discord-green cursor-pointer transition-all" title="Join a Server">
+
+                {/* Join Server */}
+                <motion.div whileHover={{ borderRadius: '35%' }}
+                    onClick={() => { setShowJoinServer(true); setServerError(''); }}
+                    className="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center text-dark-300 hover:text-white hover:bg-discord-green cursor-pointer transition-all"
+                    title="Join a Server">
                     <FiCompass className="w-5 h-5" />
                 </motion.div>
-                <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/games')}
-                    className="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center text-dark-300 hover:text-white hover:bg-discord-green cursor-pointer transition-all">
-                    <FiPlay className="w-5 h-5" />
-                </motion.div>
+
+                <div className="w-8 h-0.5 bg-dark-700 rounded-full mx-auto" />
+
+                {/* FIXED: Game icon with proper icon */}
                 <motion.div whileHover={{ borderRadius: '35%' }}
-                    className="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center text-dark-300 hover:text-white hover:bg-purple-500 cursor-pointer transition-all">
-                    <FiMusic className="w-5 h-5" />
+                    onClick={() => router.push('/games')}
+                    className="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center text-dark-300 hover:text-white hover:bg-discord-green cursor-pointer transition-all"
+                    title="Games">
+                    <IoGameControllerOutline className="w-6 h-6" />
+                </motion.div>
+
+                {/* FIXED: Admin button (replaces useless music icon) */}
+                <motion.div whileHover={{ borderRadius: '35%' }}
+                    onClick={() => router.push('/admin')}
+                    className="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center text-dark-300 hover:text-white hover:bg-amber-500 cursor-pointer transition-all"
+                    title="Admin Panel">
+                    <FiShield className="w-5 h-5" />
                 </motion.div>
             </div>
 
@@ -269,7 +306,7 @@ export default function ChannelsPage() {
                         </div>
                     )}
                 </div>
-                {/* User Panel */}
+                {/* FIXED: User Panel with working logout and settings */}
                 <div className="h-14 bg-dark-900/50 px-2 flex items-center gap-2">
                     <div className="relative">
                         <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-sm font-bold">{user?.username?.[0]?.toUpperCase() || '?'}</div>
@@ -279,11 +316,12 @@ export default function ChannelsPage() {
                         <p className="text-sm font-medium truncate">{user?.username || 'User'}</p>
                         <p className="text-xs text-discord-green truncate">Online</p>
                     </div>
-                    <button onClick={() => router.push('/settings')} className="p-1.5 rounded hover:bg-dark-700 text-dark-300 hover:text-white"><FiSettings className="w-4 h-4" /></button>
-                    <button onClick={() => dispatch(toggleTheme())} className="p-1.5 rounded hover:bg-dark-700 text-dark-300 hover:text-white">
-                        {theme === 'dark' ? <FiSun className="w-4 h-4" /> : <FiMoon className="w-4 h-4" />}
+                    <button onClick={() => router.push('/settings')} className="p-1.5 rounded hover:bg-dark-700 text-dark-300 hover:text-white transition-colors" title="User Settings">
+                        <FiSettings className="w-4 h-4" />
                     </button>
-                    <button onClick={logout} className="p-1.5 rounded hover:bg-dark-700 text-dark-300 hover:text-red-400"><FiLogOut className="w-4 h-4" /></button>
+                    <button onClick={handleLogout} className="p-1.5 rounded hover:bg-dark-700 text-dark-300 hover:text-red-400 transition-colors" title="Log Out">
+                        <FiLogOut className="w-4 h-4" />
+                    </button>
                 </div>
             </div>
 
@@ -311,7 +349,6 @@ export default function ChannelsPage() {
                                     <p className="text-dark-400 mt-1">This is the start of the #{currentChannel.name} channel.</p>
                                 </div>
 
-                                {/* Messages */}
                                 {messages.map((msg, idx) => (
                                     <div key={msg._id || idx} className="flex items-start gap-3 group hover:bg-dark-800/50 px-2 py-1.5 rounded relative">
                                         <div className="w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
@@ -347,7 +384,6 @@ export default function ChannelsPage() {
                                                 </div>
                                             )}
                                         </div>
-                                        {/* Hover action buttons */}
                                         <div className="absolute -top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <div className="flex items-center bg-dark-700 rounded-md border border-dark-600 shadow-lg">
                                                 <button onClick={() => setShowEmojiPicker(showEmojiPicker === msg._id ? null : msg._id)}
@@ -378,7 +414,6 @@ export default function ChannelsPage() {
                                 <div ref={messagesEndRef} />
                             </div>
 
-                            {/* Members sidebar */}
                             <AnimatePresence>
                                 {showMembers && currentServer && (
                                     <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: 240, opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="bg-dark-800 border-l border-dark-900 overflow-y-auto">
@@ -430,7 +465,9 @@ export default function ChannelsPage() {
                             <div className="p-6 text-center"><h2 className="text-2xl font-bold mb-2">Create a Server</h2><p className="text-dark-300 text-sm">Give your new server a personality with a name and description.</p></div>
                             <div className="px-6 pb-2 space-y-4">
                                 <div><label className="text-xs font-bold text-dark-300 uppercase tracking-wide">Server Name</label>
-                                    <input type="text" value={newServerName} onChange={(e) => setNewServerName(e.target.value)} placeholder="My Awesome Server" className="mt-2 w-full bg-dark-900 rounded-md px-3 py-2.5 text-sm outline-none text-white focus:ring-2 focus:ring-primary-500 transition-all" autoFocus /></div>
+                                    <input type="text" value={newServerName} onChange={(e) => setNewServerName(e.target.value)} placeholder="My Awesome Server"
+                                        onKeyDown={(e) => e.key === 'Enter' && handleCreateServer()}
+                                        className="mt-2 w-full bg-dark-900 rounded-md px-3 py-2.5 text-sm outline-none text-white focus:ring-2 focus:ring-primary-500 transition-all" autoFocus /></div>
                                 <div><label className="text-xs font-bold text-dark-300 uppercase tracking-wide">Description <span className="text-dark-500 font-normal">(optional)</span></label>
                                     <textarea value={newServerDesc} onChange={(e) => setNewServerDesc(e.target.value)} placeholder="What's your server about?" rows={2} className="mt-2 w-full bg-dark-900 rounded-md px-3 py-2.5 text-sm outline-none text-white focus:ring-2 focus:ring-primary-500 transition-all resize-none" /></div>
                                 {serverError && <p className="text-red-400 text-sm">{serverError}</p>}
@@ -452,9 +489,10 @@ export default function ChannelsPage() {
                             <div className="p-6 text-center"><h2 className="text-2xl font-bold mb-2">Join a Server</h2><p className="text-dark-300 text-sm">Enter an invite code to join an existing server.</p></div>
                             <div className="px-6 pb-2 space-y-4">
                                 <div><label className="text-xs font-bold text-dark-300 uppercase tracking-wide">Invite Code</label>
-                                    <input type="text" value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="e.g. a1b2c3d4" className="mt-2 w-full bg-dark-900 rounded-md px-3 py-2.5 text-sm outline-none text-white focus:ring-2 focus:ring-primary-500 transition-all" autoFocus /></div>
+                                    <input type="text" value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="e.g. a1b2c3d4"
+                                        onKeyDown={(e) => e.key === 'Enter' && handleJoinServer()}
+                                        className="mt-2 w-full bg-dark-900 rounded-md px-3 py-2.5 text-sm outline-none text-white focus:ring-2 focus:ring-primary-500 transition-all" autoFocus /></div>
                                 {serverError && <p className="text-red-400 text-sm">{serverError}</p>}
-                                <div className="text-xs text-dark-400"><p className="font-semibold mb-1">Invites should look like:</p><p className="text-dark-500">a1b2c3d4</p></div>
                             </div>
                             <div className="p-4 bg-dark-800 flex justify-between items-center mt-4">
                                 <button onClick={() => setShowJoinServer(false)} className="text-sm text-dark-300 hover:text-white transition-colors">Cancel</button>
@@ -481,7 +519,9 @@ export default function ChannelsPage() {
                                 <div><label className="text-xs font-bold text-dark-300 uppercase tracking-wide">Channel Name</label>
                                     <div className="mt-2 flex items-center bg-dark-900 rounded-md px-3">
                                         {newChannelType === 'text' ? <FiHash className="w-4 h-4 text-dark-400" /> : <FiVolume2 className="w-4 h-4 text-dark-400" />}
-                                        <input type="text" value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} placeholder="new-channel" className="flex-1 bg-transparent py-2.5 px-2 text-sm outline-none text-white placeholder-dark-500" autoFocus />
+                                        <input type="text" value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleCreateChannel()}
+                                            placeholder="new-channel" className="flex-1 bg-transparent py-2.5 px-2 text-sm outline-none text-white placeholder-dark-500" autoFocus />
                                     </div>
                                 </div>
                             </div>
