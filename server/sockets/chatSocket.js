@@ -14,8 +14,17 @@ module.exports = (io, socket) => {
         socket.leave(`channel:${channelId}`);
     });
 
-    // Voice channel join
+    // Voice channel join (enforces single channel at a time)
     socket.on('voice:join', ({ channelId }) => {
+        // Auto-leave previous voice channel
+        if (socket.currentVoiceChannel && socket.currentVoiceChannel !== channelId) {
+            socket.leave(`voice:${socket.currentVoiceChannel}`);
+            io.to(`channel:${socket.currentVoiceChannel}`).emit('voice:user-left', {
+                channelId: socket.currentVoiceChannel,
+                userId: socket.userId,
+            });
+        }
+        socket.currentVoiceChannel = channelId;
         socket.join(`voice:${channelId}`);
         io.to(`channel:${channelId}`).emit('voice:user-joined', {
             channelId,
@@ -27,6 +36,7 @@ module.exports = (io, socket) => {
 
     // Voice channel leave
     socket.on('voice:leave', ({ channelId }) => {
+        socket.currentVoiceChannel = null;
         socket.leave(`voice:${channelId}`);
         io.to(`channel:${channelId}`).emit('voice:user-left', {
             channelId,

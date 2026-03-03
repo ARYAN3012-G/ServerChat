@@ -13,6 +13,7 @@ import { setServers, setCurrentServer, addServer } from '../../redux/serverSlice
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import UserProfileModal from '../../components/UserProfileModal';
+import CallModal from '../../components/CallModal';
 
 export default function ChannelsPage() {
     const dispatch = useDispatch();
@@ -60,6 +61,7 @@ export default function ChannelsPage() {
     const [isMuted, setIsMuted] = useState(false);
     const [isDeafened, setIsDeafened] = useState(false);
     const [showGameLauncher, setShowGameLauncher] = useState(false);
+    const [callType, setCallType] = useState(null);
 
     useEffect(() => {
         if (!loading && !isAuthenticated) router.push('/login');
@@ -407,6 +409,10 @@ export default function ChannelsPage() {
                                 {currentChannel.description && <span className="text-sm text-white/30 ml-2 border-l border-white/10 pl-2">{currentChannel.description}</span>}
                             </div>
                             <div className="flex items-center gap-3">
+                                <FiPhone className="w-4.5 h-4.5 text-white/20 cursor-pointer hover:text-emerald-400 transition-colors" title="Voice Call"
+                                    onClick={() => { setCallType('voice'); initiateCall(null, currentChannel._id, 'voice'); }} />
+                                <FiVideo className="w-4.5 h-4.5 text-white/20 cursor-pointer hover:text-indigo-400 transition-colors" title="Video Call"
+                                    onClick={() => { setCallType('video'); initiateCall(null, currentChannel._id, 'video'); }} />
                                 <FiSearch className={`w-5 h-5 cursor-pointer transition-colors ${showSearch ? 'text-indigo-400' : 'text-white/20 hover:text-white'}`} onClick={() => { setShowSearch(!showSearch); setSearchResults([]); setSearchQuery(''); }} />
                                 <FiUsers className={`w-5 h-5 cursor-pointer transition-colors ${showMembers ? 'text-white' : 'text-white/20 hover:text-white'}`} onClick={() => setShowMembers(!showMembers)} />
                             </div>
@@ -635,6 +641,17 @@ export default function ChannelsPage() {
 
             {/* User Profile Modal */}
             {profileUser && <UserProfileModal userId={profileUser} onClose={() => setProfileUser(null)} />}
+
+            {/* Call Modal */}
+            {(activeCall || callType) && (
+                <CallModal
+                    callSession={activeCall || { _id: 'pending', participants: [] }}
+                    user={user}
+                    type={callType || 'voice'}
+                    onEnd={(id) => { endCall(id); setCallType(null); }}
+                    onToggleMedia={toggleMedia}
+                />
+            )}
         </div>
     );
 }
