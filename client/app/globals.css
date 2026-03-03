@@ -123,3 +123,72 @@
     }
   }
 }
+
+/* ─── MOBILE RESPONSIVENESS ─── */
+@media (max-width: 768px) {
+
+  /* Hide server sidebar on mobile */
+  .flex.h-screen>div:first-child {
+    width: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  /* Shrink channel sidebar */
+  .flex.h-screen>div:nth-child(2) {
+    width: 200px !important;
+    min-width: 0;
+  }
+
+  /* Modal adjustments */
+  .fixed.inset-0>div {
+    width: 95vw !important;
+    max-width: 440px;
+    margin: 0 auto;
+  }
+
+  /* Smaller headings */
+  h1 {
+    font-size: 2rem !important;
+  }
+
+  h2 {
+    font-size: 1.5rem !important;
+  }
+
+  /* Touch-friendly buttons */
+  button,
+  a {
+    min-height: 36px;
+  }
+}
+
+@media (max-width: 480px) {
+
+  /* Hide both sidebars on very small screens — full chat */
+  .flex.h-screen>div:first-child,
+  .flex.h-screen>div:nth-child(2) {
+    display: none !important;
+  }
+
+  /* Full width chat */
+  .flex.h-screen>div:nth-child(3) {
+    width: 100% !important;
+  }
+
+  /* Adjust padding */
+  .px-8 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .py-10 {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
+  }
+
+  h1 {
+    font-size: 1.5rem !important;
+  }
+}

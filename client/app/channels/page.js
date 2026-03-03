@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiHash, FiVolume2, FiPlus, FiSettings, FiUsers, FiSearch, FiLogOut, FiChevronDown, FiCopy, FiCheck, FiCompass, FiTrash2, FiEdit2, FiSmile, FiShield, FiSend } from 'react-icons/fi';
+import { FiHash, FiVolume2, FiPlus, FiSettings, FiUsers, FiSearch, FiLogOut, FiChevronDown, FiCopy, FiCheck, FiCompass, FiTrash2, FiEdit2, FiSmile, FiShield, FiSend, FiX, FiPhone, FiVideo, FiPaperclip, FiUpload } from 'react-icons/fi';
 import { IoGameControllerOutline } from 'react-icons/io5';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
 import { setChannels, setCurrentChannel, setMessages } from '../../redux/chatSlice';
 import { setServers, setCurrentServer, addServer } from '../../redux/serverSlice';
 import api from '../../services/api';
+import toast from 'react-hot-toast';
+import UserProfileModal from '../../components/UserProfileModal';
 
 export default function ChannelsPage() {
     const dispatch = useDispatch();
@@ -35,9 +37,20 @@ export default function ChannelsPage() {
     const [editContent, setEditContent] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(null);
     const messagesEndRef = useRef(null);
+    const fileInputRef = useRef(null);
+    const typingTimeoutRef = useRef(null);
     const quickEmojis = ['👍', '❤️', '😂', '🎉', '😮', '😢', '🔥', '👏'];
 
-    const { sendMessage, joinChannel } = useSocket();
+    // Real-time features state
+    const [showSearch, setShowSearch] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [profileUser, setProfileUser] = useState(null);
+    const [showServerSettings, setShowServerSettings] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+
+    const { sendMessage, joinChannel, leaveChannel, startTyping, stopTyping, reactToMessage } = useSocket();
+    const { typingUsers, onlineUsers } = useSelector((s) => s.chat);
 
     useEffect(() => {
         if (!loading && !isAuthenticated) router.push('/login');
@@ -54,7 +67,11 @@ export default function ChannelsPage() {
     }, [currentServer]);
 
     useEffect(() => {
-        if (currentChannel?._id) fetchMessages(currentChannel._id);
+        if (currentChannel?._id) {
+            fetchMessages(currentChannel._id);
+            joinChannel(currentChannel._id);
+        }
+        return () => { if (currentChannel?._id) leaveChannel(currentChannel._id); };
     }, [currentChannel?._id]);
 
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -133,27 +150,54 @@ export default function ChannelsPage() {
 
     const handleSendMessage = async () => {
         if (!messageInput.trim() || !currentChannel) return;
-        try {
-            await api.post(`/messages/channel/${currentChannel._id}`, { content: messageInput });
-            setMessageInput('');
-            fetchMessages(currentChannel._id);
-        } catch (e) {
-            sendMessage(currentChannel._id, messageInput);
-            setMessageInput('');
+        sendMessage(currentChannel._id, messageInput);
+        setMessageInput('');
+        stopTyping(currentChannel._id);
+    };
+
+    const handleTyping = (e) => {
+        setMessageInput(e.target.value);
+        if (currentChannel?._id) {
+            startTyping(currentChannel._id);
+            clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => stopTyping(currentChannel._id), 2000);
         }
     };
 
     const handleEditMessage = async (msgId) => {
         if (!editContent.trim()) return;
-        try { await api.put(`/messages/${msgId}`, { content: editContent }); setEditingMsg(null); setEditContent(''); fetchMessages(currentChannel._id); } catch (e) { console.error(e); }
+        try { await api.put(`/messages/${msgId}`, { content: editContent }); setEditingMsg(null); setEditContent(''); } catch (e) { console.error(e); }
     };
 
     const handleDeleteMessage = async (msgId) => {
-        try { await api.delete(`/messages/${msgId}`); fetchMessages(currentChannel._id); } catch (e) { console.error(e); }
+        try { await api.delete(`/messages/${msgId}`); } catch (e) { console.error(e); }
     };
 
-    const handleReaction = async (msgId, emoji) => {
-        try { await api.post(`/messages/${msgId}/react`, { emoji }); setShowEmojiPicker(null); fetchMessages(currentChannel._id); } catch (e) { console.error(e); }
+    const handleReaction = (msgId, emoji) => {
+        reactToMessage(msgId, emoji);
+        setShowEmojiPicker(null);
+    };
+
+    const handleSearch = async () => {
+        if (!searchQuery.trim()) return;
+        try {
+            const { data } = await api.get(`/messages/channel/${currentChannel._id}?search=${searchQuery}`);
+            setSearchResults(data.messages || []);
+        } catch (e) { setSearchResults([]); }
+    };
+
+    const handleFileUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const { data } = await api.post(`/messages/channel/${currentChannel._id}/upload`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            toast.success('File sent!');
+        } catch (e) {
+            sendMessage(currentChannel._id, `📎 ${file.name}`, 'file');
+            toast.success('File reference sent');
+        }
     };
 
     const selectChannel = (channel) => {
@@ -300,10 +344,26 @@ export default function ChannelsPage() {
                                 {currentChannel.description && <span className="text-sm text-white/30 ml-2 border-l border-white/10 pl-2">{currentChannel.description}</span>}
                             </div>
                             <div className="flex items-center gap-3">
-                                <FiSearch className="w-5 h-5 text-white/20 cursor-pointer hover:text-white transition-colors" />
+                                <FiSearch className={`w-5 h-5 cursor-pointer transition-colors ${showSearch ? 'text-indigo-400' : 'text-white/20 hover:text-white'}`} onClick={() => { setShowSearch(!showSearch); setSearchResults([]); setSearchQuery(''); }} />
                                 <FiUsers className={`w-5 h-5 cursor-pointer transition-colors ${showMembers ? 'text-white' : 'text-white/20 hover:text-white'}`} onClick={() => setShowMembers(!showMembers)} />
                             </div>
                         </div>
+
+                        {/* Search Bar */}
+                        <AnimatePresence>
+                            {showSearch && (
+                                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-b border-white/5 overflow-hidden">
+                                    <div className="px-4 py-2 flex items-center gap-2">
+                                        <FiSearch className="w-4 h-4 text-white/30" />
+                                        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                            placeholder="Search messages..." className="flex-1 bg-transparent text-sm outline-none text-white placeholder-white/30" autoFocus />
+                                        {searchResults.length > 0 && <span className="text-xs text-white/30">{searchResults.length} results</span>}
+                                        <FiX className="w-4 h-4 text-white/30 cursor-pointer hover:text-white" onClick={() => { setShowSearch(false); setSearchResults([]); setSearchQuery(''); }} />
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
 
                         <div className="flex-1 flex">
                             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
@@ -315,12 +375,12 @@ export default function ChannelsPage() {
 
                                 {messages.map((msg, idx) => (
                                     <div key={msg._id || idx} className="flex items-start gap-3 group hover:bg-white/[0.02] px-2 py-1.5 rounded-lg relative">
-                                        <div className="w-10 h-10 rounded-full bg-indigo-500/80 flex items-center justify-center text-sm font-bold flex-shrink-0">
+                                        <div className="w-10 h-10 rounded-full bg-indigo-500/80 flex items-center justify-center text-sm font-bold flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setProfileUser(msg.sender?._id || msg.sender)}>
                                             {(msg.sender?.username || 'U')[0].toUpperCase()}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-baseline gap-2">
-                                                <span className="font-medium text-white">{msg.sender?.username || 'User'}</span>
+                                                <span className="font-medium text-white cursor-pointer hover:underline" onClick={() => setProfileUser(msg.sender?._id || msg.sender)}>{msg.sender?.username || 'User'}</span>
                                                 <span className="text-xs text-white/20">{new Date(msg.createdAt || Date.now()).toLocaleString()}</span>
                                                 {msg.isEdited && <span className="text-xs text-white/15">(edited)</span>}
                                             </div>
@@ -376,7 +436,7 @@ export default function ChannelsPage() {
                                                 <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer transition-colors">
                                                     <div className="relative">
                                                         <div className="w-8 h-8 rounded-full bg-indigo-500/60 flex items-center justify-center text-xs font-bold">{(m.user?.username || 'U')[0].toUpperCase()}</div>
-                                                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-dark-800 ${m.user?.status === 'online' ? 'bg-emerald-400' : 'bg-white/20'}`} />
+                                                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-dark-800 ${onlineUsers.includes(m.user?._id) || m.user?.status === 'online' ? 'bg-emerald-400' : 'bg-white/20'}`} />
                                                     </div>
                                                     <p className="text-sm truncate text-white/70">
                                                         {m.user?.username || 'User'}
@@ -391,10 +451,20 @@ export default function ChannelsPage() {
                             </AnimatePresence>
                         </div>
 
+                        {/* Typing Indicator */}
+                        {currentChannel && typingUsers[currentChannel._id] && Object.keys(typingUsers[currentChannel._id]).length > 0 && (
+                            <div className="px-4 py-1">
+                                <p className="text-xs text-indigo-400 animate-pulse">
+                                    {Object.values(typingUsers[currentChannel._id]).join(', ')} {Object.keys(typingUsers[currentChannel._id]).length === 1 ? 'is' : 'are'} typing...
+                                </p>
+                            </div>
+                        )}
+
                         <div className="px-4 pb-6 pt-2">
                             <div className="bg-white/5 border border-white/10 rounded-xl flex items-center px-4">
-                                <FiPlus className="w-5 h-5 text-white/20 cursor-pointer hover:text-white transition-colors" />
-                                <input type="text" value={messageInput} onChange={(e) => setMessageInput(e.target.value)}
+                                <FiPaperclip className="w-5 h-5 text-white/20 cursor-pointer hover:text-white transition-colors" onClick={() => fileInputRef.current?.click()} title="Attach file" />
+                                <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
+                                <input type="text" value={messageInput} onChange={handleTyping}
                                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                                     placeholder={`Message #${currentChannel.name}`} className="flex-1 bg-transparent py-3 px-3 text-sm outline-none text-white placeholder-white/30" />
                                 <button onClick={handleSendMessage} className="text-white/20 hover:text-indigo-400 transition-colors"><FiSend className="w-5 h-5" /></button>
@@ -499,6 +569,9 @@ export default function ChannelsPage() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* User Profile Modal */}
+            {profileUser && <UserProfileModal userId={profileUser} onClose={() => setProfileUser(null)} />}
         </div>
     );
 }
