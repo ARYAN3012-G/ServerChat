@@ -14,6 +14,8 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 import UserProfileModal from '../../components/UserProfileModal';
 import CallModal from '../../components/CallModal';
+import GameLauncher from '../../components/GameLauncher';
+import MusicRoom from '../../components/MusicRoom';
 
 export default function ChannelsPage() {
     const dispatch = useDispatch();
@@ -61,6 +63,7 @@ export default function ChannelsPage() {
     const [isMuted, setIsMuted] = useState(false);
     const [isDeafened, setIsDeafened] = useState(false);
     const [showGameLauncher, setShowGameLauncher] = useState(false);
+    const [showMusicRoom, setShowMusicRoom] = useState(false);
     const [callType, setCallType] = useState(null);
 
     useEffect(() => {
@@ -332,6 +335,23 @@ export default function ChannelsPage() {
                                         )}
                                     </div>
                                 ))}
+                            </div>
+
+                            {/* Activities */}
+                            <div>
+                                <div className="flex items-center justify-between px-1 mb-1 mt-2">
+                                    <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wider">Activities</span>
+                                </div>
+                                <motion.div onClick={() => setShowGameLauncher(true)}
+                                    className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-white/40 hover:text-white/70 hover:bg-white/5 transition-all duration-150">
+                                    <IoGameControllerOutline className="w-5 h-5 text-indigo-400/50" />
+                                    <span className="text-sm">Play Games</span>
+                                </motion.div>
+                                <motion.div onClick={() => setShowMusicRoom(true)}
+                                    className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-white/40 hover:text-white/70 hover:bg-white/5 transition-all duration-150">
+                                    <FiVolume2 className="w-5 h-5 text-pink-400/50" />
+                                    <span className="text-sm">Listen Together</span>
+                                </motion.div>
                             </div>
                         </>
                     ) : (
@@ -650,6 +670,31 @@ export default function ChannelsPage() {
                     type={callType || 'voice'}
                     onEnd={(id) => { endCall(id); setCallType(null); }}
                     onToggleMedia={toggleMedia}
+                />
+            )}
+
+            {/* Game Launcher */}
+            {showGameLauncher && currentChannel && (
+                <GameLauncher
+                    channelId={currentChannel._id}
+                    onClose={() => setShowGameLauncher(false)}
+                    createGame={createGame}
+                    joinGame={joinGame}
+                    makeGameMove={makeGameMove}
+                    requestRematch={requestRematch}
+                />
+            )}
+
+            {/* Music Room */}
+            {showMusicRoom && currentServer && (
+                <MusicRoom
+                    serverId={currentServer._id}
+                    serverName={currentServer.name}
+                    onClose={() => setShowMusicRoom(false)}
+                    joinMusicRoom={joinMusicRoom}
+                    syncMusic={syncMusic}
+                    leaveMusicRoom={leaveMusicRoom}
+                    musicRoom={musicRoom}
                 />
             )}
         </div>
