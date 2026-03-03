@@ -14,6 +14,26 @@ module.exports = (io, socket) => {
         socket.leave(`channel:${channelId}`);
     });
 
+    // Voice channel join
+    socket.on('voice:join', ({ channelId }) => {
+        socket.join(`voice:${channelId}`);
+        io.to(`channel:${channelId}`).emit('voice:user-joined', {
+            channelId,
+            userId: socket.userId,
+            username: socket.username,
+        });
+        logger.debug(`${socket.username} joined voice channel ${channelId}`);
+    });
+
+    // Voice channel leave
+    socket.on('voice:leave', ({ channelId }) => {
+        socket.leave(`voice:${channelId}`);
+        io.to(`channel:${channelId}`).emit('voice:user-left', {
+            channelId,
+            userId: socket.userId,
+        });
+    });
+
     // Send a message
     socket.on('message:send', async (data) => {
         try {
