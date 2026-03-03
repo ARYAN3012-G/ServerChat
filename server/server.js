@@ -49,6 +49,7 @@ app.use('/api/friends', require('./routes/friendRoutes'));
 app.use('/api/games', require('./routes/gameRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
+app.use('/api/calls', require('./routes/callRoutes'));
 
 // Health check
 app.get('/api/health', (req, res) => {

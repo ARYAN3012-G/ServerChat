@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUser, FiLock, FiMoon, FiBell, FiSave, FiCheck, FiCamera } from 'react-icons/fi';
+import { FiArrowLeft, FiUser, FiLock, FiMoon, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 
@@ -20,9 +20,13 @@ export default function SettingsPage() {
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState('');
     const [notifSettings, setNotifSettings] = useState({ messages: true, friends: true, mentions: true, sounds: true });
+    const [subscription, setSubscription] = useState(null);
 
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
     useEffect(() => { if (user) { setUsername(user.username || ''); setBio(user.bio || ''); setCustomStatus(user.customStatus || ''); } }, [user]);
+    useEffect(() => { if (isAuthenticated) fetchSubscription(); }, [isAuthenticated]);
+
+    const fetchSubscription = async () => { try { const { data } = await api.get('/payments/subscription'); setSubscription(data.subscription || { tier: 'free', status: 'inactive' }); } catch (e) { setSubscription({ tier: 'free', status: 'inactive' }); } };
 
     const handleSaveProfile = async () => {
         setError(''); setSaved(false);
@@ -37,9 +41,16 @@ export default function SettingsPage() {
         catch (e) { setError(e.response?.data?.message || 'Failed'); }
     };
 
+    const tierConfig = {
+        free: { color: 'from-gray-500 to-gray-600', badge: 'text-white/40 bg-white/5', label: 'Free', features: ['10 MB uploads', 'Basic features'] },
+        basic: { color: 'from-blue-500 to-indigo-600', badge: 'text-blue-400 bg-blue-500/10', label: 'Basic', features: ['50 MB uploads', 'Custom Emojis', 'Screen Share'] },
+        premium: { color: 'from-amber-500 to-orange-600', badge: 'text-amber-400 bg-amber-500/10', label: 'Premium', features: ['100 MB uploads', 'Custom Emojis', 'Premium Badge', 'Animated Avatar', 'Screen Share'] },
+    };
+
     const tabs = [
         { id: 'account', label: 'My Account', icon: FiUser },
         { id: 'security', label: 'Security', icon: FiLock },
+        { id: 'subscription', label: 'Subscription', icon: FiStar },
         { id: 'appearance', label: 'Appearance', icon: FiMoon },
         { id: 'notifications', label: 'Notifications', icon: FiBell },
     ];
@@ -154,6 +165,50 @@ export default function SettingsPage() {
                                     </div>
                                 ))}
                             </div>
+                        </motion.div>
+                    )}
+
+                    {/* SUBSCRIPTION (Subscription + Payment collections) */}
+                    {tab === 'subscription' && (
+                        <motion.div key="subscription" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                            <h3 className="text-2xl font-bold mb-8">Subscription</h3>
+                            <p className="text-white/40 text-sm mb-6">Your plan and features — from <code className="text-indigo-400">subscriptions</code> & <code className="text-indigo-400">payments</code> collections</p>
+
+                            {/* Current Plan Card */}
+                            <div className={`bg-gradient-to-br ${tierConfig[subscription?.tier || 'free']?.color} rounded-2xl p-8 shadow-xl mb-6 relative overflow-hidden`}>
+                                <div className="absolute top-4 right-4 opacity-20"><FiZap className="w-16 h-16" /></div>
+                                <p className="text-white/70 text-sm font-medium uppercase tracking-wider">Current Plan</p>
+                                <h4 className="text-4xl font-black mt-2 mb-1">{tierConfig[subscription?.tier || 'free']?.label}</h4>
+                                <p className="text-white/60 text-sm mb-4">Status: <span className={`font-semibold ${subscription?.status === 'active' ? 'text-emerald-300' : 'text-white/50'}`}>{subscription?.status || 'inactive'}</span></p>
+                                {subscription?.currentPeriodEnd && <p className="text-white/40 text-xs">Renews: {new Date(subscription.currentPeriodEnd).toLocaleDateString()}</p>}
+                            </div>
+
+                            {/* Features */}
+                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8">
+                                <h4 className="text-lg font-semibold mb-5">Your Features</h4>
+                                <div className="space-y-3">
+                                    {(tierConfig[subscription?.tier || 'free']?.features || []).map((f, i) => (
+                                        <div key={i} className="flex items-center gap-3">
+                                            <FiCheck className="w-4 h-4 text-emerald-400" />
+                                            <span className="text-sm text-white/70">{f}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Upgrade Tiers */}
+                            <div className="grid grid-cols-3 gap-4 mt-6">
+                                {Object.entries(tierConfig).map(([key, cfg]) => (
+                                    <div key={key} className={`rounded-2xl border p-6 text-center transition-all ${subscription?.tier === key ? 'border-indigo-500 bg-indigo-500/10' : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04]'}`}>
+                                        <h5 className="font-bold text-lg mb-1">{cfg.label}</h5>
+                                        <p className="text-xs text-white/30 mb-3">{key === 'free' ? 'Free forever' : key === 'basic' ? '$4.99/mo' : '$9.99/mo'}</p>
+                                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${subscription?.tier === key ? 'bg-indigo-500 text-white' : cfg.badge}`}>
+                                            {subscription?.tier === key ? 'Current' : 'Select'}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="text-white/20 text-xs mt-4 text-center">Payment processing requires Stripe configuration</p>
                         </motion.div>
                     )}
                 </AnimatePresence>

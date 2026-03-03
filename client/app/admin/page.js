@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUsers, FiShield, FiSearch, FiBarChart2, FiAlertTriangle, FiTrendingUp } from 'react-icons/fi';
+import { FiArrowLeft, FiUsers, FiShield, FiSearch, FiBarChart2, FiAlertTriangle, FiTrendingUp, FiActivity, FiFileText, FiPlay } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 
@@ -14,12 +14,25 @@ export default function AdminPage() {
     const [stats, setStats] = useState(null);
     const [users, setUsers] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [activityLogs, setActivityLogs] = useState([]);
+    const [adminLogs, setAdminLogs] = useState([]);
+    const [gameActivity, setGameActivity] = useState([]);
 
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
     useEffect(() => { if (isAuthenticated) { fetchStats(); fetchUsers(); } }, [isAuthenticated]);
 
-    const fetchStats = async () => { try { const { data } = await api.get('/admin/dashboard'); setStats(data); } catch (e) { console.error(e); } };
+    const fetchStats = async () => { try { const { data } = await api.get('/admin/dashboard'); setStats(data.stats || data); } catch (e) { console.error(e); } };
     const fetchUsers = async () => { try { const { data } = await api.get('/admin/users'); setUsers(data.users || data || []); } catch (e) { console.error(e); } };
+    const fetchActivityLogs = async () => { try { const { data } = await api.get('/admin/logs/login'); setActivityLogs(data.logs || []); } catch (e) { console.error(e); } };
+    const fetchAdminLogs = async () => { try { const { data } = await api.get('/admin/logs/admin'); setAdminLogs(data.logs || []); } catch (e) { console.error(e); } };
+    const fetchGameActivity = async () => { try { const { data } = await api.get('/admin/logs/games'); setGameActivity(data.games || []); } catch (e) { console.error(e); } };
+
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        if (tab === 'activity') fetchActivityLogs();
+        if (tab === 'audit') fetchAdminLogs();
+        if (tab === 'games') fetchGameActivity();
+    }, [tab, isAuthenticated]);
 
     const handleBanUser = async (userId, isBanned) => {
         if (!confirm(isBanned ? 'Unban this user?' : 'Ban this user?')) return;
@@ -35,23 +48,45 @@ export default function AdminPage() {
     const statCards = stats ? [
         { label: 'Total Users', value: stats.totalUsers || 0, color: 'from-indigo-500 to-blue-500', shadow: 'shadow-indigo-500/20', icon: FiUsers },
         { label: 'Online Now', value: stats.onlineUsers || 0, color: 'from-emerald-500 to-teal-500', shadow: 'shadow-emerald-500/20', icon: FiTrendingUp },
-        { label: 'Admins', value: stats.admins || 0, color: 'from-amber-500 to-orange-500', shadow: 'shadow-amber-500/20', icon: FiShield },
-        { label: 'Banned', value: stats.bannedUsers || 0, color: 'from-red-500 to-rose-500', shadow: 'shadow-red-500/20', icon: FiAlertTriangle },
+        { label: 'Messages 24h', value: stats.messagesDay || 0, color: 'from-violet-500 to-purple-500', shadow: 'shadow-violet-500/20', icon: FiActivity },
+        { label: 'Active Games', value: stats.activeGames || 0, color: 'from-amber-500 to-orange-500', shadow: 'shadow-amber-500/20', icon: FiPlay },
+        { label: 'Total Revenue', value: `$${stats.totalRevenue || 0}`, color: 'from-emerald-600 to-teal-600', shadow: 'shadow-emerald-500/20', icon: FiBarChart2 },
+        { label: 'New This Week', value: stats.newUsersWeek || 0, color: 'from-red-500 to-rose-500', shadow: 'shadow-red-500/20', icon: FiAlertTriangle },
     ] : [];
 
-    if (loading) return <div className="flex h-screen items-center justify-center bg-dark-900"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
+    const tabs = [
+        { id: 'overview', label: 'Overview', icon: FiBarChart2 },
+        { id: 'users', label: 'Users', icon: FiUsers },
+        { id: 'activity', label: 'Activity Logs', icon: FiActivity },
+        { id: 'audit', label: 'Admin Audit', icon: FiFileText },
+        { id: 'games', label: 'Game Activity', icon: FiPlay },
+    ];
+
+    const actionColors = {
+        login: 'text-emerald-400 bg-emerald-500/10', logout: 'text-white/40 bg-white/5', register: 'text-blue-400 bg-blue-500/10',
+        message_sent: 'text-indigo-400 bg-indigo-500/10', friend_added: 'text-pink-400 bg-pink-500/10',
+        game_finished: 'text-amber-400 bg-amber-500/10', game_started: 'text-amber-400 bg-amber-500/10',
+        user_banned: 'text-red-400 bg-red-500/10', user_unbanned: 'text-emerald-400 bg-emerald-500/10',
+        user_role_changed: 'text-purple-400 bg-purple-500/10', profile_updated: 'text-sky-400 bg-sky-500/10',
+        call_started: 'text-teal-400 bg-teal-500/10', call_ended: 'text-white/40 bg-white/5',
+    };
+
+    if (loading) return <div className="flex h-screen items-center justify-center bg-[#0c0e1a]"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
 
     return (
-        <div className="flex h-screen bg-dark-900 text-white overflow-hidden">
+        <div className="flex h-screen bg-[#0c0e1a] text-white overflow-hidden">
             {/* Sidebar */}
-            <div className="w-56 bg-dark-800 border-r border-white/5 flex flex-col">
+            <div className="w-56 bg-[#080a14] border-r border-white/5 flex flex-col">
                 <div className="p-4 border-b border-white/5">
                     <button onClick={() => router.push('/channels')} className="flex items-center gap-2 text-white/40 hover:text-white text-sm transition-colors mb-4"><FiArrowLeft className="w-4 h-4" /> Back to Chat</button>
-                    <h2 className="text-lg font-bold flex items-center gap-2"><FiShield className="w-5 h-5 text-amber-400" /> Admin</h2>
+                    <h2 className="text-lg font-bold flex items-center gap-2"><FiShield className="w-5 h-5 text-amber-400" /> Admin Panel</h2>
                 </div>
                 <div className="flex-1 p-2 space-y-1">
-                    <button onClick={() => setTab('overview')} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === 'overview' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}><FiBarChart2 className="w-4 h-4" /> Overview</button>
-                    <button onClick={() => setTab('users')} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === 'users' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}><FiUsers className="w-4 h-4" /> Users</button>
+                    {tabs.map(t => (
+                        <button key={t.id} onClick={() => setTab(t.id)} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === t.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
+                            <t.icon className="w-4 h-4" /> {t.label}
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -62,7 +97,7 @@ export default function AdminPage() {
                     {tab === 'overview' && (
                         <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                             <h3 className="text-2xl font-bold mb-8">Dashboard Overview</h3>
-                            <div className="grid grid-cols-4 gap-4 mb-8">
+                            <div className="grid grid-cols-3 gap-4 mb-8">
                                 {statCards.map((card, i) => (
                                     <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                                         className={`bg-gradient-to-br ${card.color} rounded-2xl p-6 shadow-xl ${card.shadow} relative overflow-hidden`}>
@@ -72,8 +107,6 @@ export default function AdminPage() {
                                     </motion.div>
                                 ))}
                             </div>
-
-                            {/* Activity Chart */}
                             <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-6">
                                 <h4 className="text-lg font-semibold mb-6">User Activity (Last 7 days)</h4>
                                 <div className="flex items-end gap-3 h-48">
@@ -104,7 +137,6 @@ export default function AdminPage() {
                                         className="bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white placeholder-white/20 focus:ring-2 focus:ring-indigo-500 w-64" />
                                 </div>
                             </div>
-
                             <div className="bg-white/[0.03] rounded-2xl border border-white/5 overflow-hidden">
                                 <table className="w-full">
                                     <thead>
@@ -144,6 +176,120 @@ export default function AdminPage() {
                                     </tbody>
                                 </table>
                                 {filteredUsers.length === 0 && <div className="text-center py-10 text-white/30">No users found</div>}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* ACTIVITY LOGS (ActivityLog collection) */}
+                    {tab === 'activity' && (
+                        <motion.div key="activity" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                            <h3 className="text-2xl font-bold mb-6">Activity Logs</h3>
+                            <p className="text-white/40 text-sm mb-6">User login, register, and other activity events — from <code className="text-indigo-400">activitylogs</code> collection</p>
+                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 overflow-hidden">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-white/5">
+                                            <th className="text-left px-6 py-4 text-[11px] font-bold text-white/30 uppercase tracking-wider">User</th>
+                                            <th className="text-left px-6 py-4 text-[11px] font-bold text-white/30 uppercase tracking-wider">Action</th>
+                                            <th className="text-left px-6 py-4 text-[11px] font-bold text-white/30 uppercase tracking-wider">IP Address</th>
+                                            <th className="text-left px-6 py-4 text-[11px] font-bold text-white/30 uppercase tracking-wider">Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {activityLogs.map((log, i) => (
+                                            <motion.tr key={log._id || i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}
+                                                className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                                                <td className="px-6 py-3 text-sm font-medium">{log.user?.username || 'Unknown'}</td>
+                                                <td className="px-6 py-3">
+                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${actionColors[log.action] || 'text-white/40 bg-white/5'}`}>
+                                                        {log.action?.replace(/_/g, ' ')}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-3 text-sm text-white/30 font-mono">{log.ipAddress || '—'}</td>
+                                                <td className="px-6 py-3 text-sm text-white/30">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '—'}</td>
+                                            </motion.tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {activityLogs.length === 0 && <div className="text-center py-10 text-white/30">No activity logs yet — logs are created on login, register, and other user actions</div>}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* ADMIN AUDIT LOG (AdminLog collection) */}
+                    {tab === 'audit' && (
+                        <motion.div key="audit" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                            <h3 className="text-2xl font-bold mb-6">Admin Audit Trail</h3>
+                            <p className="text-white/40 text-sm mb-6">Every admin action is recorded — from <code className="text-indigo-400">adminlogs</code> collection</p>
+                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 overflow-hidden">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-white/5">
+                                            <th className="text-left px-6 py-4 text-[11px] font-bold text-white/30 uppercase tracking-wider">Admin</th>
+                                            <th className="text-left px-6 py-4 text-[11px] font-bold text-white/30 uppercase tracking-wider">Action</th>
+                                            <th className="text-left px-6 py-4 text-[11px] font-bold text-white/30 uppercase tracking-wider">Details</th>
+                                            <th className="text-left px-6 py-4 text-[11px] font-bold text-white/30 uppercase tracking-wider">Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {adminLogs.map((log, i) => (
+                                            <motion.tr key={log._id || i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}
+                                                className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                                                <td className="px-6 py-3 text-sm font-medium">{log.admin?.username || 'Unknown'}</td>
+                                                <td className="px-6 py-3">
+                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${actionColors[log.action] || 'text-white/40 bg-white/5'}`}>
+                                                        {log.action?.replace(/_/g, ' ')}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-3 text-sm text-white/30 font-mono max-w-xs truncate">{log.details ? JSON.stringify(log.details) : '—'}</td>
+                                                <td className="px-6 py-3 text-sm text-white/30">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '—'}</td>
+                                            </motion.tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {adminLogs.length === 0 && <div className="text-center py-10 text-white/30">No admin logs yet — logs are created when admins ban/unban users or change roles</div>}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* GAME ACTIVITY (GameSession collection) */}
+                    {tab === 'games' && (
+                        <motion.div key="games" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                            <h3 className="text-2xl font-bold mb-6">Game Activity</h3>
+                            <p className="text-white/40 text-sm mb-6">All game sessions & scores — from <code className="text-indigo-400">gamesessions</code> collection</p>
+                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 overflow-hidden">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-white/5">
+                                            <th className="text-left px-6 py-4 text-[11px] font-bold text-white/30 uppercase tracking-wider">Game</th>
+                                            <th className="text-left px-6 py-4 text-[11px] font-bold text-white/30 uppercase tracking-wider">Players</th>
+                                            <th className="text-left px-6 py-4 text-[11px] font-bold text-white/30 uppercase tracking-wider">Winner</th>
+                                            <th className="text-left px-6 py-4 text-[11px] font-bold text-white/30 uppercase tracking-wider">Status</th>
+                                            <th className="text-left px-6 py-4 text-[11px] font-bold text-white/30 uppercase tracking-wider">Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {gameActivity.map((g, i) => (
+                                            <motion.tr key={g._id || i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}
+                                                className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                                                <td className="px-6 py-3">
+                                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-400">
+                                                        {g.game?.replace(/-/g, ' ')}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-3 text-sm">{g.players?.map(p => p.user?.username || 'Unknown').join(', ')}</td>
+                                                <td className="px-6 py-3 text-sm text-amber-400">{g.winner?.username || '—'}</td>
+                                                <td className="px-6 py-3">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${g.status === 'finished' ? 'text-emerald-400 bg-emerald-500/10' : g.status === 'in_progress' ? 'text-amber-400 bg-amber-500/10' : 'text-white/30 bg-white/5'}`}>
+                                                        {g.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-3 text-sm text-white/30">{g.createdAt ? new Date(g.createdAt).toLocaleString() : '—'}</td>
+                                            </motion.tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {gameActivity.length === 0 && <div className="text-center py-10 text-white/30">No game sessions recorded yet — play games to generate data!</div>}
                             </div>
                         </motion.div>
                     )}

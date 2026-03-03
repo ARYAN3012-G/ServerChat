@@ -1,4 +1,35 @@
 const GameSession = require('../models/GameSession');
+const ActivityLog = require('../models/ActivityLog');
+
+// Save a game score
+exports.saveScore = async (req, res, next) => {
+    try {
+        const { game, score, won } = req.body;
+
+        const session = await GameSession.create({
+            game,
+            players: [{ user: req.user._id, score: score || 0 }],
+            state: {},
+            status: 'finished',
+            winner: won ? req.user._id : null,
+            round: 1,
+            maxRounds: 1,
+            startedAt: new Date(Date.now() - 60000),
+            finishedAt: new Date(),
+        });
+
+        await ActivityLog.create({
+            user: req.user._id,
+            action: 'game_finished',
+            details: { game, score, won, sessionId: session._id },
+            ipAddress: req.ip,
+        });
+
+        res.status(201).json({ session });
+    } catch (error) {
+        next(error);
+    }
+};
 
 // Get active games
 exports.getActiveGames = async (req, res, next) => {

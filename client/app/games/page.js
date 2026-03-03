@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiRotateCw, FiUsers, FiCpu, FiAward, FiZap } from 'react-icons/fi';
+import { FiArrowLeft, FiRotateCw, FiUsers, FiCpu, FiAward, FiZap, FiTrendingUp } from 'react-icons/fi';
 import { IoGameControllerOutline } from 'react-icons/io5';
+import api from '../../services/api';
 
 // ─── HIGH SCORE HELPERS ─────────────────────────────────────
 const getHighScore = (game) => {
@@ -46,7 +47,15 @@ export default function GamesPage() {
     };
 
     const startWithMode = (mode) => { setActiveGame(selectingMode.id); setGameMode(mode); setSelectingMode(null); };
-    const goBack = () => { setActiveGame(null); setGameMode(null); };
+    const goBack = () => { setActiveGame(null); setGameMode(null); fetchLeaderboard(); };
+
+    const [leaderboard, setLeaderboard] = useState([]);
+    const fetchLeaderboard = async () => { try { const { data } = await api.get('/games/leaderboard'); setLeaderboard(data.leaderboard || []); } catch (e) { /* ok */ } };
+    useEffect(() => { if (mounted) fetchLeaderboard(); }, [mounted]);
+
+    const saveScoreToDb = async (game, score, won = false) => {
+        try { await api.post('/games/save-score', { game, score, won }); } catch (e) { /* silent */ }
+    };
 
     return (
         <div className="flex h-screen bg-[#0c0e1a] text-white overflow-hidden">
@@ -129,6 +138,35 @@ export default function GamesPage() {
                                     </motion.div>
                                 ))}
                             </div>
+
+                            {/* LEADERBOARD from GameSession collection */}
+                            {mounted && leaderboard.length > 0 && (
+                                <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+                                    className="mt-10 bg-white/[0.03] rounded-2xl border border-white/5 p-6">
+                                    <div className="flex items-center gap-3 mb-5">
+                                        <FiTrendingUp className="w-5 h-5 text-amber-400" />
+                                        <h3 className="text-lg font-bold">Global Leaderboard</h3>
+                                        <span className="text-xs text-white/20 ml-auto">from gamesessions collection</span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {leaderboard.slice(0, 8).map((entry, i) => (
+                                            <div key={i} className={`flex items-center gap-4 px-4 py-3 rounded-xl ${i < 3 ? 'bg-white/[0.04]' : ''}`}>
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black ${i === 0 ? 'bg-amber-500/20 text-amber-400' : i === 1 ? 'bg-gray-300/20 text-gray-300' : i === 2 ? 'bg-orange-500/20 text-orange-400' : 'text-white/20'}`}>
+                                                    {i + 1}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className="font-semibold text-sm">{entry.user?.username || 'Unknown'}</p>
+                                                    <p className="text-xs text-white/30">{entry.gamesPlayed} games · {entry.wins} wins</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="font-bold text-indigo-400">{entry.totalScore}</p>
+                                                    <p className="text-[10px] text-white/20">points</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            )}
                         </motion.div>
                     )}
 
@@ -161,10 +199,10 @@ export default function GamesPage() {
                         </motion.div>
                     )}
 
-                    {activeGame === 'ttt' && <TicTacToe key="ttt" goBack={goBack} mode={gameMode} />}
-                    {activeGame === 'rps' && <RockPaperScissors key="rps" goBack={goBack} />}
-                    {activeGame === 'memory' && <MemoryMatch key="memory" goBack={goBack} />}
-                    {activeGame === 'snake' && <SnakeGame key="snake" goBack={goBack} />}
+                    {activeGame === 'ttt' && <TicTacToe key="ttt" goBack={goBack} mode={gameMode} saveScoreToDb={saveScoreToDb} />}
+                    {activeGame === 'rps' && <RockPaperScissors key="rps" goBack={goBack} saveScoreToDb={saveScoreToDb} />}
+                    {activeGame === 'memory' && <MemoryMatch key="memory" goBack={goBack} saveScoreToDb={saveScoreToDb} />}
+                    {activeGame === 'snake' && <SnakeGame key="snake" goBack={goBack} saveScoreToDb={saveScoreToDb} />}
                 </AnimatePresence>
             </div>
         </div>
@@ -202,7 +240,7 @@ function ScorePanel({ items }) {
 // ═══════════════════════════════════════════════════════════
 // TIC-TAC-TOE
 // ═══════════════════════════════════════════════════════════
-function TicTacToe({ goBack, mode }) {
+function TicTacToe({ goBack, mode, saveScoreToDb }) {
     const [board, setBoard] = useState(Array(9).fill(null));
     const [turn, setTurn] = useState('X');
     const [winner, setWinner] = useState(null);
@@ -233,12 +271,12 @@ function TicTacToe({ goBack, mode }) {
         if (board[i] || winner) return;
         const nb = [...board]; nb[i] = turn;
         let w = check(nb);
-        if (w) { setBoard(nb); setWinner(w); if (w === 'draw') setScores(s => ({ ...s, draws: s.draws + 1 })); else setScores(s => ({ ...s, [w]: s[w] + 1 })); return; }
+        if (w) { setBoard(nb); setWinner(w); if (w === 'draw') setScores(s => ({ ...s, draws: s.draws + 1 })); else { setScores(s => ({ ...s, [w]: s[w] + 1 })); if (w === 'X') saveScoreToDb?.('tic-tac-toe', 1, true); else saveScoreToDb?.('tic-tac-toe', 0, false); } return; }
         if (mode === 'cpu') {
             setWinLine(null);
             const after = cpuMove(nb); setBoard(after);
             w = check(after);
-            if (w) { setWinner(w); if (w === 'draw') setScores(s => ({ ...s, draws: s.draws + 1 })); else setScores(s => ({ ...s, [w]: s[w] + 1 })); }
+            if (w) { setWinner(w); if (w === 'draw') setScores(s => ({ ...s, draws: s.draws + 1 })); else { setScores(s => ({ ...s, [w]: s[w] + 1 })); if (w === 'O') saveScoreToDb?.('tic-tac-toe', 0, false); else saveScoreToDb?.('tic-tac-toe', 1, true); } }
         } else { setBoard(nb); setTurn(turn === 'X' ? 'O' : 'X'); }
     };
 
@@ -279,7 +317,7 @@ function TicTacToe({ goBack, mode }) {
 // ═══════════════════════════════════════════════════════════
 // ROCK PAPER SCISSORS
 // ═══════════════════════════════════════════════════════════
-function RockPaperScissors({ goBack }) {
+function RockPaperScissors({ goBack, saveScoreToDb }) {
     const [choice, setChoice] = useState(null);
     const [cpuChoice, setCpuChoice] = useState(null);
     const [result, setResult] = useState(null);
@@ -299,7 +337,7 @@ function RockPaperScissors({ goBack }) {
         if (c.id === cpu.id) { setResult('draw'); setStreak(0); }
         else if (c.beats === cpu.id) {
             setResult('win'); setScore(s => ({ ...s, player: s.player + 1 }));
-            const ns = streak + 1; setStreak(ns); setHighScore('rps', ns);
+            const ns = streak + 1; setStreak(ns); setHighScore('rps', ns); saveScoreToDb?.('rock-paper-scissors', ns, true);
         }
         else { setResult('lose'); setScore(s => ({ ...s, cpu: s.cpu + 1 })); setStreak(0); }
     };
@@ -357,7 +395,7 @@ function RockPaperScissors({ goBack }) {
 // ═══════════════════════════════════════════════════════════
 // MEMORY MATCH
 // ═══════════════════════════════════════════════════════════
-function MemoryMatch({ goBack }) {
+function MemoryMatch({ goBack, saveScoreToDb }) {
     const createBoard = () => [...MEMORY_ICONS, ...MEMORY_ICONS].sort(() => Math.random() - 0.5).map((icon, i) => ({ id: i, icon, flipped: false, matched: false }));
 
     const [cards, setCards] = useState(createBoard);
@@ -380,8 +418,10 @@ function MemoryMatch({ goBack }) {
                     const mc = [...cards]; mc[a].matched = true; mc[b].matched = true; setCards(mc); setFlipped([]); setLockBoard(false);
                     if (mc.every(c => c.matched)) {
                         setWon(true);
-                        const isBest = setHighScore('memory', 1000 - (moves + 1) * 10);
+                        const memScore = 1000 - (moves + 1) * 10;
+                        const isBest = setHighScore('memory', memScore);
                         setNewBest(isBest);
+                        saveScoreToDb?.('quiz', memScore, true);
                     }
                 }, 400);
             } else {
@@ -432,7 +472,7 @@ function MemoryMatch({ goBack }) {
 // ═══════════════════════════════════════════════════════════
 // SNAKE (FIXED)
 // ═══════════════════════════════════════════════════════════
-function SnakeGame({ goBack }) {
+function SnakeGame({ goBack, saveScoreToDb }) {
     const SIZE = 15;
     const SPEED = 130;
     const [displaySnake, setDisplaySnake] = useState([{ x: 7, y: 7 }]);
@@ -477,6 +517,7 @@ function SnakeGame({ goBack }) {
             setRunning(false);
             const isBest = setHighScore('snake', gs.score);
             if (isBest) { setNewBest(true); setBest(gs.score); }
+            saveScoreToDb?.('snake', gs.score, false);
             return;
         }
 
