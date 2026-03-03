@@ -432,102 +432,134 @@ function MemoryMatch({ goBack }) {
 function SnakeGame({ goBack }) {
     const SIZE = 15;
     const SPEED = 130;
-    const [snake, setSnake] = useState([{ x: 7, y: 7 }]);
-    const [food, setFood] = useState({ x: 5, y: 5 });
+    const [displaySnake, setDisplaySnake] = useState([{ x: 7, y: 7 }]);
+    const [displayFood, setDisplayFood] = useState({ x: 5, y: 5 });
     const [gameOver, setGameOver] = useState(false);
     const [running, setRunning] = useState(false);
     const [score, setScore] = useState(0);
     const [best, setBest] = useState(0);
     const [newBest, setNewBest] = useState(false);
-    const dirRef = useRef({ x: 1, y: 0 });
-    const snakeRef = useRef([{ x: 7, y: 7 }]);
-    const foodRef = useRef({ x: 5, y: 5 });
-    const runningRef = useRef(false);
-    const gameOverRef = useRef(false);
-    const scoreRef = useRef(0);
-    const intervalRef = useRef(null);
+
+    const gameState = useRef({
+        snake: [{ x: 7, y: 7 }],
+        food: { x: 5, y: 5 },
+        dir: { x: 1, y: 0 },
+        running: false,
+        gameOver: false,
+        score: 0,
+    });
+    const rafRef = useRef(null);
+    const lastTickRef = useRef(0);
 
     useEffect(() => { setBest(getHighScore('snake')); }, []);
 
-    const spawnFood = useCallback((snk) => {
+    const spawnFood = (snk) => {
         let f;
         do { f = { x: Math.floor(Math.random() * SIZE), y: Math.floor(Math.random() * SIZE) }; }
         while (snk.some(s => s.x === f.x && s.y === f.y));
         return f;
+    };
+
+    const tick = () => {
+        const gs = gameState.current;
+        if (!gs.running || gs.gameOver) return;
+
+        const head = { x: gs.snake[0].x + gs.dir.x, y: gs.snake[0].y + gs.dir.y };
+
+        // Wall or self collision
+        if (head.x < 0 || head.x >= SIZE || head.y < 0 || head.y >= SIZE || gs.snake.some(s => s.x === head.x && s.y === head.y)) {
+            gs.gameOver = true;
+            gs.running = false;
+            setGameOver(true);
+            setRunning(false);
+            const isBest = setHighScore('snake', gs.score);
+            if (isBest) { setNewBest(true); setBest(gs.score); }
+            return;
+        }
+
+        const ns = [head, ...gs.snake];
+        if (head.x === gs.food.x && head.y === gs.food.y) {
+            gs.score += 10;
+            setScore(gs.score);
+            gs.food = spawnFood(ns);
+            setDisplayFood({ ...gs.food });
+        } else {
+            ns.pop();
+        }
+
+        gs.snake = ns;
+        setDisplaySnake([...ns]);
+    };
+
+    const gameLoop = useCallback((timestamp) => {
+        const gs = gameState.current;
+        if (!gs.running) return;
+
+        if (timestamp - lastTickRef.current >= SPEED) {
+            lastTickRef.current = timestamp;
+            tick();
+        }
+        rafRef.current = requestAnimationFrame(gameLoop);
     }, []);
 
     const startGame = useCallback(() => {
+        // Cancel any existing loop
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+
         const init = [{ x: 7, y: 7 }];
         const fd = spawnFood(init);
-        setSnake(init); snakeRef.current = init;
-        setFood(fd); foodRef.current = fd;
-        dirRef.current = { x: 1, y: 0 };
-        setGameOver(false); gameOverRef.current = false;
-        setScore(0); scoreRef.current = 0;
+
+        gameState.current = {
+            snake: init,
+            food: fd,
+            dir: { x: 1, y: 0 },
+            running: true,
+            gameOver: false,
+            score: 0,
+        };
+
+        setDisplaySnake([...init]);
+        setDisplayFood({ ...fd });
+        setGameOver(false);
+        setScore(0);
         setNewBest(false);
-        setRunning(true); runningRef.current = true;
-    }, [spawnFood]);
+        setRunning(true);
+
+        lastTickRef.current = performance.now();
+        rafRef.current = requestAnimationFrame(gameLoop);
+    }, [gameLoop]);
 
     // Keyboard
     useEffect(() => {
         const handleKey = (e) => {
-            if (!runningRef.current) return;
-            const d = dirRef.current;
-            if ((e.key === 'ArrowUp' || e.key === 'w') && d.y !== 1) dirRef.current = { x: 0, y: -1 };
-            if ((e.key === 'ArrowDown' || e.key === 's') && d.y !== -1) dirRef.current = { x: 0, y: 1 };
-            if ((e.key === 'ArrowLeft' || e.key === 'a') && d.x !== 1) dirRef.current = { x: -1, y: 0 };
-            if ((e.key === 'ArrowRight' || e.key === 'd') && d.x !== -1) dirRef.current = { x: 1, y: 0 };
+            const gs = gameState.current;
+            if (!gs.running) return;
+            const d = gs.dir;
+            if ((e.key === 'ArrowUp' || e.key === 'w') && d.y !== 1) gs.dir = { x: 0, y: -1 };
+            if ((e.key === 'ArrowDown' || e.key === 's') && d.y !== -1) gs.dir = { x: 0, y: 1 };
+            if ((e.key === 'ArrowLeft' || e.key === 'a') && d.x !== 1) gs.dir = { x: -1, y: 0 };
+            if ((e.key === 'ArrowRight' || e.key === 'd') && d.x !== -1) gs.dir = { x: 1, y: 0 };
         };
         window.addEventListener('keydown', handleKey);
         return () => window.removeEventListener('keydown', handleKey);
     }, []);
 
-    // Game loop
+    // Cleanup on unmount
     useEffect(() => {
-        if (!running) { if (intervalRef.current) clearInterval(intervalRef.current); return; }
-
-        intervalRef.current = setInterval(() => {
-            if (gameOverRef.current) return;
-            const prev = snakeRef.current;
-            const dir = dirRef.current;
-            const head = { x: prev[0].x + dir.x, y: prev[0].y + dir.y };
-
-            if (head.x < 0 || head.x >= SIZE || head.y < 0 || head.y >= SIZE || prev.some(s => s.x === head.x && s.y === head.y)) {
-                gameOverRef.current = true;
-                setGameOver(true); setRunning(false); runningRef.current = false;
-                const isBest = setHighScore('snake', scoreRef.current);
-                if (isBest) { setNewBest(true); setBest(scoreRef.current); }
-                return;
-            }
-
-            const ns = [head, ...prev];
-            const fd = foodRef.current;
-            if (head.x === fd.x && head.y === fd.y) {
-                scoreRef.current += 10;
-                setScore(scoreRef.current);
-                const nf = spawnFood(ns);
-                foodRef.current = nf;
-                setFood(nf);
-            } else { ns.pop(); }
-
-            snakeRef.current = ns;
-            setSnake([...ns]);
-        }, SPEED);
-
-        return () => clearInterval(intervalRef.current);
-    }, [running, spawnFood]);
+        return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    }, []);
 
     const moveDir = (dx, dy) => {
-        const d = dirRef.current;
-        if (dx !== 0 && d.x !== -dx) dirRef.current = { x: dx, y: 0 };
-        if (dy !== 0 && d.y !== -dy) dirRef.current = { x: 0, y: dy };
+        const gs = gameState.current;
+        if (dx !== 0 && gs.dir.x !== -dx) gs.dir = { x: dx, y: 0 };
+        if (dy !== 0 && gs.dir.y !== -dy) gs.dir = { x: 0, y: dy };
     };
 
     return (
         <GameHeader title="🐍 Snake" gradient="from-lime-400 to-emerald-400" goBack={goBack} onReset={startGame}>
             <ScorePanel items={[
                 { label: 'Score', value: score, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
-                { label: 'Length', value: snake.length, color: 'text-emerald-400' },
+                { label: 'Length', value: displaySnake.length, color: 'text-emerald-400' },
                 { label: 'Best', value: best || '—', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
             ]} />
 
@@ -549,9 +581,9 @@ function SnakeGame({ goBack }) {
             <div className="inline-grid gap-0 bg-[#0a0c16] rounded-2xl p-1.5 border border-white/5 shadow-inner" style={{ gridTemplateColumns: `repeat(${SIZE}, 1fr)` }}>
                 {Array.from({ length: SIZE * SIZE }).map((_, i) => {
                     const x = i % SIZE, y = Math.floor(i / SIZE);
-                    const isHead = snake[0]?.x === x && snake[0]?.y === y;
-                    const isSnake = snake.some(s => s.x === x && s.y === y);
-                    const isFood = food.x === x && food.y === y;
+                    const isHead = displaySnake[0]?.x === x && displaySnake[0]?.y === y;
+                    const isSnake = displaySnake.some(s => s.x === x && s.y === y);
+                    const isFood = displayFood.x === x && displayFood.y === y;
                     return (
                         <div key={i} className={`w-[22px] h-[22px] rounded-[3px] transition-colors duration-75 ${isHead ? 'bg-green-400 shadow-md shadow-green-400/50' : isSnake ? 'bg-green-500/70' : isFood ? 'bg-red-400 shadow-md shadow-red-400/50 animate-pulse' : 'bg-white/[0.02]'}`} />
                     );
