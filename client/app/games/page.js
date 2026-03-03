@@ -35,6 +35,9 @@ export default function GamesPage() {
     const [activeGame, setActiveGame] = useState(null);
     const [gameMode, setGameMode] = useState(null);
     const [selectingMode, setSelectingMode] = useState(null);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => { setMounted(true); }, []);
 
     const handlePick = (g) => {
         if (g.modes.length === 1 && g.modes[0] === 'solo') { setActiveGame(g.id); setGameMode('solo'); }
@@ -116,7 +119,7 @@ export default function GamesPage() {
                                                     <FiUsers className="w-3.5 h-3.5" />
                                                     {g.modes.includes('2player') ? '1–2 Players' : g.modes.includes('cpu') ? 'vs CPU' : 'Solo'}
                                                 </div>
-                                                {getHighScore(g.id) > 0 && (
+                                                {mounted && getHighScore(g.id) > 0 && (
                                                     <div className="flex items-center gap-1.5 bg-amber-500/20 backdrop-blur-sm border border-amber-400/30 rounded-full px-3 py-1.5 text-xs font-semibold text-amber-300">
                                                         <FiAward className="w-3.5 h-3.5" /> Best: {getHighScore(g.id)}
                                                     </div>
