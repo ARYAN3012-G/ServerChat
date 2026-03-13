@@ -185,7 +185,7 @@ export default function HomePage() {
                     >
                         <FiMessageSquare className="w-5 h-5 text-dark-900" />
                     </motion.div>
-                    <span className="text-2xl font-display font-bold text-white">ServerChat</span>
+                    <span className="hidden sm:block text-2xl font-display font-bold text-white">ServerChat</span>
                 </motion.div>
 
                 <motion.div
