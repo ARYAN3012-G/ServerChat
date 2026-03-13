@@ -248,7 +248,7 @@ export default function HomePage() {
                                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-white to-silver-400 flex items-center justify-center">
                                         <FiMessageSquare className="w-4 h-4 text-dark-900" />
                                     </div>
-                                    <span className="text-lg font-display font-bold text-white uppercase tracking-wider">ServerChat</span>
+                                    <span className="text-lg font-display font-bold text-white">ServerChat</span>
                                 </Link>
                                 <button 
                                     onClick={() => setIsMobileMenuOpen(false)} 
