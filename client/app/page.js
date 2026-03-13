@@ -192,16 +192,16 @@ export default function HomePage() {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                    className="flex items-center gap-4"
+                    className="flex items-center gap-2 sm:gap-4 shrink-0"
                 >
-                    <Link href="/login" className="text-silver-400 hover:text-white transition-colors font-medium">
+                    <Link href="/login" className="text-silver-400 hover:text-white transition-colors font-medium text-sm sm:text-base whitespace-nowrap">
                         Log In
                     </Link>
                     <Link href="/register">
                         <motion.button
                             whileHover={{ scale: 1.05, boxShadow: '0 0 30px rgba(255,255,255,0.15)' }}
                             whileTap={{ scale: 0.95 }}
-                            className="bg-white text-dark-900 font-semibold py-2.5 px-6 rounded-lg transition-all"
+                            className="bg-white text-dark-900 font-semibold py-2 px-3 sm:py-2.5 sm:px-6 rounded-lg transition-all text-sm sm:text-base whitespace-nowrap"
                         >
                             Get Started
                         </motion.button>
