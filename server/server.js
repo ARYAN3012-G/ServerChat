@@ -1,30 +1,38 @@
+const dotenv = require('dotenv');
+// Load environment variables FIRST (before any config that reads them)
+dotenv.config({ path: '../.env' });
+
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const dotenv = require('dotenv');
+const path = require('path');
+const session = require('express-session');
+const passport = require('./config/passport');
 const { connectDB } = require('./config/db');
 const { connectRedis } = require('./config/redis');
+const { connectCloudinary } = require('./config/cloudinary');
 const { initializeSocket } = require('./sockets');
 const { logger } = require('./config/logger');
 const errorHandler = require('./middleware/errorHandler');
 
-// Load environment variables
-dotenv.config({ path: '../.env' });
-
 const app = express();
 const server = http.createServer(app);
 
-// Connect to databases
+// Connect to databases and services
 connectDB();
 connectRedis();
+connectCloudinary();
 
 // Initialize Socket.io
 initializeSocket(server);
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false,
+}));
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true,
@@ -39,7 +47,29 @@ app.use(morgan('combined', {
   stream: { write: (message) => logger.info(message.trim()) }
 }));
 
+// Session middleware (Required for Passport OAuth)
+app.use(session({
+  secret: process.env.JWT_SECRET || 'secret',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: process.env.NODE_ENV === 'production' }
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
 // API Routes
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, filePath) => {
+    // Force audio MIME type for webm/weba files so HTML5 <audio> can play voice messages
+    if (filePath.endsWith('.webm') || filePath.endsWith('.weba')) {
+      res.setHeader('Content-Type', 'audio/webm');
+      res.setHeader('Accept-Ranges', 'bytes');
+    }
+  }
+}));
+app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/servers', require('./routes/serverRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
@@ -60,8 +90,9 @@ app.get('/api/health', (req, res) => {
 app.use(errorHandler);
 
 // Start server
+// Start server
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   logger.info(`🚀 ServerChat API running on port ${PORT}`);
   logger.info(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
 });

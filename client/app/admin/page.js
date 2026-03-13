@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUsers, FiShield, FiSearch, FiBarChart2, FiAlertTriangle, FiTrendingUp, FiActivity, FiFileText, FiPlay } from 'react-icons/fi';
+import { FiArrowLeft, FiUsers, FiShield, FiSearch, FiBarChart2, FiAlertTriangle, FiTrendingUp, FiActivity, FiFileText, FiPlay, FiMenu } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 
@@ -17,6 +17,7 @@ export default function AdminPage() {
     const [activityLogs, setActivityLogs] = useState([]);
     const [adminLogs, setAdminLogs] = useState([]);
     const [gameActivity, setGameActivity] = useState([]);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
     useEffect(() => { if (isAuthenticated) { fetchStats(); fetchUsers(); } }, [isAuthenticated]);
@@ -46,12 +47,15 @@ export default function AdminPage() {
     const filteredUsers = users.filter(u => (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) || (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()));
 
     const statCards = stats ? [
-        { label: 'Total Users', value: stats.totalUsers || 0, color: 'from-indigo-500 to-blue-500', shadow: 'shadow-indigo-500/20', icon: FiUsers },
-        { label: 'Online Now', value: stats.onlineUsers || 0, color: 'from-emerald-500 to-teal-500', shadow: 'shadow-emerald-500/20', icon: FiTrendingUp },
-        { label: 'Messages 24h', value: stats.messagesDay || 0, color: 'from-violet-500 to-purple-500', shadow: 'shadow-violet-500/20', icon: FiActivity },
-        { label: 'Active Games', value: stats.activeGames || 0, color: 'from-amber-500 to-orange-500', shadow: 'shadow-amber-500/20', icon: FiPlay },
-        { label: 'Total Revenue', value: `$${stats.totalRevenue || 0}`, color: 'from-emerald-600 to-teal-600', shadow: 'shadow-emerald-500/20', icon: FiBarChart2 },
-        { label: 'New This Week', value: stats.newUsersWeek || 0, color: 'from-red-500 to-rose-500', shadow: 'shadow-red-500/20', icon: FiAlertTriangle },
+        { label: 'Total Users', value: stats.totalUsers || 0, color: 'from-white/10 to-white/5', shadow: 'shadow-white/5', icon: FiUsers },
+        { label: 'Online Now', value: stats.onlineUsers || 0, color: 'from-emerald-500/20 to-emerald-500/5', shadow: 'shadow-emerald-500/10', icon: FiTrendingUp },
+        { label: 'Total Messages', value: stats.totalMessages || 0, color: 'from-white/10 to-white/5', shadow: 'shadow-white/5', icon: FiActivity },
+        { label: 'Messages 24h', value: stats.messagesDay || 0, color: 'from-sky-500/20 to-sky-500/5', shadow: 'shadow-sky-500/10', icon: FiActivity },
+        { label: 'Total Channels', value: stats.totalChannels || 0, color: 'from-white/10 to-white/5', shadow: 'shadow-white/5', icon: FiBarChart2 },
+        { label: 'Active Games', value: stats.activeGames || 0, color: 'from-amber-500/20 to-amber-500/5', shadow: 'shadow-amber-500/10', icon: FiPlay },
+        { label: 'Total Games', value: stats.totalGames || 0, color: 'from-white/10 to-white/5', shadow: 'shadow-white/5', icon: FiPlay },
+        { label: 'New This Week', value: stats.newUsersWeek || 0, color: 'from-white/10 to-white/5', shadow: 'shadow-white/5', icon: FiAlertTriangle },
+        { label: 'Total Revenue', value: `$${stats.totalRevenue || 0}`, color: 'from-emerald-500/20 to-emerald-500/5', shadow: 'shadow-emerald-500/10', icon: FiBarChart2 },
     ] : [];
 
     const tabs = [
@@ -64,26 +68,41 @@ export default function AdminPage() {
 
     const actionColors = {
         login: 'text-emerald-400 bg-emerald-500/10', logout: 'text-white/40 bg-white/5', register: 'text-blue-400 bg-blue-500/10',
-        message_sent: 'text-indigo-400 bg-indigo-500/10', friend_added: 'text-pink-400 bg-pink-500/10',
+        message_sent: 'text-silver-300 bg-silver-400/10', friend_added: 'text-pink-400 bg-pink-500/10',
         game_finished: 'text-amber-400 bg-amber-500/10', game_started: 'text-amber-400 bg-amber-500/10',
         user_banned: 'text-red-400 bg-red-500/10', user_unbanned: 'text-emerald-400 bg-emerald-500/10',
-        user_role_changed: 'text-purple-400 bg-purple-500/10', profile_updated: 'text-sky-400 bg-sky-500/10',
+        user_role_changed: 'text-silver-300 bg-silver-400/10', profile_updated: 'text-sky-400 bg-sky-500/10',
         call_started: 'text-teal-400 bg-teal-500/10', call_ended: 'text-white/40 bg-white/5',
     };
 
-    if (loading) return <div className="flex h-screen items-center justify-center bg-[#0c0e1a]"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
+    if (loading) return <div className="flex h-screen items-center justify-center bg-[#040407]"><div className="w-10 h-10 border-2 border-silver-400 border-t-transparent rounded-full animate-spin" /></div>;
+
+    // Get weekly activity data from API or default to zeros
+    const weeklyActivity = stats?.weeklyActivity || [
+        { day: 'Sun', messages: 0, newUsers: 0 },
+        { day: 'Mon', messages: 0, newUsers: 0 },
+        { day: 'Tue', messages: 0, newUsers: 0 },
+        { day: 'Wed', messages: 0, newUsers: 0 },
+        { day: 'Thu', messages: 0, newUsers: 0 },
+        { day: 'Fri', messages: 0, newUsers: 0 },
+        { day: 'Sat', messages: 0, newUsers: 0 },
+    ];
+    const maxMessages = Math.max(...weeklyActivity.map(d => d.messages), 1);
 
     return (
-        <div className="flex h-screen bg-[#0c0e1a] text-white overflow-hidden">
+        <div className="flex h-screen bg-[#040407] text-white overflow-hidden">
+            {/* Mobile overlay */}
+            {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />}
+
             {/* Sidebar */}
-            <div className="w-56 bg-[#080a14] border-r border-white/5 flex flex-col">
+            <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed inset-y-0 left-0 z-40 w-56 bg-dark-800 border-r border-white/5 flex flex-col h-full transition-transform duration-300 md:relative`}>
                 <div className="p-4 border-b border-white/5">
                     <button onClick={() => router.push('/channels')} className="flex items-center gap-2 text-white/40 hover:text-white text-sm transition-colors mb-4"><FiArrowLeft className="w-4 h-4" /> Back to Chat</button>
                     <h2 className="text-lg font-bold flex items-center gap-2"><FiShield className="w-5 h-5 text-amber-400" /> Admin Panel</h2>
                 </div>
                 <div className="flex-1 p-2 space-y-1">
                     {tabs.map(t => (
-                        <button key={t.id} onClick={() => setTab(t.id)} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === t.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
+                        <button key={t.id} onClick={() => { setTab(t.id); setSidebarOpen(false); }} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === t.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
                             <t.icon className="w-4 h-4" /> {t.label}
                         </button>
                     ))}
@@ -91,35 +110,43 @@ export default function AdminPage() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 w-full relative">
+                {/* Mobile header */}
+                <div className="md:hidden mb-6 flex items-center justify-between border-b border-white/5 pb-4">
+                    <h2 className="text-xl font-bold flex items-center gap-2"><FiShield className="w-5 h-5 text-amber-400" /> Admin Panel</h2>
+                    <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg bg-dark-800 border border-white/10 text-white/70 hover:text-white transition-colors">
+                        <FiMenu className="w-6 h-6" />
+                    </button>
+                </div>
                 <AnimatePresence mode="wait">
                     {/* OVERVIEW */}
                     {tab === 'overview' && (
                         <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                             <h3 className="text-2xl font-bold mb-8">Dashboard Overview</h3>
-                            <div className="grid grid-cols-3 gap-4 mb-8">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                                 {statCards.map((card, i) => (
                                     <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
-                                        className={`bg-gradient-to-br ${card.color} rounded-2xl p-6 shadow-xl ${card.shadow} relative overflow-hidden`}>
+                                        className={`bg-gradient-to-br ${card.color} rounded-2xl p-6 shadow-xl ${card.shadow} relative overflow-hidden border border-white/[0.06]`}>
                                         <div className="absolute top-3 right-3 opacity-20"><card.icon className="w-8 h-8" /></div>
-                                        <p className="text-white/70 text-sm font-medium">{card.label}</p>
+                                        <p className="text-white/50 text-sm font-medium">{card.label}</p>
                                         <p className="text-3xl font-black mt-2">{card.value}</p>
                                     </motion.div>
                                 ))}
                             </div>
                             <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-6">
-                                <h4 className="text-lg font-semibold mb-6">User Activity (Last 7 days)</h4>
+                                <h4 className="text-lg font-semibold mb-2">Messages Activity (Last 7 days)</h4>
+                                <p className="text-white/30 text-xs mb-6">Real data from your database</p>
                                 <div className="flex items-end gap-3 h-48">
-                                    {[65, 45, 78, 52, 90, 70, 85].map((h, i) => (
-                                        <motion.div key={i} initial={{ height: 0 }} animate={{ height: `${h}%` }} transition={{ delay: i * 0.1, duration: 0.5 }}
-                                            className="flex-1 bg-gradient-to-t from-indigo-500 to-indigo-400/30 rounded-t-lg relative group cursor-pointer">
-                                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs text-white/50 opacity-0 group-hover:opacity-100 transition-opacity">{h}</div>
+                                    {weeklyActivity.map((d, i) => (
+                                        <motion.div key={i} initial={{ height: 0 }} animate={{ height: `${maxMessages > 0 ? (d.messages / maxMessages) * 100 : 0}%` }} transition={{ delay: i * 0.1, duration: 0.5 }}
+                                            className="flex-1 bg-gradient-to-t from-white/20 to-white/5 rounded-t-lg relative group cursor-pointer min-h-[4px] border-t border-white/20">
+                                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs text-white/50 opacity-0 group-hover:opacity-100 transition-opacity">{d.messages}</div>
                                         </motion.div>
                                     ))}
                                 </div>
                                 <div className="flex gap-3 mt-3">
-                                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
-                                        <div key={d} className="flex-1 text-center text-xs text-white/30">{d}</div>
+                                    {weeklyActivity.map(d => (
+                                        <div key={d.day} className="flex-1 text-center text-xs text-white/30">{d.day}</div>
                                     ))}
                                 </div>
                             </div>
@@ -134,10 +161,10 @@ export default function AdminPage() {
                                 <div className="relative">
                                     <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
                                     <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search users..."
-                                        className="bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white placeholder-white/20 focus:ring-2 focus:ring-indigo-500 w-64" />
+                                        className="bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white placeholder-white/20 focus:ring-2 focus:ring-silver-400 w-64" />
                                 </div>
                             </div>
-                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 overflow-hidden">
+                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 overflow-hidden overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
                                         <tr className="border-b border-white/5">
@@ -154,7 +181,7 @@ export default function AdminPage() {
                                                 className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
                                                 <td className="px-6 py-3">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-9 h-9 rounded-full bg-indigo-500/40 flex items-center justify-center text-sm font-bold">{(u.username || '?')[0].toUpperCase()}</div>
+                                                        <div className="w-9 h-9 rounded-full bg-silver-400/40 flex items-center justify-center text-sm font-bold">{(u.username || '?')[0].toUpperCase()}</div>
                                                         <div><p className="font-medium text-sm">{u.username}</p><p className="text-xs text-white/30">{u.email}</p></div>
                                                     </div>
                                                 </td>
@@ -184,8 +211,8 @@ export default function AdminPage() {
                     {tab === 'activity' && (
                         <motion.div key="activity" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                             <h3 className="text-2xl font-bold mb-6">Activity Logs</h3>
-                            <p className="text-white/40 text-sm mb-6">User login, register, and other activity events — from <code className="text-indigo-400">activitylogs</code> collection</p>
-                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 overflow-hidden">
+                            <p className="text-white/40 text-sm mb-6">User login, register, and other activity events — from <code className="text-silver-300">activitylogs</code> collection</p>
+                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 overflow-hidden overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
                                         <tr className="border-b border-white/5">
@@ -220,8 +247,8 @@ export default function AdminPage() {
                     {tab === 'audit' && (
                         <motion.div key="audit" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                             <h3 className="text-2xl font-bold mb-6">Admin Audit Trail</h3>
-                            <p className="text-white/40 text-sm mb-6">Every admin action is recorded — from <code className="text-indigo-400">adminlogs</code> collection</p>
-                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 overflow-hidden">
+                            <p className="text-white/40 text-sm mb-6">Every admin action is recorded — from <code className="text-silver-300">adminlogs</code> collection</p>
+                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 overflow-hidden overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
                                         <tr className="border-b border-white/5">
@@ -256,8 +283,8 @@ export default function AdminPage() {
                     {tab === 'games' && (
                         <motion.div key="games" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                             <h3 className="text-2xl font-bold mb-6">Game Activity</h3>
-                            <p className="text-white/40 text-sm mb-6">All game sessions & scores — from <code className="text-indigo-400">gamesessions</code> collection</p>
-                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 overflow-hidden">
+                            <p className="text-white/40 text-sm mb-6">All game sessions & scores — from <code className="text-silver-300">gamesessions</code> collection</p>
+                            <div className="bg-white/[0.03] rounded-2xl border border-white/5 overflow-hidden overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
                                         <tr className="border-b border-white/5">
@@ -273,7 +300,7 @@ export default function AdminPage() {
                                             <motion.tr key={g._id || i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}
                                                 className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
                                                 <td className="px-6 py-3">
-                                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-400">
+                                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-silver-400/10 text-silver-300">
                                                         {g.game?.replace(/-/g, ' ')}
                                                     </span>
                                                 </td>

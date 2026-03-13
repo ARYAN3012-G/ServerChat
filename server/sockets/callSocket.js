@@ -1,5 +1,24 @@
 const CallSession = require('../models/CallSession');
+const Message = require('../models/Message');
 const { logger } = require('../config/logger');
+const mongoose = require('mongoose');
+
+// Helper: post a system message in the channel for call events
+async function postCallSystemMessage(io, channelId, senderId, content) {
+    if (!channelId || !mongoose.isValidObjectId(channelId)) return;
+    try {
+        const msg = await Message.create({
+            content,
+            sender: senderId,
+            channel: channelId,
+            type: 'system',
+        });
+        const populated = await msg.populate('sender', 'username avatar');
+        io.to(channelId).emit('message:new', populated);
+    } catch (err) {
+        logger.error(`Failed to post call system message: ${err.message}`);
+    }
+}
 
 module.exports = (io, socket) => {
     // Initiate a call
@@ -7,20 +26,25 @@ module.exports = (io, socket) => {
         try {
             const { targetUserId, channelId, type = 'voice', isGroup = false } = data;
 
-            const session = await CallSession.create({
+            const sessionPayload = {
                 type,
-                channel: channelId,
                 initiator: socket.userId,
                 participants: [{ user: socket.userId }],
                 isGroup,
                 status: 'ringing',
-            });
+            };
 
+            if (channelId && mongoose.isValidObjectId(channelId)) {
+                sessionPayload.channel = channelId;
+            }
+
+            const session = await CallSession.create(sessionPayload);
             socket.join(`call:${session._id}`);
 
-            // Notify target user
+            await session.populate(['initiator', 'participants.user']);
+
             io.to(`user:${targetUserId}`).emit('call:incoming', {
-                session: await session.populate(['initiator', 'participants.user']),
+                session,
                 from: { userId: socket.userId, username: socket.username },
             });
         } catch (error) {
@@ -33,7 +57,6 @@ module.exports = (io, socket) => {
         try {
             const { sessionId } = data;
             const session = await CallSession.findById(sessionId);
-
             if (!session) return;
 
             session.participants.push({ user: socket.userId });
@@ -86,7 +109,6 @@ module.exports = (io, socket) => {
         try {
             const { sessionId } = data;
             const session = await CallSession.findById(sessionId);
-
             if (!session) return;
 
             session.status = 'ended';
@@ -95,6 +117,19 @@ module.exports = (io, socket) => {
                 session.duration = Math.floor((session.endedAt - session.startedAt) / 1000);
             }
             await session.save();
+
+            // Post system message about call end
+            const duration = session.duration;
+            const mins = Math.floor((duration || 0) / 60);
+            const secs = (duration || 0) % 60;
+            const durationText = duration ? `Duration: ${mins}m ${secs}s` : '';
+            const callTypeIcon = session.type === 'video' ? '📹' : '📞';
+            await postCallSystemMessage(
+                io,
+                session.channel?.toString(),
+                session.initiator,
+                `${callTypeIcon} ${session.type === 'video' ? 'Video' : 'Voice'} call ended. ${durationText}`
+            );
 
             io.to(`call:${sessionId}`).emit('call:ended', { sessionId });
         } catch (error) {
@@ -119,7 +154,17 @@ module.exports = (io, socket) => {
             const session = await CallSession.findByIdAndUpdate(sessionId, {
                 status: 'missed',
                 endedAt: new Date(),
-            });
+            }, { new: true });
+
+            if (session) {
+                const callTypeIcon = session.type === 'video' ? '📹' : '📞';
+                await postCallSystemMessage(
+                    io,
+                    session.channel?.toString(),
+                    session.initiator,
+                    `${callTypeIcon} Missed ${session.type === 'video' ? 'video' : 'voice'} call`
+                );
+            }
 
             io.to(`call:${sessionId}`).emit('call:rejected', { sessionId });
         } catch (error) {

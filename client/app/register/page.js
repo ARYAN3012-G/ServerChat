@@ -46,6 +46,11 @@ export default function RegisterPage() {
         }
     };
 
+    const handleOAuth = (provider) => {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        window.location.href = `${apiUrl}/api/auth/${provider}`;
+    };
+
     // Password strength
     const getPasswordStrength = () => {
         const { password } = formData;
@@ -72,8 +77,8 @@ export default function RegisterPage() {
     return (
         <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4 relative overflow-hidden">
             <div className="fixed inset-0 bg-mesh opacity-30" />
-            <div className="fixed top-0 right-1/3 w-[600px] h-[600px] bg-purple-500/8 rounded-full blur-3xl" />
-            <div className="fixed bottom-0 left-1/3 w-[600px] h-[600px] bg-primary-500/8 rounded-full blur-3xl" />
+            <div className="fixed top-0 right-1/3 w-[600px] h-[600px] bg-white/[0.02] rounded-full blur-3xl" />
+            <div className="fixed bottom-0 left-1/3 w-[600px] h-[600px] bg-white/[0.03] rounded-full blur-3xl" />
 
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -83,14 +88,14 @@ export default function RegisterPage() {
             >
                 <div className="text-center mb-8">
                     <Link href="/" className="inline-flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-white/90 to-silver-300/90 flex items-center justify-center">
                             <FiMessageSquare className="w-6 h-6 text-white" />
                         </div>
                         <span className="text-3xl font-display font-bold text-white">ServerChat</span>
                     </Link>
                 </div>
 
-                <div className="glass p-8">
+                <div className="glass p-5 sm:p-8">
                     <h2 className="text-2xl font-bold text-white text-center mb-2">Create Account</h2>
                     <p className="text-dark-400 text-center mb-8">Join the community today</p>
 
@@ -186,11 +191,11 @@ export default function RegisterPage() {
                                 type="checkbox"
                                 checked={agreeToTerms}
                                 onChange={(e) => setAgreeToTerms(e.target.checked)}
-                                className="mt-1 rounded border-dark-600 bg-dark-800 text-primary-500 focus:ring-primary-500"
+                                className="mt-1 rounded border-dark-600 bg-dark-800 text-primary-500 focus:ring-white/20"
                             />
                             <span className="text-dark-400 text-sm">
-                                I agree to the <span className="text-primary-400">Terms of Service</span> and{' '}
-                                <span className="text-primary-400">Privacy Policy</span>
+                                I agree to the <span className="text-silver-300">Terms of Service</span> and{' '}
+                                <span className="text-silver-300">Privacy Policy</span>
                             </span>
                         </label>
 
@@ -198,7 +203,7 @@ export default function RegisterPage() {
                             whileTap={{ scale: 0.98 }}
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-gradient-to-r from-primary-500 to-purple-600 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center"
+                            className="w-full bg-gradient-to-r from-white/90 to-silver-300/90 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center"
                         >
                             {loading ? (
                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -218,11 +223,19 @@ export default function RegisterPage() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                        <motion.button
+                            onClick={() => handleOAuth('google')}
+                            type="button"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                             className="flex items-center justify-center gap-2 py-3 rounded-lg bg-dark-700 hover:bg-dark-600 text-white font-medium transition-colors">
                             <FaGoogle className="w-4 h-4 text-red-400" /> Google
                         </motion.button>
-                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                        <motion.button
+                            onClick={() => handleOAuth('github')}
+                            type="button"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                             className="flex items-center justify-center gap-2 py-3 rounded-lg bg-dark-700 hover:bg-dark-600 text-white font-medium transition-colors">
                             <FaGithub className="w-4 h-4" /> GitHub
                         </motion.button>
@@ -230,7 +243,7 @@ export default function RegisterPage() {
 
                     <p className="text-center text-dark-400 mt-6 text-sm">
                         Already have an account?{' '}
-                        <Link href="/login" className="text-primary-400 hover:text-primary-300 font-medium transition-colors">
+                        <Link href="/login" className="text-silver-300 hover:text-silver-200 font-medium transition-colors">
                             Log In
                         </Link>
                     </p>

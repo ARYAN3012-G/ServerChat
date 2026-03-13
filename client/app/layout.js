@@ -3,7 +3,9 @@
 import { Provider } from 'react-redux';
 import { store } from '../redux/store';
 import { Toaster } from 'react-hot-toast';
-import { NotificationProvider } from '../components/NotificationProvider';
+import NotificationProvider from '../components/NotificationProvider';
+import CallProvider from '../components/CallProvider';
+import BackgroundRenderer from '../components/BackgroundRenderer';
 import './globals.css';
 
 export default function RootLayout({ children }) {
@@ -13,15 +15,17 @@ export default function RootLayout({ children }) {
                 <title>ServerChat - Real-Time Communication Platform</title>
                 <meta name="description" content="Discord-like real-time communication and entertainment platform" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <link rel="icon" href="/favicon.ico" />
+                <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
                 <link rel="manifest" href="/manifest.json" />
-                <meta name="theme-color" content="#5865F2" />
+                <meta name="theme-color" content="#040407" />
             </head>
-            <body className="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased">
+            <body className="bg-transparent text-[var(--text-primary)] antialiased">
                 <Provider store={store}>
-                    <NotificationProvider>
+                    <CallProvider>
+                        <BackgroundRenderer />
+                        <NotificationProvider />
                         {children}
-                    </NotificationProvider>
+                    </CallProvider>
                     <Toaster
                         position="top-right"
                         toastOptions={{

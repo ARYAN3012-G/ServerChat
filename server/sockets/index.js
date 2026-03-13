@@ -48,6 +48,9 @@ const initializeSocket = (server) => {
         callSocket(io, socket);
         streamSocket(io, socket);
 
+        // Status change handler
+        socket.on('presence:status', (data) => presenceSocket.handleStatusChange(io, socket, data));
+
         // Handle disconnect
         socket.on('disconnect', (reason) => {
             logger.info(`🔌 User disconnected: ${socket.username} - ${reason}`);

@@ -4,19 +4,25 @@ const { logger } = require('../config/logger');
 
 const handleConnect = async (io, socket) => {
     try {
+        // Join personal room immediately so real-time messaging doesn't break
+        socket.join(`user:${socket.userId}`);
+
         const redis = getRedis();
 
         // Update user status
-        await User.findByIdAndUpdate(socket.userId, { status: 'online' });
+        const userDoc = await User.findById(socket.userId);
+        const newStatus = userDoc?.preferredStatus || 'online';
+        await User.findByIdAndUpdate(socket.userId, { status: newStatus });
 
         // Store in Redis for fast lookups
         if (redis) {
-            await redis.sadd('online_users', socket.userId);
-            await redis.set(`user:${socket.userId}:socketId`, socket.id);
+            try {
+                await redis.sadd('online_users', socket.userId);
+                await redis.set(`user:${socket.userId}:socketId`, socket.id);
+            } catch (redisErr) {
+                logger.warn(`Redis presence error (non-fatal): ${redisErr.message}`);
+            }
         }
-
-        // Join personal room
-        socket.join(`user:${socket.userId}`);
 
         // Notify friends
         const user = await User.findById(socket.userId).select('friends');
@@ -24,7 +30,7 @@ const handleConnect = async (io, socket) => {
             user.friends.forEach(friendId => {
                 io.to(`user:${friendId}`).emit('presence:online', {
                     userId: socket.userId,
-                    status: 'online',
+                    status: newStatus,
                 });
             });
         }
@@ -46,8 +52,12 @@ const handleDisconnect = async (io, socket) => {
 
         // Remove from Redis
         if (redis) {
-            await redis.srem('online_users', socket.userId);
-            await redis.del(`user:${socket.userId}:socketId`);
+            try {
+                await redis.srem('online_users', socket.userId);
+                await redis.del(`user:${socket.userId}:socketId`);
+            } catch (redisErr) {
+                logger.warn(`Redis presence disconnect error (non-fatal): ${redisErr.message}`);
+            }
         }
 
         // Notify friends
@@ -65,4 +75,26 @@ const handleDisconnect = async (io, socket) => {
     }
 };
 
-module.exports = { handleConnect, handleDisconnect };
+const handleStatusChange = async (io, socket, data) => {
+    try {
+        const { status } = data;
+        if (!['online', 'idle', 'dnd', 'invisible'].includes(status)) return;
+
+        await User.findByIdAndUpdate(socket.userId, { status, preferredStatus: status });
+
+        // Notify friends of status change
+        const user = await User.findById(socket.userId).select('friends');
+        if (user?.friends) {
+            user.friends.forEach(friendId => {
+                io.to(`user:${friendId}`).emit('presence:status-changed', {
+                    userId: socket.userId,
+                    status,
+                });
+            });
+        }
+    } catch (error) {
+        logger.error(`Status change error: ${error.message}`);
+    }
+};
+
+module.exports = { handleConnect, handleDisconnect, handleStatusChange };

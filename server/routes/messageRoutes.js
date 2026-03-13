@@ -11,5 +11,6 @@ router.get('/search', auth, messageController.searchMessages);
 router.put('/:messageId', auth, messageController.editMessage);
 router.delete('/:messageId', auth, messageController.deleteMessage);
 router.post('/:messageId/react', auth, messageController.toggleReaction);
+router.post('/:messageId/read', auth, messageController.markAsRead);
 
 module.exports = router;

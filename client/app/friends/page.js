@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUserPlus, FiUserCheck, FiUserX, FiSearch, FiMessageSquare, FiUsers, FiClock, FiX, FiCheck } from 'react-icons/fi';
+import { FiArrowLeft, FiUserPlus, FiUserCheck, FiUserX, FiSearch, FiMessageSquare, FiUsers, FiClock, FiX, FiCheck, FiMenu } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
+import { getSocket } from '../../services/socket';
 
 export default function FriendsPage() {
     const router = useRouter();
@@ -16,9 +18,18 @@ export default function FriendsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [addUsername, setAddUsername] = useState('');
     const [addStatus, setAddStatus] = useState(null);
+    const { onlineUsers } = useSelector((s) => s.chat);
 
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
     useEffect(() => { if (isAuthenticated) { fetchFriends(); fetchRequests(); } }, [isAuthenticated]);
+
+    useEffect(() => {
+        const socket = getSocket();
+        if (!socket) return;
+        const handleStatus = () => fetchFriends();
+        socket.on('presence:status-changed', handleStatus);
+        return () => socket.off('presence:status-changed', handleStatus);
+    }, []);
 
     const fetchFriends = async () => { try { const { data } = await api.get('/friends'); setFriends(data.friends || data || []); } catch (e) { console.error(e); } };
     const fetchRequests = async () => { try { const { data } = await api.get('/friends/requests'); setRequests({ incoming: data.incoming || [], outgoing: data.outgoing || [] }); } catch (e) { console.error(e); } };
@@ -32,6 +43,12 @@ export default function FriendsPage() {
     const handleAccept = async (id) => { try { await api.put(`/friends/accept/${id}`); fetchFriends(); fetchRequests(); } catch (e) { console.error(e); } };
     const handleReject = async (id) => { try { await api.put(`/friends/reject/${id}`); fetchRequests(); } catch (e) { console.error(e); } };
     const handleRemove = async (id) => { if (!confirm('Remove friend?')) return; try { await api.delete(`/friends/${id}`); fetchFriends(); } catch (e) { console.error(e); } };
+    const handleMessageFriend = async (friendId) => {
+        try {
+            await api.post('/channels/dm', { targetUserId: friendId });
+            router.push('/dms');
+        } catch (e) { console.error(e); }
+    };
 
     const tabs = [
         { id: 'all', label: 'All Friends', icon: FiUsers },
@@ -45,8 +62,8 @@ export default function FriendsPage() {
 
     return (
         <div className="flex h-screen bg-dark-900 text-white overflow-hidden">
-            {/* Sidebar */}
-            <div className="w-[72px] bg-dark-950 flex flex-col items-center py-3 gap-2 border-r border-white/5">
+            {/* Sidebar - hidden on mobile */}
+            <div className="hidden md:flex w-[72px] bg-dark-950 flex-col items-center py-3 gap-2 border-r border-white/5">
                 <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/channels')}
                     className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-indigo-400 hover:text-white hover:bg-indigo-500 cursor-pointer transition-all" title="Back to Chat">
                     <FiArrowLeft className="w-6 h-6" />
@@ -54,15 +71,18 @@ export default function FriendsPage() {
             </div>
 
             {/* Main */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
                 {/* Header */}
-                <div className="h-12 px-6 flex items-center gap-6 border-b border-white/5">
-                    <FiUsers className="w-5 h-5 text-white/30" />
+                <div className="h-12 px-4 sm:px-6 flex items-center gap-3 sm:gap-6 border-b border-white/5">
+                    <button onClick={() => router.push('/channels')} className="md:hidden text-white/40 hover:text-white transition-colors">
+                        <FiArrowLeft className="w-5 h-5" />
+                    </button>
+                    <FiUsers className="w-5 h-5 text-white/30 hidden sm:block" />
                     <span className="font-bold">Friends</span>
-                    <div className="flex items-center gap-1 ml-4">
+                    <div className="flex items-center gap-1 ml-2 sm:ml-4 overflow-x-auto scrollbar-none">
                         {tabs.map(t => (
                             <button key={t.id} onClick={() => setTab(t.id)}
-                                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tab === t.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
+                                className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${tab === t.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
                                 <t.icon className="w-4 h-4" /> {t.label}
                                 {t.count > 0 && <span className="ml-1 w-5 h-5 bg-red-500 rounded-full text-[10px] flex items-center justify-center font-bold">{t.count}</span>}
                             </button>
@@ -70,7 +90,7 @@ export default function FriendsPage() {
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                     <AnimatePresence mode="wait">
                         {/* ALL FRIENDS */}
                         {tab === 'all' && (
@@ -90,11 +110,26 @@ export default function FriendsPage() {
                                                 className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 transition-colors group">
                                                 <div className="relative">
                                                     <div className="w-10 h-10 rounded-full bg-indigo-500/60 flex items-center justify-center font-bold">{(f.username || '?')[0].toUpperCase()}</div>
-                                                    <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-dark-900 ${f.status === 'online' ? 'bg-emerald-400' : 'bg-white/20'}`} />
+                                                    <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-dark-900 ${(() => {
+                                                        if (!onlineUsers.includes(f._id)) return 'bg-white/20';
+                                                        const s = f.status;
+                                                        if (s === 'dnd') return 'bg-red-500';
+                                                        if (s === 'idle') return 'bg-amber-400';
+                                                        if (s === 'invisible') return 'bg-white/20';
+                                                        return 'bg-emerald-400';
+                                                    })()
+                                                        }`} />
                                                 </div>
-                                                <div className="flex-1"><p className="font-medium">{f.username}</p><p className="text-xs text-white/30">{f.status || 'offline'}</p></div>
-                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors" title="Message"><FiMessageSquare className="w-4 h-4" /></button>
+                                                <div className="flex-1">
+                                                    <p className="font-medium">{f.username}</p>
+                                                    <p className="text-xs text-white/30">{
+                                                        onlineUsers.includes(f._id) && f.status !== 'invisible'
+                                                            ? (f.status === 'dnd' ? 'Do Not Disturb' : f.status === 'idle' ? 'Idle' : 'Online')
+                                                            : 'Offline'
+                                                    }</p>
+                                                </div>
+                                                <div className="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => handleMessageFriend(f._id)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors" title="Message"><FiMessageSquare className="w-4 h-4" /></button>
                                                     <button onClick={() => handleRemove(f._id)} className="p-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-400 transition-colors" title="Remove"><FiUserX className="w-4 h-4" /></button>
                                                 </div>
                                             </motion.div>
@@ -112,8 +147,8 @@ export default function FriendsPage() {
                                         <p className="text-[11px] font-semibold text-white/30 uppercase tracking-wider mb-3">Incoming — {requests.incoming.length}</p>
                                         {requests.incoming.map((r, i) => (
                                             <div key={r._id || i} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 transition-colors">
-                                                <div className="w-10 h-10 rounded-full bg-emerald-500/30 flex items-center justify-center font-bold text-emerald-300">{(r.sender?.username || '?')[0].toUpperCase()}</div>
-                                                <div className="flex-1"><p className="font-medium">{r.sender?.username}</p><p className="text-xs text-white/30">Incoming request</p></div>
+                                                <div className="w-10 h-10 rounded-full bg-emerald-500/30 flex items-center justify-center font-bold text-emerald-300">{(r.from?.username || '?')[0].toUpperCase()}</div>
+                                                <div className="flex-1"><p className="font-medium">{r.from?.username}</p><p className="text-xs text-white/30">Incoming request</p></div>
                                                 <button onClick={() => handleAccept(r._id)} className="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-colors"><FiCheck className="w-4 h-4" /></button>
                                                 <button onClick={() => handleReject(r._id)} className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"><FiX className="w-4 h-4" /></button>
                                             </div>
@@ -125,8 +160,8 @@ export default function FriendsPage() {
                                         <p className="text-[11px] font-semibold text-white/30 uppercase tracking-wider mb-3">Outgoing — {requests.outgoing.length}</p>
                                         {requests.outgoing.map((r, i) => (
                                             <div key={r._id || i} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 transition-colors">
-                                                <div className="w-10 h-10 rounded-full bg-amber-500/30 flex items-center justify-center font-bold text-amber-300">{(r.receiver?.username || '?')[0].toUpperCase()}</div>
-                                                <div className="flex-1"><p className="font-medium">{r.receiver?.username}</p><p className="text-xs text-white/30">Outgoing • Pending</p></div>
+                                                <div className="w-10 h-10 rounded-full bg-amber-500/30 flex items-center justify-center font-bold text-amber-300">{(r.to?.username || '?')[0].toUpperCase()}</div>
+                                                <div className="flex-1"><p className="font-medium">{r.to?.username}</p><p className="text-xs text-white/30">Outgoing • Pending</p></div>
                                                 <button onClick={() => handleReject(r._id)} className="p-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-white/30 hover:text-red-400 transition-colors"><FiX className="w-4 h-4" /></button>
                                             </div>
                                         ))}
@@ -143,7 +178,7 @@ export default function FriendsPage() {
                             <motion.div key="add" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="max-w-lg">
                                 <h3 className="text-xl font-bold mb-2">Add a Friend</h3>
                                 <p className="text-white/40 text-sm mb-6">Enter their username to send a friend request.</p>
-                                <div className="flex gap-3">
+                                <div className="flex flex-col sm:flex-row gap-3">
                                     <input type="text" value={addUsername} onChange={(e) => { setAddUsername(e.target.value); setAddStatus(null); }}
                                         onKeyDown={(e) => e.key === 'Enter' && handleSendRequest()} placeholder="Enter a username"
                                         className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white placeholder-white/20 focus:ring-2 focus:ring-indigo-500" />

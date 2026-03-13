@@ -53,13 +53,31 @@ exports.register = async (req, res, next) => {
 // Login
 exports.login = async (req, res, next) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, phone } = req.body;
 
-        const user = await User.findOne({
-            $or: [{ email }, { phone: email }, { username: email }]
-        }).select('+password +twoFactorSecret');
+        // If phone field provided, look up by phone only
+        let query;
+        if (phone) {
+            query = { phone };
+        } else {
+            query = { $or: [{ email }, { username: email }] };
+        }
+        const user = await User.findOne(query).select('+password +twoFactorSecret');
 
-        if (!user || !(await user.comparePassword(password))) {
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        // Check if user signed up via OAuth and has no password
+        if (!user.password && (user.googleId || user.githubId)) {
+            const provider = user.googleId ? 'Google' : 'GitHub';
+            return res.status(401).json({
+                message: `This account was created with ${provider}. Please use ${provider} login, or set a password in your account settings.`,
+                oauthAccount: true
+            });
+        }
+
+        if (!(await user.comparePassword(password))) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
@@ -219,7 +237,48 @@ exports.resetPassword = async (req, res, next) => {
 
 // Get current user
 exports.getMe = async (req, res) => {
-    res.json({ user: req.user });
+    const user = await User.findById(req.user._id).select('+faceDescriptor');
+    res.json({ user });
+};
+
+// Set password (for OAuth users who don't have one)
+exports.setPassword = async (req, res, next) => {
+    try {
+        const { password } = req.body;
+        if (!password || password.length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters' });
+        }
+
+        const user = await User.findById(req.user._id).select('+password');
+        if (user.password) {
+            return res.status(400).json({ message: 'Password already set. Use change password instead.' });
+        }
+
+        user.password = password;
+        await user.save(); // pre-save hook will hash it
+        res.json({ message: 'Password set successfully. You can now login with email and password.' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Update phone number
+exports.updatePhone = async (req, res, next) => {
+    try {
+        const { phone } = req.body;
+        if (!phone || phone.length < 7) {
+            return res.status(400).json({ message: 'Please provide a valid phone number' });
+        }
+        // Check uniqueness
+        const existing = await User.findOne({ phone, _id: { $ne: req.user._id } });
+        if (existing) {
+            return res.status(400).json({ message: 'This phone number is already linked to another account' });
+        }
+        await User.findByIdAndUpdate(req.user._id, { phone });
+        res.json({ message: 'Phone number updated successfully' });
+    } catch (error) {
+        next(error);
+    }
 };
 
 // Face login - store descriptor
@@ -228,6 +287,16 @@ exports.storeFaceDescriptor = async (req, res, next) => {
         const { descriptor } = req.body;
         await User.findByIdAndUpdate(req.user._id, { faceDescriptor: descriptor });
         res.json({ message: 'Face data stored successfully' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Face login - delete descriptor
+exports.deleteFaceDescriptor = async (req, res, next) => {
+    try {
+        await User.findByIdAndUpdate(req.user._id, { $unset: { faceDescriptor: 1 } });
+        res.json({ message: 'Face data deleted successfully' });
     } catch (error) {
         next(error);
     }
@@ -254,6 +323,39 @@ exports.faceLogin = async (req, res, next) => {
 
         const tokens = generateTokens(user);
         res.json({ user: user.toJSON(), ...tokens });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// OAuth Callback
+exports.oauthCallback = async (req, res, next) => {
+    try {
+        if (!req.user) {
+            return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=oauth_failed`);
+        }
+
+        const tokens = generateTokens(req.user);
+
+        // Check if user has a password set
+        const fullUser = await User.findById(req.user._id).select('+password');
+        const needsPassword = !fullUser.password;
+
+        // Log activity
+        await ActivityLog.create({
+            user: req.user._id,
+            action: 'login',
+            ipAddress: req.ip,
+            userAgent: req.get('user-agent'),
+            details: { method: 'oauth' }
+        });
+
+        // Redirect back to frontend with tokens in URL (frontend will parse and store them)
+        let redirectUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/login?token=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`;
+        if (needsPassword) {
+            redirectUrl += '&needsPassword=true';
+        }
+        res.redirect(redirectUrl);
     } catch (error) {
         next(error);
     }

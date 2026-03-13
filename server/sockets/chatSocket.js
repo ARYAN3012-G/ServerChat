@@ -69,12 +69,20 @@ module.exports = (io, socket) => {
             }
 
             // Update channel last message
-            await Channel.findByIdAndUpdate(channelId, {
+            const channel = await Channel.findByIdAndUpdate(channelId, {
                 lastMessage: message._id,
                 lastActivity: new Date(),
-            });
+            }, { new: true });
 
-            io.to(`channel:${channelId}`).emit('message:new', populated);
+            if (channel && (channel.type === 'dm' || channel.type === 'group_dm')) {
+                channel.members.forEach(member => {
+                    console.log(`[Socket] Emitting DM message to user:${member.user.toString()}`);
+                    io.to(`user:${member.user.toString()}`).emit('message:new', populated);
+                });
+            } else {
+                console.log(`[Socket] Emitting Channel message to channel:${channelId}`);
+                io.to(`channel:${channelId}`).emit('message:new', populated);
+            }
         } catch (error) {
             logger.error(`Message send error: ${error.message}`);
             socket.emit('error', { message: 'Failed to send message' });

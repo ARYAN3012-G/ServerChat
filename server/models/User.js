@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: [true, 'Password is required'],
+        required: [function () { return !this.googleId && !this.githubId; }, 'Password is required'],
         minlength: 6,
         select: false,
     },
@@ -50,6 +50,11 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: ['online', 'offline', 'idle', 'dnd', 'invisible'],
         default: 'offline',
+    },
+    preferredStatus: {
+        type: String,
+        enum: ['online', 'idle', 'dnd', 'invisible'],
+        default: 'online',
     },
     customStatus: {
         text: { type: String, default: '' },
@@ -119,6 +124,11 @@ const userSchema = new mongoose.Schema({
     resetPasswordToken: String,
     resetPasswordExpires: Date,
 
+    // User preferences
+    preferences: {
+        background: { type: String, default: '' },
+    },
+
 }, { timestamps: true });
 
 // Hash password before saving
@@ -138,6 +148,7 @@ userSchema.methods.toJSON = function () {
     const obj = this.toObject();
     delete obj.password;
     delete obj.twoFactorSecret;
+    obj.hasFaceId = !!(obj.faceDescriptor && obj.faceDescriptor.length > 0);
     delete obj.faceDescriptor;
     delete obj.resetPasswordToken;
     delete obj.resetPasswordExpires;

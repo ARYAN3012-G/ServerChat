@@ -5,17 +5,22 @@ const { getIO } = require('../sockets');
 // Send friend request
 exports.sendRequest = async (req, res, next) => {
     try {
-        const { userId } = req.body;
+        const { username } = req.body;
 
-        if (userId === req.user._id.toString()) {
-            return res.status(400).json({ message: "Can't send request to yourself" });
+        if (!username) {
+            return res.status(400).json({ message: 'Username is required' });
         }
 
         // Check if blocked
-        const targetUser = await User.findById(userId);
+        const targetUser = await User.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
         if (!targetUser) {
             return res.status(404).json({ message: 'User not found' });
         }
+
+        if (targetUser._id.toString() === req.user._id.toString()) {
+            return res.status(400).json({ message: "Can't send request to yourself" });
+        }
+
         if (targetUser.blockedUsers?.includes(req.user._id)) {
             return res.status(400).json({ message: 'Cannot send request' });
         }
@@ -23,8 +28,8 @@ exports.sendRequest = async (req, res, next) => {
         // Check existing
         const existing = await FriendRequest.findOne({
             $or: [
-                { from: req.user._id, to: userId },
-                { from: userId, to: req.user._id },
+                { from: req.user._id, to: targetUser._id },
+                { from: targetUser._id, to: req.user._id },
             ],
         });
 
@@ -34,7 +39,7 @@ exports.sendRequest = async (req, res, next) => {
 
         const request = await FriendRequest.create({
             from: req.user._id,
-            to: userId,
+            to: targetUser._id,
         });
 
         const populated = await request.populate('from', 'username avatar');
@@ -42,7 +47,7 @@ exports.sendRequest = async (req, res, next) => {
         // Notify target user
         const io = getIO();
         if (io) {
-            io.to(`user:${userId}`).emit('friend:request', { request: populated });
+            io.to(`user:${targetUser._id}`).emit('friend:request', { request: populated });
         }
 
         res.status(201).json({ request: populated });

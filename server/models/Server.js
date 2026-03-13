@@ -126,7 +126,6 @@ serverSchema.methods.createInvite = function (userId, options = {}) {
 
 // Indexes
 serverSchema.index({ name: 'text', description: 'text' });
-serverSchema.index({ inviteCode: 1 });
 serverSchema.index({ 'inviteLinks.code': 1 });
 serverSchema.index({ 'members.user': 1 });
 serverSchema.index({ isPublic: 1 });

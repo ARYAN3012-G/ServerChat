@@ -188,3 +188,23 @@ exports.toggleReaction = async (req, res, next) => {
         next(error);
     }
 };
+
+// Mark a message as read
+exports.markAsRead = async (req, res, next) => {
+    try {
+        const { messageId } = req.params;
+
+        const message = await Message.findById(messageId);
+        if (!message) return res.status(404).json({ message: 'Message not found' });
+
+        const alreadyRead = message.readBy.find(r => r.user.toString() === req.user._id.toString());
+        if (!alreadyRead) {
+            message.readBy.push({ user: req.user._id, readAt: new Date() });
+            await message.save();
+        }
+
+        res.json({ success: true, messageId });
+    } catch (error) {
+        next(error);
+    }
+};

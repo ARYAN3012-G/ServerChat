@@ -9,8 +9,6 @@ import { setGameSession } from '../redux/gameSlice';
 export function useSocket() {
     const dispatch = useDispatch();
     const { token } = useSelector((state) => state.auth);
-    const [incomingCall, setIncomingCall] = useState(null);
-    const [activeCall, setActiveCall] = useState(null);
     const [voiceUsers, setVoiceUsers] = useState({});
     const [musicRoom, setMusicRoom] = useState(null);
 
@@ -19,95 +17,64 @@ export function useSocket() {
 
         const socket = connectSocket(token);
 
-        // Chat events
-        socket.on('message:new', (message) => {
+        // Define handler references
+        const handleNewMessage = (message) => {
+            console.log('[Socket] message:new received!', message._id);
             dispatch(addMessage(message));
-        });
+        };
+        const handleUpdatedMessage = (message) => dispatch(updateMessage(message));
+        const handleDeletedMessage = ({ messageId }) => dispatch(removeMessage(messageId));
+        const handleTypingStart = ({ userId, username, channelId }) => dispatch(setTypingUser({ channelId, userId, username, isTyping: true }));
+        const handleTypingStop = ({ userId, channelId }) => dispatch(setTypingUser({ channelId, userId, isTyping: false }));
+        const handleReactedMessage = ({ messageId, reactions }) => dispatch(updateReactions({ messageId, reactions }));
+        const handlePresenceOnline = ({ userId }) => dispatch(addOnlineUser(userId));
+        const handlePresenceOffline = ({ userId }) => dispatch(removeOnlineUser(userId));
+        const handleGameUpdated = ({ session }) => dispatch(setGameSession(session));
+        const handleGameCreated = ({ session }) => dispatch(setGameSession(session));
+        const handleGameRematch = ({ session }) => dispatch(setGameSession(session));
+        const handleVoiceJoined = ({ channelId, userId, username }) => setVoiceUsers(prev => ({ ...prev, [channelId]: [...(prev[channelId] || []).filter(u => u.userId !== userId), { userId, username }] }));
+        const handleVoiceLeft = ({ channelId, userId }) => setVoiceUsers(prev => ({ ...prev, [channelId]: (prev[channelId] || []).filter(u => u.userId !== userId) }));
+        const handleMusicSync = (data) => setMusicRoom(prev => ({ ...prev, ...data }));
+        const handleStreamJoined = ({ userId, username }) => setMusicRoom(prev => prev ? { ...prev, users: [...(prev.users || []), { userId, username }] } : prev);
+        const handleStreamLeft = ({ userId }) => setMusicRoom(prev => prev ? { ...prev, users: (prev.users || []).filter(u => u.userId !== userId) } : prev);
 
-        socket.on('message:updated', (message) => {
-            dispatch(updateMessage(message));
-        });
-
-        socket.on('message:deleted', ({ messageId }) => {
-            dispatch(removeMessage(messageId));
-        });
-
-        socket.on('typing:start', ({ userId, username, channelId }) => {
-            dispatch(setTypingUser({ channelId, userId, username, isTyping: true }));
-        });
-
-        socket.on('typing:stop', ({ userId, channelId }) => {
-            dispatch(setTypingUser({ channelId, userId, isTyping: false }));
-        });
-
-        socket.on('message:reacted', ({ messageId, reactions }) => {
-            dispatch(updateReactions({ messageId, reactions }));
-        });
-
-        // Presence events
-        socket.on('presence:online', ({ userId }) => {
-            dispatch(addOnlineUser(userId));
-        });
-
-        socket.on('presence:offline', ({ userId }) => {
-            dispatch(removeOnlineUser(userId));
-        });
-
-        // Game events
-        socket.on('game:updated', ({ session }) => {
-            dispatch(setGameSession(session));
-        });
-        socket.on('game:created', ({ session }) => {
-            dispatch(setGameSession(session));
-        });
-        socket.on('game:rematch', ({ session }) => {
-            dispatch(setGameSession(session));
-        });
-
-        // Call events
-        socket.on('call:incoming', (data) => {
-            setIncomingCall(data);
-        });
-        socket.on('call:answered', ({ session }) => {
-            setActiveCall(session);
-            setIncomingCall(null);
-        });
-        socket.on('call:ended', () => {
-            setActiveCall(null);
-            setIncomingCall(null);
-        });
-        socket.on('call:rejected', () => {
-            setActiveCall(null);
-            setIncomingCall(null);
-        });
-
-        // Voice channel events
-        socket.on('voice:user-joined', ({ channelId, userId, username }) => {
-            setVoiceUsers(prev => ({
-                ...prev,
-                [channelId]: [...(prev[channelId] || []).filter(u => u.userId !== userId), { userId, username }]
-            }));
-        });
-        socket.on('voice:user-left', ({ channelId, userId }) => {
-            setVoiceUsers(prev => ({
-                ...prev,
-                [channelId]: (prev[channelId] || []).filter(u => u.userId !== userId)
-            }));
-        });
-
-        // Music events
-        socket.on('music:sync', (data) => {
-            setMusicRoom(prev => ({ ...prev, ...data }));
-        });
-        socket.on('stream:user-joined', ({ userId, username }) => {
-            setMusicRoom(prev => prev ? { ...prev, users: [...(prev.users || []), { userId, username }] } : prev);
-        });
-        socket.on('stream:user-left', ({ userId }) => {
-            setMusicRoom(prev => prev ? { ...prev, users: (prev.users || []).filter(u => u.userId !== userId) } : prev);
-        });
+        // Attach listeners
+        socket.on('message:new', handleNewMessage);
+        socket.on('message:updated', handleUpdatedMessage);
+        socket.on('message:deleted', handleDeletedMessage);
+        socket.on('typing:start', handleTypingStart);
+        socket.on('typing:stop', handleTypingStop);
+        socket.on('message:reacted', handleReactedMessage);
+        socket.on('presence:online', handlePresenceOnline);
+        socket.on('presence:offline', handlePresenceOffline);
+        socket.on('game:updated', handleGameUpdated);
+        socket.on('game:created', handleGameCreated);
+        socket.on('game:rematch', handleGameRematch);
+        socket.on('voice:user-joined', handleVoiceJoined);
+        socket.on('voice:user-left', handleVoiceLeft);
+        socket.on('music:sync', handleMusicSync);
+        socket.on('stream:user-joined', handleStreamJoined);
+        socket.on('stream:user-left', handleStreamLeft);
 
         return () => {
-            disconnectSocket();
+            if (socket) {
+                socket.off('message:new', handleNewMessage);
+                socket.off('message:updated', handleUpdatedMessage);
+                socket.off('message:deleted', handleDeletedMessage);
+                socket.off('typing:start', handleTypingStart);
+                socket.off('typing:stop', handleTypingStop);
+                socket.off('message:reacted', handleReactedMessage);
+                socket.off('presence:online', handlePresenceOnline);
+                socket.off('presence:offline', handlePresenceOffline);
+                socket.off('game:updated', handleGameUpdated);
+                socket.off('game:created', handleGameCreated);
+                socket.off('game:rematch', handleGameRematch);
+                socket.off('voice:user-joined', handleVoiceJoined);
+                socket.off('voice:user-left', handleVoiceLeft);
+                socket.off('music:sync', handleMusicSync);
+                socket.off('stream:user-joined', handleStreamJoined);
+                socket.off('stream:user-left', handleStreamLeft);
+            }
         };
     }, [token, dispatch]);
 
@@ -140,34 +107,6 @@ export function useSocket() {
     const reactToMessage = useCallback((messageId, emoji) => {
         const socket = getSocket();
         if (socket) socket.emit('message:react', { messageId, emoji });
-    }, []);
-
-    // Call functions
-    const initiateCall = useCallback((targetUserId, channelId, type = 'voice') => {
-        const socket = getSocket();
-        if (socket) socket.emit('call:initiate', { targetUserId, channelId, type });
-    }, []);
-
-    const answerCall = useCallback((sessionId) => {
-        const socket = getSocket();
-        if (socket) socket.emit('call:answer', { sessionId });
-    }, []);
-
-    const endCall = useCallback((sessionId) => {
-        const socket = getSocket();
-        if (socket) socket.emit('call:end', { sessionId });
-        setActiveCall(null);
-    }, []);
-
-    const rejectCall = useCallback((sessionId) => {
-        const socket = getSocket();
-        if (socket) socket.emit('call:reject', { sessionId });
-        setIncomingCall(null);
-    }, []);
-
-    const toggleMedia = useCallback((sessionId, type, enabled) => {
-        const socket = getSocket();
-        if (socket) socket.emit('call:toggle-media', { sessionId, type, enabled });
     }, []);
 
     // Voice channel functions
@@ -224,11 +163,10 @@ export function useSocket() {
 
     return {
         sendMessage, joinChannel, leaveChannel, startTyping, stopTyping, reactToMessage,
-        initiateCall, answerCall, endCall, rejectCall, toggleMedia,
         joinVoiceChannel, leaveVoiceChannel, voiceUsers,
         createGame, joinGame, makeGameMove, requestRematch,
         joinMusicRoom, syncMusic, leaveMusicRoom, musicRoom,
-        incomingCall, activeCall,
     };
 }
+
 

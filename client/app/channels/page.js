@@ -3,19 +3,31 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiHash, FiVolume2, FiPlus, FiSettings, FiUsers, FiSearch, FiLogOut, FiChevronDown, FiCopy, FiCheck, FiCompass, FiTrash2, FiEdit2, FiSmile, FiShield, FiSend, FiX, FiPhone, FiVideo, FiPaperclip, FiUpload } from 'react-icons/fi';
+import { FiHash, FiVolume2, FiPlus, FiSettings, FiUsers, FiSearch, FiLogOut, FiChevronDown, FiCopy, FiCheck, FiCompass, FiTrash2, FiEdit2, FiSmile, FiShield, FiSend, FiX, FiPhone, FiVideo, FiPaperclip, FiUpload, FiBookmark, FiMessageCircle, FiMessageSquare, FiCornerUpRight, FiMenu } from 'react-icons/fi';
 import { IoGameControllerOutline } from 'react-icons/io5';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
+import { useCall } from '../../components/CallProvider';
 import { setChannels, setCurrentChannel, setMessages } from '../../redux/chatSlice';
 import { setServers, setCurrentServer, addServer } from '../../redux/serverSlice';
+import { updateUser } from '../../redux/authSlice';
 import api from '../../services/api';
+import { getSocket } from '../../services/socket';
 import toast from 'react-hot-toast';
 import UserProfileModal from '../../components/UserProfileModal';
-import CallModal from '../../components/CallModal';
-import GameLauncher from '../../components/GameLauncher';
-import MusicRoom from '../../components/MusicRoom';
+import TypingIndicator from '../../components/TypingIndicator';
+import VoiceRecorder from '../../components/VoiceRecorder';
+
+// Lazy-load heavy components (only loaded when user opens them)
+const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false, loading: () => <div className="w-[350px] h-[400px] bg-dark-800 rounded-xl animate-pulse" /> });
+const GameLauncher = dynamic(() => import('../../components/GameLauncher'), { ssr: false });
+const MusicRoom = dynamic(() => import('../../components/MusicRoom'), { ssr: false });
+const GifPicker = dynamic(() => import('../../components/GifPicker'), { ssr: false });
+import AudioPlayer from '../../components/AudioPlayer';
+import MessageSearch from '../../components/MessageSearch';
+import { MdGif } from 'react-icons/md';
 
 export default function ChannelsPage() {
     const dispatch = useDispatch();
@@ -25,6 +37,8 @@ export default function ChannelsPage() {
     const { servers, currentServer } = useSelector((s) => s.server);
 
     const [messageInput, setMessageInput] = useState('');
+    const [showInputEmojiPicker, setShowInputEmojiPicker] = useState(false);
+    const [showGifPicker, setShowGifPicker] = useState(false);
     const [showMembers, setShowMembers] = useState(true);
     const [showCreateServer, setShowCreateServer] = useState(false);
     const [showJoinServer, setShowJoinServer] = useState(false);
@@ -36,6 +50,7 @@ export default function ChannelsPage() {
     const [serverError, setServerError] = useState('');
     const [newChannelName, setNewChannelName] = useState('');
     const [newChannelType, setNewChannelType] = useState('text');
+    const [newChannelCategory, setNewChannelCategory] = useState('');
     const [editingMsg, setEditingMsg] = useState(null);
     const [editContent, setEditContent] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(null);
@@ -51,20 +66,56 @@ export default function ChannelsPage() {
     const [profileUser, setProfileUser] = useState(null);
     const [showServerSettings, setShowServerSettings] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [pinnedMessages, setPinnedMessages] = useState([]);
+    const [showPinned, setShowPinned] = useState(false);
+    const [threadView, setThreadView] = useState(null);
+    const [threadMessages, setThreadMessages] = useState([]);
+    const [threadInput, setThreadInput] = useState('');
+    const localVideoRef = useRef(null);
+    const screenVideoRef = useRef(null);
 
     const { sendMessage, joinChannel, leaveChannel, startTyping, stopTyping, reactToMessage,
-        initiateCall, answerCall, endCall, rejectCall, toggleMedia,
         joinVoiceChannel, leaveVoiceChannel, voiceUsers,
         createGame, joinGame, makeGameMove, requestRematch,
-        joinMusicRoom, syncMusic, leaveMusicRoom, musicRoom,
-        incomingCall, activeCall } = useSocket();
+        joinMusicRoom, syncMusic, leaveMusicRoom, musicRoom } = useSocket();
+    const { initiateCall } = useCall() || {};
     const { typingUsers, onlineUsers } = useSelector((s) => s.chat);
     const [connectedVoice, setConnectedVoice] = useState(null);
     const [isMuted, setIsMuted] = useState(false);
     const [isDeafened, setIsDeafened] = useState(false);
+    const [isVideoOn, setIsVideoOn] = useState(false);
+    const [isScreenSharing, setIsScreenSharing] = useState(false);
+    const [localVideoStream, setLocalVideoStream] = useState(null);
+    const [screenStream, setScreenStream] = useState(null);
     const [showGameLauncher, setShowGameLauncher] = useState(false);
     const [showMusicRoom, setShowMusicRoom] = useState(false);
-    const [callType, setCallType] = useState(null);
+    const [showCallPicker, setShowCallPicker] = useState(null); // 'voice' | 'video' | null
+
+    // Listen for friend status changes globally
+    useEffect(() => {
+        const socket = getSocket();
+        if (!socket) return;
+        const handleFriendStatus = ({ userId, status }) => {
+            fetchServers();
+        };
+        socket.on('presence:status-changed', handleFriendStatus);
+        return () => socket.off('presence:status-changed', handleFriendStatus);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (localVideoRef.current && localVideoStream) {
+            localVideoRef.current.srcObject = localVideoStream;
+            localVideoRef.current.play().catch(() => { });
+        }
+    }, [localVideoStream]);
+
+    useEffect(() => {
+        if (screenVideoRef.current && screenStream) {
+            screenVideoRef.current.srcObject = screenStream;
+            screenVideoRef.current.play().catch(() => { });
+        }
+    }, [screenStream]);
 
     useEffect(() => {
         if (!loading && !isAuthenticated) router.push('/login');
@@ -84,6 +135,9 @@ export default function ChannelsPage() {
         if (currentChannel?._id) {
             fetchMessages(currentChannel._id);
             joinChannel(currentChannel._id);
+            // Mark messages as read & fetch pinned
+            fetchPinnedMessages(currentChannel._id);
+            markMessagesRead(currentChannel._id);
         }
         return () => { if (currentChannel?._id) leaveChannel(currentChannel._id); };
     }, [currentChannel?._id]);
@@ -92,6 +146,11 @@ export default function ChannelsPage() {
 
     const fetchMessages = async (channelId) => {
         try { const { data } = await api.get(`/messages/channel/${channelId}`); dispatch(setMessages(data.messages || [])); } catch (e) { console.error(e); }
+    };
+
+    const onEmojiClick = (emojiObject) => {
+        setMessageInput(prev => prev + emojiObject.emoji);
+        setShowInputEmojiPicker(false);
     };
 
     const fetchServers = async () => {
@@ -145,10 +204,10 @@ export default function ChannelsPage() {
     const handleCreateChannel = async () => {
         if (!newChannelName.trim() || !currentServer) return;
         try {
-            await api.post('/channels', { name: newChannelName.toLowerCase().replace(/\s+/g, '-'), type: newChannelType, serverId: currentServer._id });
+            await api.post('/channels', { name: newChannelName.toLowerCase().replace(/\s+/g, '-'), type: newChannelType, category: newChannelCategory.trim() || undefined, serverId: currentServer._id });
             const { data } = await api.get(`/servers/${currentServer._id}`);
             dispatch(setCurrentServer(data));
-            setShowCreateChannel(false); setNewChannelName(''); setNewChannelType('text');
+            setShowCreateChannel(false); setNewChannelName(''); setNewChannelType('text'); setNewChannelCategory('');
         } catch (e) { console.error(e); }
     };
 
@@ -163,18 +222,40 @@ export default function ChannelsPage() {
     };
 
     const handleSendMessage = async () => {
-        if (!messageInput.trim() || !currentChannel) return;
-        sendMessage(currentChannel._id, messageInput);
+        if (!messageInput.trim() && !fileInputRef.current?.files?.[0]) return;
+
+        sendMessage(currentChannel._id, messageInput, 'text');
+
         setMessageInput('');
+        setShowInputEmojiPicker(false);
+        setShowGifPicker(false);
         stopTyping(currentChannel._id);
     };
 
     const handleTyping = (e) => {
-        setMessageInput(e.target.value);
+        const val = e.target.value;
+        setMessageInput(val);
         if (currentChannel?._id) {
             startTyping(currentChannel._id);
             clearTimeout(typingTimeoutRef.current);
             typingTimeoutRef.current = setTimeout(() => stopTyping(currentChannel._id), 2000);
+        }
+        // @mention detection
+        const lastAt = val.lastIndexOf('@');
+        if (lastAt !== -1 && (lastAt === 0 || val[lastAt - 1] === ' ')) {
+            const query = val.slice(lastAt + 1);
+            if (query.length >= 0 && !query.includes(' ')) {
+                setMentionQuery(query);
+                const matches = serverMembers.filter(m =>
+                    (m.username || '').toLowerCase().includes(query.toLowerCase())
+                ).slice(0, 5);
+                setMentionList(matches);
+                setShowMentions(matches.length > 0);
+            } else {
+                setShowMentions(false);
+            }
+        } else {
+            setShowMentions(false);
         }
     };
 
@@ -200,17 +281,54 @@ export default function ChannelsPage() {
         } catch (e) { setSearchResults([]); }
     };
 
+    // ── Pinned Messages ──
+    const fetchPinnedMessages = async (channelId) => {
+        try { const { data } = await api.get(`/messages/pinned/${channelId}`); setPinnedMessages(data.messages || data || []); } catch (e) { setPinnedMessages([]); }
+    };
+
+    const handlePinMessage = async (msgId) => {
+        const socket = getSocket();
+        if (socket) socket.emit('message:pin', { messageId: msgId, channelId: currentChannel._id });
+        toast.success('Message pinned!');
+        setTimeout(() => fetchPinnedMessages(currentChannel._id), 500);
+    };
+
+    // ── Read Receipts ──
+    const markMessagesRead = async (channelId) => {
+        if (messages.length > 0) {
+            const lastMsg = messages[messages.length - 1];
+            try {
+                await api.post(`/messages/${lastMsg._id}/read`);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    };
+
+    // ── Threads ──
+    const openThread = async (msg) => {
+        setThreadView(msg);
+        try { const { data } = await api.get(`/messages/thread/${msg._id}`); setThreadMessages(data.messages || data || []); } catch (e) { setThreadMessages([]); }
+    };
+
+    const sendThreadReply = () => {
+        if (!threadInput.trim() || !threadView) return;
+        sendMessage(currentChannel._id, threadInput, 'text', [], null, threadView._id);
+        setThreadInput('');
+        setTimeout(() => openThread(threadView), 300);
+    };
+
     const handleFileUpload = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
         try {
             const formData = new FormData();
             formData.append('file', file);
-            const { data } = await api.post(`/messages/channel/${currentChannel._id}/upload`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-            toast.success('File sent!');
+            const { data } = await api.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+
+            sendMessage(currentChannel._id, `📎 ${file.name}`, 'file', [{ url: data.url, type: data.type, name: file.name }]);
         } catch (e) {
-            sendMessage(currentChannel._id, `📎 ${file.name}`, 'file');
-            toast.success('File reference sent');
+            toast.error('File upload failed');
         }
     };
 
@@ -227,15 +345,115 @@ export default function ChannelsPage() {
     const textChannels = channels.filter(c => c.type === 'text');
     const voiceChannels = channels.filter(c => c.type === 'voice');
 
+    // Category grouping — group text channels by category
+    const textCategories = textChannels.reduce((acc, ch) => {
+        const cat = ch.category || 'General';
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push(ch);
+        return acc;
+    }, {});
+    const voiceCategories = voiceChannels.reduce((acc, ch) => {
+        const cat = ch.category || 'Voice';
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push(ch);
+        return acc;
+    }, {});
+
+    // Collapsed categories state
+    const [collapsedCats, setCollapsedCats] = useState({});
+    const toggleCategory = (cat) => setCollapsedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
+
+    // Unread tracking (localStorage based)
+    const [unreadChannels, setUnreadChannels] = useState({});
+    useEffect(() => {
+        const saved = localStorage.getItem('lastRead');
+        if (saved) setUnreadChannels(JSON.parse(saved));
+    }, []);
+    const markChannelRead = (channelId) => {
+        setUnreadChannels(prev => {
+            const updated = { ...prev, [channelId]: Date.now() };
+            localStorage.setItem('lastRead', JSON.stringify(updated));
+            return updated;
+        });
+    };
+    // Mark current channel as read when switching
+    useEffect(() => {
+        if (currentChannel?._id) markChannelRead(currentChannel._id);
+    }, [currentChannel?._id]);
+
+    // User status picker
+    const [showStatusPicker, setShowStatusPicker] = useState(false);
+    const [customStatusText, setCustomStatusText] = useState(user?.customStatus?.text || '');
+    const statusOptions = [
+        { value: 'online', label: 'Online', color: 'bg-emerald-400', icon: '🟢' },
+        { value: 'idle', label: 'Idle', color: 'bg-amber-400', icon: '🌙' },
+        { value: 'dnd', label: 'Do Not Disturb', color: 'bg-red-500', icon: '⛔' },
+        { value: 'invisible', label: 'Invisible', color: 'bg-gray-400', icon: '👻' },
+    ];
+    const handleStatusChange = async (newStatus) => {
+        try {
+            await api.put('/users/profile', { status: newStatus, customStatus: { text: customStatusText } });
+            dispatch(updateUser({ status: newStatus, customStatus: { text: customStatusText } }));
+            const socket = getSocket();
+            if (socket) socket.emit('presence:status', { status: newStatus });
+            setShowStatusPicker(false);
+        } catch (e) { console.error(e); }
+    };
+
+    // @Mention autocomplete
+    const [showMentions, setShowMentions] = useState(false);
+    const [mentionQuery, setMentionQuery] = useState('');
+    const [mentionList, setMentionList] = useState([]);
+    const serverMembers = currentServer?.members?.map(m => m.user || m) || [];
+    const handleInputChange = (e) => {
+        const val = e.target.value;
+        setMessageInput(val);
+        // Detect @mention
+        const lastAt = val.lastIndexOf('@');
+        if (lastAt !== -1 && (lastAt === 0 || val[lastAt - 1] === ' ')) {
+            const query = val.slice(lastAt + 1);
+            if (query.length >= 0 && !query.includes(' ')) {
+                setMentionQuery(query);
+                const matches = serverMembers.filter(m =>
+                    (m.username || '').toLowerCase().includes(query.toLowerCase())
+                ).slice(0, 5);
+                setMentionList(matches);
+                setShowMentions(matches.length > 0);
+            } else {
+                setShowMentions(false);
+            }
+        } else {
+            setShowMentions(false);
+        }
+    };
+    const insertMention = (username) => {
+        const lastAt = messageInput.lastIndexOf('@');
+        const newVal = messageInput.slice(0, lastAt) + `@${username} `;
+        setMessageInput(newVal);
+        setShowMentions(false);
+    };
+
     if (loading) return <div className="flex h-screen items-center justify-center bg-dark-900"><div className="w-10 h-10 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
 
     return (
         <div className="flex h-screen bg-dark-900 text-white overflow-hidden">
+            {/* Mobile Sidebar Overlay */}
+            {!sidebarOpen && (
+                <div
+                    className="md:hidden fixed inset-0 bg-black/60 z-40"
+                    onClick={() => setSidebarOpen(true)}
+                />
+            )}
+
             {/* ─── SERVER SIDEBAR ─── */}
-            <div className="w-[72px] bg-dark-950 flex flex-col items-center py-3 gap-2 overflow-y-auto border-r border-white/5" style={{ scrollbarWidth: 'none' }}>
+            <div className={`fixed mt-12 md:mt-0 md:relative z-50 w-[72px] h-full bg-dark-950 flex flex-col items-center py-3 gap-2 border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? '-translate-x-full md:translate-x-0' : 'translate-x-0'}`} style={{ scrollbarWidth: 'none', overflowY: 'auto' }}>
                 <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/friends')}
-                    className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-indigo-400 hover:text-white hover:bg-indigo-500 cursor-pointer transition-all duration-200" title="Friends & DMs">
+                    className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-emerald-400 hover:text-white hover:bg-emerald-500 cursor-pointer transition-all duration-200" title="Friends">
                     <FiUsers className="w-6 h-6" />
+                </motion.div>
+                <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/dms')}
+                    className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-indigo-400 hover:text-white hover:bg-indigo-500 cursor-pointer transition-all duration-200" title="Direct Messages">
+                    <FiMessageSquare className="w-6 h-6" />
                 </motion.div>
                 <div className="w-8 h-0.5 bg-white/10 rounded-full" />
 
@@ -275,7 +493,7 @@ export default function ChannelsPage() {
             </div>
 
             {/* ─── CHANNEL SIDEBAR ─── */}
-            <div className="w-60 bg-dark-800 flex flex-col border-r border-white/5">
+            <div className={`fixed mt-12 md:mt-0 md:relative z-40 left-[72px] md:left-0 h-full w-60 bg-dark-800 flex flex-col border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? '-translate-x-full md:translate-x-0' : 'translate-x-[0px]'}`}>
                 <div className="h-12 px-4 flex items-center justify-between border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
                     <span className="font-bold text-white truncate">{currentServer?.name || 'No Server'}</span>
                     {currentServer && (
@@ -287,71 +505,107 @@ export default function ChannelsPage() {
                         </div>
                     )}
                 </div>
-                <div className="flex-1 overflow-y-auto px-2 pt-4 space-y-4">
+                <div className="flex-1 overflow-y-auto px-2 pt-4 space-y-1">
                     {currentServer ? (
                         <>
-                            <div>
-                                <div className="flex items-center justify-between px-1 mb-1">
-                                    <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wider">Text Channels</span>
-                                    <FiPlus onClick={() => { setNewChannelType('text'); setShowCreateChannel(true); }} className="w-4 h-4 text-white/20 cursor-pointer hover:text-white transition-colors" />
-                                </div>
-                                {textChannels.map((ch) => (
-                                    <motion.div key={ch._id} onClick={() => selectChannel(ch)}
-                                        className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer group transition-all duration-150 ${currentChannel?._id === ch._id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
-                                        <FiHash className="w-5 h-5 text-white/20 flex-shrink-0" />
-                                        <span className="text-sm truncate flex-1">{ch.name}</span>
-                                        <FiTrash2 onClick={(e) => { e.stopPropagation(); handleDeleteChannel(ch._id); }}
-                                            className="w-3.5 h-3.5 text-white/10 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" />
-                                    </motion.div>
-                                ))}
-                            </div>
-                            <div>
-                                <div className="flex items-center justify-between px-1 mb-1">
-                                    <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wider">Voice Channels</span>
-                                    <FiPlus onClick={() => { setNewChannelType('voice'); setShowCreateChannel(true); }} className="w-4 h-4 text-white/20 cursor-pointer hover:text-white transition-colors" />
-                                </div>
-                                {voiceChannels.map((ch) => (
-                                    <div key={ch._id}>
-                                        <motion.div onClick={() => {
-                                            if (connectedVoice === ch._id) { leaveVoiceChannel(ch._id); setConnectedVoice(null); }
-                                            else { if (connectedVoice) leaveVoiceChannel(connectedVoice); joinVoiceChannel(ch._id); setConnectedVoice(ch._id); }
-                                        }}
-                                            className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-all duration-150 group ${connectedVoice === ch._id ? 'bg-emerald-500/10 text-emerald-400' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
-                                            <FiVolume2 className={`w-5 h-5 flex-shrink-0 ${connectedVoice === ch._id ? 'text-emerald-400' : 'text-white/20'}`} />
-                                            <span className="text-sm truncate flex-1">{ch.name}</span>
-                                            <FiTrash2 onClick={(e) => { e.stopPropagation(); handleDeleteChannel(ch._id); }}
-                                                className="w-3.5 h-3.5 text-white/10 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" />
-                                        </motion.div>
-                                        {/* Show connected users */}
-                                        {voiceUsers[ch._id]?.length > 0 && (
-                                            <div className="ml-7 mt-0.5 space-y-0.5">
-                                                {voiceUsers[ch._id].map((u) => (
-                                                    <div key={u.userId} className="flex items-center gap-1.5 text-xs text-white/40 py-0.5">
-                                                        <div className="w-4 h-4 rounded-full bg-indigo-500/60 flex items-center justify-center text-[8px] font-bold">{(u.username || 'U')[0].toUpperCase()}</div>
-                                                        <span>{u.username}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                            {/* Text Channel Categories */}
+                            {Object.entries(textCategories).map(([cat, chs]) => (
+                                <div key={`text-${cat}`} className="mb-2">
+                                    <div className="flex items-center justify-between px-1 mb-0.5 cursor-pointer group" onClick={() => toggleCategory(`text-${cat}`)}>
+                                        <div className="flex items-center gap-1">
+                                            <FiChevronDown className={`w-3 h-3 text-white/20 transition-transform ${collapsedCats[`text-${cat}`] ? '-rotate-90' : ''}`} />
+                                            <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wider">{cat}</span>
+                                        </div>
+                                        <FiPlus onClick={(e) => { e.stopPropagation(); setNewChannelType('text'); setShowCreateChannel(true); }} className="w-3.5 h-3.5 text-white/15 cursor-pointer hover:text-white transition-colors opacity-0 group-hover:opacity-100" />
                                     </div>
-                                ))}
-                            </div>
+                                    <AnimatePresence>
+                                        {!collapsedCats[`text-${cat}`] && chs.map((ch) => {
+                                            const isUnread = ch.lastActivity && (!unreadChannels[ch._id] || new Date(ch.lastActivity).getTime() > unreadChannels[ch._id]);
+                                            const isActive = currentChannel?._id === ch._id;
+                                            return (
+                                                <motion.div key={ch._id} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                                                    onClick={() => { selectChannel(ch); markChannelRead(ch._id); }}
+                                                    className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer group transition-all duration-150 ${isActive ? 'bg-white/10 text-white' : isUnread ? 'text-white font-medium' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
+                                                    {isUnread && !isActive && <div className="absolute -left-1 w-1 h-2 bg-white rounded-r-full" />}
+                                                    <FiHash className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white/60' : 'text-white/20'}`} />
+                                                    <span className="text-sm truncate flex-1">{ch.name}</span>
+                                                    {isUnread && !isActive && <div className="w-2 h-2 rounded-full bg-white flex-shrink-0" />}
+                                                    <FiTrash2 onClick={(e) => { e.stopPropagation(); handleDeleteChannel(ch._id); }}
+                                                        className="w-3.5 h-3.5 text-white/10 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" />
+                                                </motion.div>
+                                            );
+                                        })}
+                                    </AnimatePresence>
+                                </div>
+                            ))}
+
+                            {/* Voice Channel Categories */}
+                            {Object.entries(voiceCategories).map(([cat, chs]) => (
+                                <div key={`voice-${cat}`} className="mb-2">
+                                    <div className="flex items-center justify-between px-1 mb-0.5 cursor-pointer group" onClick={() => toggleCategory(`voice-${cat}`)}>
+                                        <div className="flex items-center gap-1">
+                                            <FiChevronDown className={`w-3 h-3 text-white/20 transition-transform ${collapsedCats[`voice-${cat}`] ? '-rotate-90' : ''}`} />
+                                            <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wider">{cat}</span>
+                                        </div>
+                                        <FiPlus onClick={(e) => { e.stopPropagation(); setNewChannelType('voice'); setShowCreateChannel(true); }} className="w-3.5 h-3.5 text-white/15 cursor-pointer hover:text-white transition-colors opacity-0 group-hover:opacity-100" />
+                                    </div>
+                                    <AnimatePresence>
+                                        {!collapsedCats[`voice-${cat}`] && chs.map((ch) => (
+                                            <motion.div key={ch._id} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                                                <div onClick={() => {
+                                                    if (connectedVoice === ch._id) {
+                                                        leaveVoiceChannel(ch._id); setConnectedVoice(null);
+                                                        if (localVideoStream) { localVideoStream.getTracks().forEach(t => t.stop()); setLocalVideoStream(null); setIsVideoOn(false); }
+                                                        if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); setScreenStream(null); setIsScreenSharing(false); }
+                                                    } else {
+                                                        if (connectedVoice) leaveVoiceChannel(connectedVoice);
+                                                        if (localVideoStream) { localVideoStream.getTracks().forEach(t => t.stop()); setLocalVideoStream(null); setIsVideoOn(false); }
+                                                        if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); setScreenStream(null); setIsScreenSharing(false); }
+                                                        joinVoiceChannel(ch._id); setConnectedVoice(ch._id);
+                                                    }
+                                                }}
+                                                    className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-all duration-150 group ${connectedVoice === ch._id ? 'bg-emerald-500/10 text-emerald-400' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
+                                                    <FiVolume2 className={`w-4 h-4 flex-shrink-0 ${connectedVoice === ch._id ? 'text-emerald-400' : 'text-white/20'}`} />
+                                                    <span className="text-sm truncate flex-1">{ch.name}</span>
+                                                    <FiTrash2 onClick={(e) => { e.stopPropagation(); handleDeleteChannel(ch._id); }}
+                                                        className="w-3.5 h-3.5 text-white/10 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" />
+                                                </div>
+                                                {voiceUsers[ch._id]?.length > 0 && (
+                                                    <div className="ml-6 mt-0.5 space-y-0.5">
+                                                        {voiceUsers[ch._id].map((u) => (
+                                                            <div key={u.userId} className="flex items-center gap-1.5 text-xs text-white/40 py-0.5">
+                                                                <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] font-bold">{(u.username || 'U')[0].toUpperCase()}</div>
+                                                                <span>{u.username}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </motion.div>
+                                        ))}
+                                    </AnimatePresence>
+                                </div>
+                            ))}
 
                             {/* Activities */}
-                            <div>
-                                <div className="flex items-center justify-between px-1 mb-1 mt-2">
-                                    <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wider">Activities</span>
+                            <div className="mb-2">
+                                <div className="flex items-center px-1 mb-0.5 cursor-pointer" onClick={() => toggleCategory('activities')}>
+                                    <FiChevronDown className={`w-3 h-3 text-white/20 transition-transform ${collapsedCats['activities'] ? '-rotate-90' : ''}`} />
+                                    <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wider ml-1">Activities</span>
                                 </div>
-                                <motion.div onClick={() => setShowGameLauncher(true)}
-                                    className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-white/40 hover:text-white/70 hover:bg-white/5 transition-all duration-150">
-                                    <IoGameControllerOutline className="w-5 h-5 text-indigo-400/50" />
-                                    <span className="text-sm">Play Games</span>
-                                </motion.div>
-                                <motion.div onClick={() => setShowMusicRoom(true)}
-                                    className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-white/40 hover:text-white/70 hover:bg-white/5 transition-all duration-150">
-                                    <FiVolume2 className="w-5 h-5 text-pink-400/50" />
-                                    <span className="text-sm">Listen Together</span>
-                                </motion.div>
+                                {!collapsedCats['activities'] && (
+                                    <>
+                                        <div onClick={() => setShowGameLauncher(true)}
+                                            className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-white/40 hover:text-white/70 hover:bg-white/5 transition-all duration-150">
+                                            <IoGameControllerOutline className="w-4 h-4 text-indigo-400/50" />
+                                            <span className="text-sm">Play Games</span>
+                                        </div>
+                                        <div onClick={() => setShowMusicRoom(true)}
+                                            className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-white/40 hover:text-white/70 hover:bg-white/5 transition-all duration-150">
+                                            <FiVolume2 className="w-4 h-4 text-pink-400/50" />
+                                            <span className="text-sm">Listen Together</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </>
                     ) : (
@@ -369,86 +623,261 @@ export default function ChannelsPage() {
                             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                             <span className="text-xs text-emerald-400 font-medium">Voice Connected</span>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="grid grid-cols-4 gap-1 mb-1">
                             <button onClick={() => setIsMuted(!isMuted)}
-                                className={`flex-1 p-1.5 rounded-lg text-xs transition-colors ${isMuted ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
-                                {isMuted ? '🔇 Muted' : '🎤 Mic'}
+                                className={`p-1.5 rounded-lg text-xs transition-colors flex flex-col items-center gap-0.5 ${isMuted ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
+                                {isMuted ? '🔇' : '🎤'}
+                                <span className="text-[9px]">{isMuted ? 'Muted' : 'Mic'}</span>
                             </button>
                             <button onClick={() => setIsDeafened(!isDeafened)}
-                                className={`flex-1 p-1.5 rounded-lg text-xs transition-colors ${isDeafened ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
-                                {isDeafened ? '🔇 Deafened' : '🎧 Audio'}
+                                className={`p-1.5 rounded-lg text-xs transition-colors flex flex-col items-center gap-0.5 ${isDeafened ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
+                                {isDeafened ? '🔇' : '🎧'}
+                                <span className="text-[9px]">{isDeafened ? 'Deaf' : 'Audio'}</span>
                             </button>
-                            <button onClick={() => { leaveVoiceChannel(connectedVoice); setConnectedVoice(null); }}
-                                className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs transition-colors">
-                                📞
+                            <button onClick={async () => {
+                                try {
+                                    if (!isVideoOn) {
+                                        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                                        setLocalVideoStream(stream);
+                                        setIsVideoOn(true);
+                                    } else {
+                                        if (localVideoStream) {
+                                            localVideoStream.getTracks().forEach(t => t.stop());
+                                            setLocalVideoStream(null);
+                                        }
+                                        setIsVideoOn(false);
+                                    }
+                                } catch (err) { console.error('Video error:', err); }
+                            }}
+                                className={`p-1.5 rounded-lg text-xs transition-colors flex flex-col items-center gap-0.5 ${isVideoOn ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
+                                📹
+                                <span className="text-[9px]">{isVideoOn ? 'On' : 'Video'}</span>
+                            </button>
+                            <button onClick={async () => {
+                                try {
+                                    if (!isScreenSharing) {
+                                        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                                        setScreenStream(stream);
+                                        setIsScreenSharing(true);
+                                        stream.getVideoTracks()[0].onended = () => {
+                                            setScreenStream(null);
+                                            setIsScreenSharing(false);
+                                        };
+                                    } else {
+                                        if (screenStream) {
+                                            screenStream.getTracks().forEach(t => t.stop());
+                                            setScreenStream(null);
+                                        }
+                                        setIsScreenSharing(false);
+                                    }
+                                } catch (err) { console.error('Screen share error:', err); }
+                            }}
+                                className={`p-1.5 rounded-lg text-xs transition-colors flex flex-col items-center gap-0.5 ${isScreenSharing ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
+                                🖥️
+                                <span className="text-[9px]">{isScreenSharing ? 'Stop' : 'Share'}</span>
                             </button>
                         </div>
+                        <button onClick={() => { leaveVoiceChannel(connectedVoice); setConnectedVoice(null); if (localVideoStream) { localVideoStream.getTracks().forEach(t => t.stop()); setLocalVideoStream(null); setIsVideoOn(false); } if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); setScreenStream(null); setIsScreenSharing(false); } }}
+                            className="w-full p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs transition-colors flex items-center justify-center gap-1">
+                            📞 Disconnect
+                        </button>
                     </div>
                 )}
 
-                {/* Incoming Call Notification */}
-                {incomingCall && (
-                    <div className="px-2 py-2 border-t border-white/5 bg-indigo-500/10 animate-pulse">
-                        <p className="text-xs text-indigo-300 mb-2">📞 {incomingCall.from?.username} is calling...</p>
-                        <div className="flex gap-2">
-                            <button onClick={() => answerCall(incomingCall.session?._id)}
-                                className="flex-1 py-1.5 bg-emerald-500 rounded-lg text-xs text-white font-medium hover:bg-emerald-600 transition-colors">Answer</button>
-                            <button onClick={() => rejectCall(incomingCall.session?._id)}
-                                className="flex-1 py-1.5 bg-red-500 rounded-lg text-xs text-white font-medium hover:bg-red-600 transition-colors">Decline</button>
-                        </div>
-                    </div>
-                )}
+                {/* Incoming call is now handled globally by CallProvider */}
 
                 {/* USER PANEL */}
-                <div className="h-14 bg-dark-950/50 px-2.5 flex items-center gap-2 border-t border-white/5">
-                    <div className="relative">
-                        <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-sm font-bold">{user?.username?.[0]?.toUpperCase() || '?'}</div>
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-dark-950" />
+                <div className="relative bg-dark-950/50 px-2.5 py-2 border-t border-white/5">
+                    {/* Status Picker Popup */}
+                    <AnimatePresence>
+                        {showStatusPicker && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute bottom-full left-0 right-0 mb-1 mx-1 bg-dark-800 rounded-xl border border-white/10 shadow-2xl p-3 z-50">
+                                <p className="text-[10px] text-white/30 uppercase font-semibold mb-2 tracking-wider">Set Status</p>
+                                {statusOptions.map(opt => (
+                                    <div key={opt.value} onClick={(e) => { e.stopPropagation(); handleStatusChange(opt.value); }}
+                                        className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
+                                        <div className={`w-3 h-3 rounded-full ${opt.color}`} />
+                                        <span className="text-sm text-white/80">{opt.label}</span>
+                                    </div>
+                                ))}
+                                <div className="border-t border-white/5 mt-2 pt-2">
+                                    <input type="text" value={customStatusText} onChange={e => setCustomStatusText(e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        placeholder="Set custom status..."
+                                        className="w-full bg-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-white/20 outline-none border border-white/5 focus:border-white/20"
+                                        onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); handleStatusChange(user?.status || 'online'); } }}
+                                    />
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                    <div className="flex items-center gap-2">
+                        <div className="relative cursor-pointer" onClick={() => setShowStatusPicker(!showStatusPicker)}>
+                            <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-sm font-bold">{user?.username?.[0]?.toUpperCase() || '?'}</div>
+                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-dark-950 ${user?.status === 'dnd' ? 'bg-red-500' : user?.status === 'idle' ? 'bg-amber-400' : user?.status === 'invisible' ? 'bg-gray-400' : 'bg-emerald-400'
+                                }`} />
+                        </div>
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowStatusPicker(!showStatusPicker)}>
+                            <p className="text-sm font-medium truncate">{user?.username || 'User'}</p>
+                            <p className={`text-[10px] ${user?.status === 'dnd' ? 'text-red-400' : user?.status === 'idle' ? 'text-amber-400' : user?.status === 'invisible' ? 'text-gray-400' : 'text-emerald-400'}`}>
+                                {user?.customStatus?.text || (user?.status === 'dnd' ? 'Do Not Disturb' : user?.status === 'idle' ? 'Idle' : user?.status === 'invisible' ? 'Invisible' : 'Online')}
+                            </p>
+                        </div>
+                        <button onClick={() => router.push('/settings')} className="p-1.5 rounded hover:bg-white/10 text-white/30 hover:text-white transition-colors" title="Settings">
+                            <FiSettings className="w-4 h-4" />
+                        </button>
+                        <button onClick={handleLogout} className="p-1.5 rounded hover:bg-white/10 text-white/30 hover:text-red-400 transition-colors" title="Log Out">
+                            <FiLogOut className="w-4 h-4" />
+                        </button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{user?.username || 'User'}</p>
-                        <p className="text-[10px] text-emerald-400">Online</p>
-                    </div>
-                    <button onClick={() => router.push('/settings')} className="p-1.5 rounded hover:bg-white/10 text-white/30 hover:text-white transition-colors" title="Settings">
-                        <FiSettings className="w-4 h-4" />
-                    </button>
-                    <button onClick={handleLogout} className="p-1.5 rounded hover:bg-white/10 text-white/30 hover:text-red-400 transition-colors" title="Log Out">
-                        <FiLogOut className="w-4 h-4" />
-                    </button>
                 </div>
             </div>
 
             {/* ─── MAIN CHAT ─── */}
-            <div className="flex-1 flex flex-col bg-dark-900">
+            <div className="flex-1 flex flex-col min-w-0 bg-dark-900 h-full w-full">
                 {currentChannel ? (
                     <>
-                        <div className="h-12 px-4 flex items-center justify-between border-b border-white/5">
-                            <div className="flex items-center gap-2">
-                                <FiHash className="w-5 h-5 text-white/20" />
-                                <span className="font-bold">{currentChannel.name}</span>
+                        <div className="h-12 px-4 flex items-center justify-between border-b border-white/5 shrink-0 z-30 bg-dark-900 border-white/5 w-full">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <button
+                                    onClick={() => setSidebarOpen(prev => !prev)}
+                                    className="md:hidden mr-2 p-1.5 rounded-lg bg-dark-800 border border-white/10 text-white/70 hover:text-white transition-colors flex-shrink-0"
+                                >
+                                    <FiMenu className="w-5 h-5" />
+                                </button>
+                                <FiHash className="w-5 h-5 text-white/20 shrink-0" />
+                                <span className="font-bold truncate">{currentChannel.name}</span>
                                 {currentChannel.description && <span className="text-sm text-white/30 ml-2 border-l border-white/10 pl-2">{currentChannel.description}</span>}
                             </div>
                             <div className="flex items-center gap-3">
                                 <FiPhone className="w-4.5 h-4.5 text-white/20 cursor-pointer hover:text-emerald-400 transition-colors" title="Voice Call"
-                                    onClick={() => { setCallType('voice'); initiateCall(null, currentChannel._id, 'voice'); }} />
+                                    onClick={() => setShowCallPicker('voice')} />
                                 <FiVideo className="w-4.5 h-4.5 text-white/20 cursor-pointer hover:text-indigo-400 transition-colors" title="Video Call"
-                                    onClick={() => { setCallType('video'); initiateCall(null, currentChannel._id, 'video'); }} />
+                                    onClick={() => setShowCallPicker('video')} />
+                                <FiBookmark className={`w-4.5 h-4.5 cursor-pointer transition-colors ${showPinned ? 'text-amber-400' : 'text-white/20 hover:text-amber-400'}`} title="Pinned Messages"
+                                    onClick={() => { setShowPinned(!showPinned); if (!showPinned) fetchPinnedMessages(currentChannel._id); }} />
                                 <FiSearch className={`w-5 h-5 cursor-pointer transition-colors ${showSearch ? 'text-indigo-400' : 'text-white/20 hover:text-white'}`} onClick={() => { setShowSearch(!showSearch); setSearchResults([]); setSearchQuery(''); }} />
                                 <FiUsers className={`w-5 h-5 cursor-pointer transition-colors ${showMembers ? 'text-white' : 'text-white/20 hover:text-white'}`} onClick={() => setShowMembers(!showMembers)} />
                             </div>
                         </div>
 
-                        {/* Search Bar */}
+                        {/* Message Search Modal */}
+                        <MessageSearch
+                            isOpen={showSearch}
+                            onClose={() => setShowSearch(false)}
+                            channelId={currentChannel?._id}
+                            onJumpToMessage={(msg) => toast.success(`Jump to: ${msg.content.substring(0, 20)}...`)}
+                        />
+
+                        {/* Pinned Messages Panel */}
                         <AnimatePresence>
-                            {showSearch && (
-                                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-b border-white/5 overflow-hidden">
-                                    <div className="px-4 py-2 flex items-center gap-2">
-                                        <FiSearch className="w-4 h-4 text-white/30" />
-                                        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                            placeholder="Search messages..." className="flex-1 bg-transparent text-sm outline-none text-white placeholder-white/30" autoFocus />
-                                        {searchResults.length > 0 && <span className="text-xs text-white/30">{searchResults.length} results</span>}
-                                        <FiX className="w-4 h-4 text-white/30 cursor-pointer hover:text-white" onClick={() => { setShowSearch(false); setSearchResults([]); setSearchQuery(''); }} />
+                            {showPinned && (
+                                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-b border-white/5 overflow-hidden bg-amber-500/5">
+                                    <div className="px-4 py-2">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-semibold text-amber-400 flex items-center gap-1"><FiBookmark className="w-3 h-3" /> Pinned Messages</span>
+                                            <FiX className="w-3.5 h-3.5 text-white/30 cursor-pointer hover:text-white" onClick={() => setShowPinned(false)} />
+                                        </div>
+                                        {pinnedMessages.length > 0 ? pinnedMessages.map((pm, i) => (
+                                            <div key={pm._id || i} className="flex items-start gap-2 py-1.5 text-sm">
+                                                <span className="font-medium text-white/70">{pm.sender?.username || 'User'}</span>
+                                                <span className="text-white/40 truncate flex-1">{pm.content}</span>
+                                            </div>
+                                        )) : <p className="text-xs text-white/20 py-1">No pinned messages yet</p>}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* VIDEO / SCREEN SHARE PANEL */}
+                        <AnimatePresence>
+                            {(isVideoOn || isScreenSharing) && connectedVoice && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="border-b border-white/5 overflow-hidden"
+                                >
+                                    <div className="relative bg-dark-950">
+                                        {/* Screen Share - Main View */}
+                                        {isScreenSharing && (
+                                            <div className="relative w-full" style={{ maxHeight: '45vh' }}>
+                                                <video
+                                                    ref={screenVideoRef}
+                                                    autoPlay
+                                                    playsInline
+                                                    muted
+                                                    className="w-full object-contain bg-black"
+                                                    style={{ maxHeight: '45vh' }}
+                                                />
+                                                <div className="absolute top-3 left-3 flex items-center gap-2 bg-dark-900/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/10">
+                                                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                                    <span className="text-xs text-white font-medium">Screen Sharing</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        if (screenStream) {
+                                                            screenStream.getTracks().forEach(t => t.stop());
+                                                            setScreenStream(null);
+                                                        }
+                                                        setIsScreenSharing(false);
+                                                    }}
+                                                    className="absolute top-3 right-3 bg-red-500/80 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                                                >
+                                                    <FiX className="w-3 h-3" /> Stop Sharing
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Camera Preview - PiP or Main */}
+                                        {isVideoOn && (
+                                            <motion.div
+                                                drag={isScreenSharing}
+                                                dragConstraints={{ top: 0, bottom: 200, left: -400, right: 0 }}
+                                                className={isScreenSharing
+                                                    ? "absolute bottom-3 right-3 w-40 aspect-video rounded-xl overflow-hidden border-2 border-white/10 shadow-xl bg-dark-800 cursor-move z-10"
+                                                    : "relative w-full flex items-center justify-center bg-dark-950"
+                                                }
+                                                style={!isScreenSharing ? { maxHeight: '35vh' } : {}}
+                                            >
+                                                <video
+                                                    ref={localVideoRef}
+                                                    autoPlay
+                                                    playsInline
+                                                    muted
+                                                    className={isScreenSharing
+                                                        ? "w-full h-full object-cover"
+                                                        : "w-full object-contain bg-black"
+                                                    }
+                                                    style={!isScreenSharing ? { maxHeight: '35vh' } : {}}
+                                                />
+                                                <div className={`absolute bottom-2 left-2 flex items-center gap-1 bg-dark-900/70 backdrop-blur-sm px-2 py-1 rounded text-[10px] text-white font-medium ${isScreenSharing ? '' : 'text-xs'}`}>
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                                    {user?.username || 'You'} • Camera
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        if (localVideoStream) {
+                                                            localVideoStream.getTracks().forEach(t => t.stop());
+                                                            setLocalVideoStream(null);
+                                                        }
+                                                        setIsVideoOn(false);
+                                                    }}
+                                                    className="absolute top-2 right-2 bg-dark-900/70 hover:bg-red-500/80 text-white/60 hover:text-white p-1 rounded-lg text-xs transition-colors"
+                                                >
+                                                    <FiX className="w-3 h-3" />
+                                                </button>
+                                            </motion.div>
+                                        )}
+
+                                        {/* No video/screen active but panel shown (shouldn't happen, but safe) */}
+                                        {!isVideoOn && !isScreenSharing && (
+                                            <div className="h-32 flex items-center justify-center text-white/20 text-sm">
+                                                No active video or screen share
+                                            </div>
+                                        )}
                                     </div>
                                 </motion.div>
                             )}
@@ -470,8 +899,17 @@ export default function ChannelsPage() {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-baseline gap-2">
                                                 <span className="font-medium text-white cursor-pointer hover:underline" onClick={() => setProfileUser(msg.sender?._id || msg.sender)}>{msg.sender?.username || 'User'}</span>
-                                                <span className="text-xs text-white/20">{new Date(msg.createdAt || Date.now()).toLocaleString()}</span>
+                                                <span className="text-xs text-white/20 flex items-center gap-1">
+                                                    {new Date(msg.createdAt || Date.now()).toLocaleString()}
+                                                    {msg.sender?._id === user?._id && msg.readBy?.length > 0 && (
+                                                        <span className="text-indigo-400 flex" title="Read by others">
+                                                            <FiCheck className="w-3 h-3 -mr-1.5" /><FiCheck className="w-3 h-3" />
+                                                        </span>
+                                                    )}
+                                                </span>
                                                 {msg.isEdited && <span className="text-xs text-white/15">(edited)</span>}
+                                                {msg.isPinned && <span className="text-xs text-amber-400/60">📌</span>}
+                                                {msg.threadCount > 0 && <span className="text-xs text-indigo-400/60 cursor-pointer hover:text-indigo-400" onClick={() => openThread(msg)}>💬 {msg.threadCount} replies</span>}
                                             </div>
                                             {editingMsg === msg._id ? (
                                                 <div className="mt-1">
@@ -481,16 +919,47 @@ export default function ChannelsPage() {
                                                     <p className="text-xs text-white/20 mt-1">escape to cancel • enter to save</p>
                                                 </div>
                                             ) : (
-                                                <p className="text-white/70 text-sm mt-0.5">{msg.content}</p>
+                                                <>
+                                                    <p className="text-white/70 text-sm mt-0.5">
+                                                        {msg.content?.split(/(@\w+)/g).map((part, pi) =>
+                                                            part.startsWith('@') ? (
+                                                                <span key={pi} className="bg-indigo-500/20 text-indigo-300 px-1 rounded font-medium cursor-pointer hover:bg-indigo-500/30">{part}</span>
+                                                            ) : part
+                                                        )}
+                                                    </p>
+                                                    {msg.attachments?.length > 0 && (
+                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                            {msg.attachments.map((att, ai) => (
+                                                                <div key={ai} className="max-w-xs rounded-lg overflow-hidden border border-white/10 bg-black/20">
+                                                                {att.type?.startsWith('image/') ? (
+                                                                        <a href={att.url} target="_blank" rel="noopener noreferrer"><img src={att.url} alt={att.name} className="w-full h-auto object-cover max-h-60" /></a>
+                                                                    ) : att.type?.startsWith('video/') ? (
+                                                                        <video src={att.url} controls className="w-full h-auto max-h-60" />
+                                                                    ) : att.type?.startsWith('audio/') ? (
+                                                                        <AudioPlayer src={att.url} isMine={msg.sender?._id === user?._id} />
+                                                                    ) : (
+                                                                        <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 hover:bg-white/5 transition-colors">
+                                                                            <FiPaperclip className="w-4 h-4 text-indigo-400" />
+                                                                            <span className="text-sm text-indigo-300 underline break-all">{att.name || 'Download File'}</span>
+                                                                        </a>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                             {msg.reactions?.length > 0 && (
                                                 <div className="flex flex-wrap gap-1 mt-1.5">
-                                                    {msg.reactions.map((r, ri) => (
-                                                        <button key={ri} onClick={() => handleReaction(msg._id, r.emoji)}
-                                                            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition-colors">
-                                                            <span>{r.emoji}</span><span className="text-white/40">{r.users?.length || 0}</span>
-                                                        </button>
-                                                    ))}
+                                                    {msg.reactions.map((r, ri) => {
+                                                        const emojiStr = typeof r.emoji === 'string' ? r.emoji : (r.emoji?.emoji || r.emoji?.text || '👍');
+                                                        return (
+                                                            <button key={ri} onClick={() => handleReaction(msg._id, emojiStr)}
+                                                                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition-colors">
+                                                                <span>{emojiStr}</span><span className="text-white/40">{r.users?.length || 0}</span>
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
                                         </div>
@@ -498,6 +967,10 @@ export default function ChannelsPage() {
                                             <div className="flex items-center bg-dark-800 rounded-lg border border-white/10 shadow-xl">
                                                 <button onClick={() => setShowEmojiPicker(showEmojiPicker === msg._id ? null : msg._id)}
                                                     className="p-1.5 hover:bg-white/10 rounded-l-lg text-white/30 hover:text-white transition-colors" title="React"><FiSmile className="w-4 h-4" /></button>
+                                                <button onClick={() => openThread(msg)}
+                                                    className="p-1.5 hover:bg-white/10 text-white/30 hover:text-indigo-400 transition-colors" title="Thread"><FiMessageCircle className="w-4 h-4" /></button>
+                                                <button onClick={() => handlePinMessage(msg._id)}
+                                                    className="p-1.5 hover:bg-white/10 text-white/30 hover:text-amber-400 transition-colors" title="Pin"><FiBookmark className="w-4 h-4" /></button>
                                                 {(msg.sender?._id === user?._id || msg.sender === user?._id) && (
                                                     <button onClick={() => { setEditingMsg(msg._id); setEditContent(msg.content); }}
                                                         className="p-1.5 hover:bg-white/10 text-white/30 hover:text-white transition-colors" title="Edit"><FiEdit2 className="w-4 h-4" /></button>
@@ -506,8 +979,11 @@ export default function ChannelsPage() {
                                                     className="p-1.5 hover:bg-white/10 rounded-r-lg text-white/30 hover:text-red-400 transition-colors" title="Delete"><FiTrash2 className="w-4 h-4" /></button>
                                             </div>
                                             {showEmojiPicker === msg._id && (
-                                                <div className="absolute top-8 right-0 bg-dark-800 rounded-xl border border-white/10 shadow-2xl p-2 flex gap-1 z-50">
-                                                    {quickEmojis.map(e => (<button key={e} onClick={() => handleReaction(msg._id, e)} className="text-lg hover:bg-white/10 rounded-lg p-1 transition-colors">{e}</button>))}
+                                                <div className="absolute top-8 right-0 z-50">
+                                                    <div className="fixed inset-0" onClick={() => setShowEmojiPicker(null)} />
+                                                    <div className="relative">
+                                                        <EmojiPicker onEmojiClick={(emojiObject) => handleReaction(msg._id, emojiObject.emoji)} theme="dark" />
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -525,7 +1001,16 @@ export default function ChannelsPage() {
                                                 <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer transition-colors">
                                                     <div className="relative">
                                                         <div className="w-8 h-8 rounded-full bg-indigo-500/60 flex items-center justify-center text-xs font-bold">{(m.user?.username || 'U')[0].toUpperCase()}</div>
-                                                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-dark-800 ${onlineUsers.includes(m.user?._id) || m.user?.status === 'online' ? 'bg-emerald-400' : 'bg-white/20'}`} />
+                                                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-dark-800 ${(() => {
+                                                            const isMe = m.user?._id === user?._id;
+                                                            if (!isMe && !onlineUsers.includes(m.user?._id)) return 'bg-white/20';
+                                                            const s = isMe ? user?.status : m.user?.status;
+                                                            if (s === 'dnd') return 'bg-red-500';
+                                                            if (s === 'idle') return 'bg-amber-400';
+                                                            if (s === 'invisible') return 'bg-gray-400';
+                                                            return 'bg-emerald-400';
+                                                        })()
+                                                            }`} />
                                                     </div>
                                                     <p className="text-sm truncate text-white/70">
                                                         {m.user?.username || 'User'}
@@ -538,35 +1023,142 @@ export default function ChannelsPage() {
                                     </motion.div>
                                 )}
                             </AnimatePresence>
+
+                            {/* Thread Panel */}
+                            <AnimatePresence>
+                                {threadView && (
+                                    <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: 340, opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="bg-dark-800 border-l border-white/5 flex flex-col overflow-hidden">
+                                        <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                                            <h3 className="text-sm font-semibold text-white flex items-center gap-2"><FiMessageCircle className="w-4 h-4 text-indigo-400" /> Thread</h3>
+                                            <FiX className="w-4 h-4 text-white/30 cursor-pointer hover:text-white" onClick={() => setThreadView(null)} />
+                                        </div>
+                                        {/* Parent Message */}
+                                        <div className="px-4 py-3 border-b border-white/5 bg-white/[0.02]">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-sm font-medium text-white">{threadView.sender?.username || 'User'}</span>
+                                                <span className="text-xs text-white/20">{new Date(threadView.createdAt || Date.now()).toLocaleString()}</span>
+                                            </div>
+                                            <p className="text-sm text-white/60">{threadView.content}</p>
+                                        </div>
+                                        {/* Thread Replies */}
+                                        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2">
+                                            {threadMessages.length > 0 ? threadMessages.map((tm, i) => (
+                                                <div key={tm._id || i} className="flex items-start gap-2">
+                                                    <div className="w-7 h-7 rounded-full bg-indigo-500/60 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                                                        {(tm.sender?.username || 'U')[0].toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-baseline gap-1.5">
+                                                            <span className="text-xs font-medium text-white">{tm.sender?.username || 'User'}</span>
+                                                            <span className="text-[10px] text-white/20">{new Date(tm.createdAt || Date.now()).toLocaleTimeString()}</span>
+                                                        </div>
+                                                        <p className="text-xs text-white/60 mt-0.5">{tm.content}</p>
+                                                    </div>
+                                                </div>
+                                            )) : <p className="text-xs text-white/20 text-center py-4">No replies yet. Start the conversation!</p>}
+                                        </div>
+                                        {/* Thread Input */}
+                                        <div className="px-3 py-2 border-t border-white/5">
+                                            <div className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2">
+                                                <input type="text" value={threadInput} onChange={(e) => setThreadInput(e.target.value)}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendThreadReply(); } }}
+                                                    placeholder="Reply in thread..." className="flex-1 bg-transparent text-xs outline-none text-white placeholder-white/30" />
+                                                <FiCornerUpRight className="w-4 h-4 text-white/20 cursor-pointer hover:text-indigo-400 transition-colors" onClick={sendThreadReply} />
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
 
                         {/* Typing Indicator */}
                         {currentChannel && typingUsers[currentChannel._id] && Object.keys(typingUsers[currentChannel._id]).length > 0 && (
-                            <div className="px-4 py-1">
-                                <p className="text-xs text-indigo-400 animate-pulse">
-                                    {Object.values(typingUsers[currentChannel._id]).join(', ')} {Object.keys(typingUsers[currentChannel._id]).length === 1 ? 'is' : 'are'} typing...
-                                </p>
-                            </div>
+                            <TypingIndicator users={Object.values(typingUsers[currentChannel._id]).map(u => ({ username: u }))} />
                         )}
 
-                        <div className="px-4 pb-6 pt-2">
-                            <div className="bg-white/5 border border-white/10 rounded-xl flex items-center px-4">
+                        <div className="px-4 pb-6 pt-2 relative">
+                            {/* @Mention Autocomplete */}
+                            <AnimatePresence>
+                                {showMentions && (
+                                    <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }}
+                                        className="absolute bottom-full left-4 right-4 mb-1 bg-dark-800 rounded-xl border border-white/10 shadow-2xl overflow-hidden z-50">
+                                        <p className="px-3 py-1.5 text-[10px] text-white/30 uppercase font-semibold border-b border-white/5">Members matching @{mentionQuery}</p>
+                                        {mentionList.map((m) => (
+                                            <div key={m._id} onClick={() => insertMention(m.username)}
+                                                className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-white/5 transition-colors">
+                                                <div className="w-6 h-6 rounded-full bg-indigo-500/60 flex items-center justify-center text-[10px] font-bold">{(m.username || 'U')[0].toUpperCase()}</div>
+                                                <span className="text-sm text-white/80">{m.username}</span>
+                                            </div>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                            <div className="bg-white/5 border border-white/10 rounded-xl flex items-center px-4 relative">
+                                <button onClick={() => { setShowInputEmojiPicker(!showInputEmojiPicker); setShowGifPicker(false); }} className="text-white/20 hover:text-amber-400 transition-colors mr-2 cursor-pointer" title="Emoji">
+                                    <FiSmile className="w-5 h-5" />
+                                </button>
+                                <button onClick={() => { setShowGifPicker(!showGifPicker); setShowInputEmojiPicker(false); }} className="text-white/20 hover:text-emerald-400 transition-colors mr-2 cursor-pointer" title="GIFs">
+                                    <MdGif className="w-7 h-7" />
+                                </button>
                                 <FiPaperclip className="w-5 h-5 text-white/20 cursor-pointer hover:text-white transition-colors" onClick={() => fileInputRef.current?.click()} title="Attach file" />
                                 <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
                                 <input type="text" value={messageInput} onChange={handleTyping}
-                                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); setShowMentions(false); setShowInputEmojiPicker(false); setShowGifPicker(false); }
+                                        if (e.key === 'Escape') { setShowMentions(false); setShowInputEmojiPicker(false); setShowGifPicker(false); }
+                                    }}
                                     placeholder={`Message #${currentChannel.name}`} className="flex-1 bg-transparent py-3 px-3 text-sm outline-none text-white placeholder-white/30" />
                                 <button onClick={handleSendMessage} className="text-white/20 hover:text-indigo-400 transition-colors"><FiSend className="w-5 h-5" /></button>
+                                <VoiceRecorder onSend={async (blob) => {
+                                    try {
+                                        const formData = new FormData();
+                                        formData.append('file', blob, 'voice-message.webm');
+                                        const { data } = await api.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                                        sendMessage(currentChannel._id, '🎤 Voice Message', 'voice_message', [{ url: data.url, type: 'audio/webm', name: 'Voice Message' }]);
+                                    } catch (e) {
+                                        console.error('Voice send error:', e.response?.data || e);
+                                        toast.error(e.response?.data?.message || 'Failed to send voice message');
+                                    }
+                                }} />
+
+                                {showInputEmojiPicker && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setShowInputEmojiPicker(false)} />
+                                        <div className="absolute bottom-16 left-4 z-50 shadow-2xl">
+                                            <EmojiPicker onEmojiClick={onEmojiClick} theme="dark" />
+                                        </div>
+                                    </>
+                                )}
+
+                                {showGifPicker && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setShowGifPicker(false)} />
+                                        <div className="absolute bottom-16 left-12 z-50">
+                                            <GifPicker onSelect={(gifUrl) => {
+                                                sendMessage(currentChannel._id, '', 'file', [{ url: gifUrl, type: 'image/gif', name: 'GIF' }]);
+                                                setShowGifPicker(false);
+                                            }} />
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex items-center justify-center">
-                        <div className="text-center">
-                            <FiHash className="w-16 h-16 mx-auto mb-4 text-white/10" />
-                            <h3 className="text-xl font-bold text-white/30 mb-2">{currentServer ? 'Select a channel' : 'No server selected'}</h3>
-                            <p className="text-sm text-white/20">{currentServer ? 'Pick a channel from the sidebar' : 'Create or join a server to start chatting!'}</p>
+                    <div className="flex-1 flex flex-col items-center justify-center text-center px-4 w-full relative">
+                        <div className="absolute top-4 left-4 md:hidden">
+                            <button
+                                onClick={() => setSidebarOpen(prev => !prev)}
+                                className="p-2 rounded-lg bg-dark-800 border border-white/10 text-white/70 hover:text-white transition-colors"
+                            >
+                                <FiMenu className="w-6 h-6" />
+                            </button>
                         </div>
+                        <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4">
+                            <FiMessageSquare className="w-8 h-8 text-indigo-400" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white/30 mb-2">{currentServer ? 'Select a channel' : 'No server selected'}</h3>
+                        <p className="text-sm text-white/20">{currentServer ? 'Pick a channel from the sidebar' : 'Create or join a server to start chatting!'}</p>
                     </div>
                 )}
             </div>
@@ -641,6 +1233,10 @@ export default function ChannelsPage() {
                                         <button onClick={() => setNewChannelType('voice')} className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${newChannelType === 'voice' ? 'border-indigo-500 bg-indigo-500/10 text-white' : 'border-white/10 text-white/40 hover:border-white/20'}`}><FiVolume2 className="w-5 h-5" /> Voice</button>
                                     </div>
                                 </div>
+                                <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Category <span className="text-white/20 font-normal">(optional)</span></label>
+                                    <input type="text" value={newChannelCategory} onChange={(e) => setNewChannelCategory(e.target.value)} placeholder="e.g. general"
+                                        className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all placeholder-white/20" />
+                                </div>
                                 <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Channel Name</label>
                                     <div className="mt-2 flex items-center bg-white/5 border border-white/10 rounded-xl px-4">
                                         {newChannelType === 'text' ? <FiHash className="w-4 h-4 text-white/30" /> : <FiVolume2 className="w-4 h-4 text-white/30" />}
@@ -662,41 +1258,87 @@ export default function ChannelsPage() {
             {/* User Profile Modal */}
             {profileUser && <UserProfileModal userId={profileUser} onClose={() => setProfileUser(null)} />}
 
-            {/* Call Modal */}
-            {(activeCall || callType) && (
-                <CallModal
-                    callSession={activeCall || { _id: 'pending', participants: [] }}
-                    user={user}
-                    type={callType || 'voice'}
-                    onEnd={(id) => { endCall(id); setCallType(null); }}
-                    onToggleMedia={toggleMedia}
-                />
-            )}
+            {/* Call is now handled globally by CallProvider */}
+
+            {/* Call Member Picker Modal */}
+            <AnimatePresence>
+                {showCallPicker && currentServer && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowCallPicker(null)}>
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-dark-800 border border-white/10 rounded-2xl w-[400px] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                            <div className="p-6 text-center border-b border-white/5">
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-silver-400 flex items-center justify-center mx-auto mb-3">
+                                    {showCallPicker === 'video' ? <FiVideo className="w-6 h-6 text-white" /> : <FiPhone className="w-6 h-6 text-white" />}
+                                </div>
+                                <h2 className="text-xl font-bold">Start {showCallPicker === 'video' ? 'Video' : 'Voice'} Call</h2>
+                                <p className="text-white/40 text-sm mt-1">Select a member to call</p>
+                            </div>
+                            <div className="max-h-64 overflow-y-auto p-2">
+                                {(currentServer.members || []).filter(m => m.user?._id !== user?._id).map((m, i) => (
+                                    <motion.div key={m.user?._id || i}
+                                        whileHover={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
+                                        onClick={() => {
+                                            initiateCall?.(m.user?._id, currentChannel?._id, showCallPicker);
+                                            setShowCallPicker(null);
+                                        }}
+                                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors">
+                                        <div className="relative">
+                                            <div className="w-10 h-10 rounded-full bg-indigo-500/60 flex items-center justify-center text-sm font-bold">
+                                                {(m.user?.username || 'U')[0].toUpperCase()}
+                                            </div>
+                                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-dark-800 ${onlineUsers.includes(m.user?._id) ? 'bg-emerald-400' : 'bg-white/20'}`} />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-sm font-medium text-white">{m.user?.username || 'User'}</p>
+                                            <p className="text-xs text-white/30">{onlineUsers.includes(m.user?._id) ? 'Online' : 'Offline'}</p>
+                                        </div>
+                                        <div className="p-2 rounded-lg bg-white/5 text-white/30 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors">
+                                            {showCallPicker === 'video' ? <FiVideo className="w-4 h-4" /> : <FiPhone className="w-4 h-4" />}
+                                        </div>
+                                    </motion.div>
+                                ))}
+                                {(currentServer.members || []).filter(m => m.user?._id !== user?._id).length === 0 && (
+                                    <p className="text-center text-white/30 text-sm py-6">No other members in this server</p>
+                                )}
+                            </div>
+                            <div className="p-4 border-t border-white/5">
+                                <button onClick={() => setShowCallPicker(null)}
+                                    className="w-full py-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-sm text-white/50 hover:text-white transition-colors">Cancel</button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Game Launcher */}
-            {showGameLauncher && currentChannel && (
-                <GameLauncher
-                    channelId={currentChannel._id}
-                    onClose={() => setShowGameLauncher(false)}
-                    createGame={createGame}
-                    joinGame={joinGame}
-                    makeGameMove={makeGameMove}
-                    requestRematch={requestRematch}
-                />
-            )}
+            {
+                showGameLauncher && currentChannel && (
+                    <GameLauncher
+                        channelId={currentChannel._id}
+                        onClose={() => setShowGameLauncher(false)}
+                        createGame={createGame}
+                        joinGame={joinGame}
+                        makeGameMove={makeGameMove}
+                        requestRematch={requestRematch}
+                    />
+                )
+            }
 
             {/* Music Room */}
-            {showMusicRoom && currentServer && (
-                <MusicRoom
-                    serverId={currentServer._id}
-                    serverName={currentServer.name}
-                    onClose={() => setShowMusicRoom(false)}
-                    joinMusicRoom={joinMusicRoom}
-                    syncMusic={syncMusic}
-                    leaveMusicRoom={leaveMusicRoom}
-                    musicRoom={musicRoom}
-                />
-            )}
-        </div>
+            {
+                showMusicRoom && currentServer && (
+                    <MusicRoom
+                        serverId={currentServer._id}
+                        serverName={currentServer.name}
+                        onClose={() => setShowMusicRoom(false)}
+                        joinMusicRoom={joinMusicRoom}
+                        syncMusic={syncMusic}
+                        leaveMusicRoom={leaveMusicRoom}
+                        musicRoom={musicRoom}
+                    />
+                )
+            }
+        </div >
     );
 }

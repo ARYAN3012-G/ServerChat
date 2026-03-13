@@ -28,6 +28,35 @@ exports.getDashboard = async (req, res, next) => {
             createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
         });
 
+        // Weekly activity (messages per day for last 7 days)
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const weeklyMessages = await Message.aggregate([
+            { $match: { createdAt: { $gte: sevenDaysAgo } } },
+            { $group: { _id: { $dayOfWeek: '$createdAt' }, count: { $sum: 1 } } },
+            { $sort: { _id: 1 } }
+        ]);
+
+        const weeklyUsers = await User.aggregate([
+            { $match: { createdAt: { $gte: sevenDaysAgo } } },
+            { $group: { _id: { $dayOfWeek: '$createdAt' }, count: { $sum: 1 } } },
+            { $sort: { _id: 1 } }
+        ]);
+
+        // Build 7-day arrays (Sun=1 to Sat=7 in MongoDB)
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const weeklyActivity = dayNames.map((day, i) => {
+            const msgData = weeklyMessages.find(d => d._id === i + 1);
+            const usrData = weeklyUsers.find(d => d._id === i + 1);
+            return {
+                day,
+                messages: msgData ? msgData.count : 0,
+                newUsers: usrData ? usrData.count : 0,
+            };
+        });
+
+        // Total game sessions
+        const totalGames = await GameSession.countDocuments();
+
         res.json({
             stats: {
                 totalUsers,
@@ -38,6 +67,8 @@ exports.getDashboard = async (req, res, next) => {
                 activeGames,
                 newUsersWeek,
                 messagesDay,
+                totalGames,
+                weeklyActivity,
             },
         });
     } catch (error) {

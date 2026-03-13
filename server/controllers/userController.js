@@ -22,12 +22,19 @@ exports.getProfile = async (req, res, next) => {
 // Update profile
 exports.updateProfile = async (req, res, next) => {
     try {
-        const { username, bio, customStatus } = req.body;
+        const { username, bio, customStatus, preferences } = req.body;
         const updates = {};
 
         if (username) updates.username = username;
         if (bio !== undefined) updates.bio = bio;
         if (customStatus) updates.customStatus = customStatus;
+        if (preferences !== undefined) {
+            updates.preferences = { ...req.user.preferences, ...preferences };
+        }
+        if (req.body.status) {
+            updates.status = req.body.status;
+            updates.preferredStatus = req.body.status;
+        }
 
         const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true, runValidators: true });
 

@@ -5,7 +5,7 @@ const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000'
 let socket = null;
 
 export const connectSocket = (token) => {
-    if (socket?.connected) return socket;
+    if (socket) return socket;
 
     socket = io(SOCKET_URL, {
         auth: { token },

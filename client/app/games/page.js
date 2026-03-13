@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiRotateCw, FiUsers, FiCpu, FiAward, FiZap, FiTrendingUp } from 'react-icons/fi';
+import { FiArrowLeft, FiRotateCw, FiUsers, FiCpu, FiAward, FiZap, FiTrendingUp, FiMenu } from 'react-icons/fi';
 import { IoGameControllerOutline } from 'react-icons/io5';
 import api from '../../services/api';
 
@@ -37,6 +37,7 @@ export default function GamesPage() {
     const [gameMode, setGameMode] = useState(null);
     const [selectingMode, setSelectingMode] = useState(null);
     const [mounted, setMounted] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -59,15 +60,18 @@ export default function GamesPage() {
 
     return (
         <div className="flex h-screen bg-[#0c0e1a] text-white overflow-hidden">
+            {/* Mobile overlay */}
+            {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />}
+
             {/* Sidebar */}
-            <div className="w-[72px] bg-[#080a14] flex flex-col items-center py-3 gap-2 border-r border-white/5">
+            <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed md:static z-40 w-[72px] bg-[#080a14] flex flex-col items-center py-3 gap-2 border-r border-white/5 h-full transition-transform duration-200`}>
                 <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/channels')}
                     className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-indigo-400 hover:text-white hover:bg-indigo-500 cursor-pointer transition-all" title="Back to Chat">
                     <FiArrowLeft className="w-6 h-6" />
                 </motion.div>
                 <div className="w-8 h-0.5 bg-white/10 rounded-full mx-auto" />
                 {GAMES.map(g => (
-                    <motion.div key={g.id} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} onClick={() => handlePick(g)}
+                    <motion.div key={g.id} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} onClick={() => { handlePick(g); setSidebarOpen(false); }}
                         className={`w-12 h-12 rounded-2xl flex items-center justify-center cursor-pointer transition-all text-xl ${activeGame === g.id ? 'bg-indigo-500 shadow-lg shadow-indigo-500/30' : 'bg-white/5 hover:bg-white/10'}`}
                         title={g.name}>
                         {g.icon}
@@ -80,28 +84,32 @@ export default function GamesPage() {
                 {/* Background glow */}
                 <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-indigo-500/10 rounded-full blur-[120px]" />
-                    <div className="absolute bottom-[-100px] right-[-100px] w-[400px] h-[400px] bg-purple-500/10 rounded-full blur-[100px]" />
+                    <div className="absolute bottom-[-100px] right-[-100px] w-[400px] h-[400px] bg-silver-400/10 rounded-full blur-[100px]" />
                 </div>
 
                 <AnimatePresence mode="wait">
                     {/* ─── LOBBY ─── */}
                     {!activeGame && !selectingMode && (
-                        <motion.div key="lobby" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative max-w-5xl mx-auto px-8 py-10">
-                            <div className="text-center mb-14">
+                        <motion.div key="lobby" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative max-w-5xl mx-auto px-4 sm:px-8 py-6 sm:py-10">
+                            {/* Mobile menu button */}
+                            <button onClick={() => setSidebarOpen(true)} className="md:hidden mb-4 p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors">
+                                <FiMenu className="w-5 h-5" />
+                            </button>
+                            <div className="text-center mb-8 sm:mb-14">
                                 <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
                                     className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-5 py-2 mb-6">
                                     <IoGameControllerOutline className="w-5 h-5 text-indigo-400" />
                                     <span className="text-sm font-medium text-indigo-300">Game Center</span>
                                 </motion.div>
                                 <motion.h1 initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}
-                                    className="text-6xl font-black mb-4 tracking-tight">
+                                    className="text-3xl sm:text-5xl lg:text-6xl font-black mb-4 tracking-tight">
                                     <span className="bg-gradient-to-r from-white via-indigo-200 to-purple-200 bg-clip-text text-transparent">Choose Your Game</span>
                                 </motion.h1>
                                 <motion.p initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}
                                     className="text-white/40 text-lg max-w-md mx-auto">Challenge yourself or a friend. Track your best scores and climb the leaderboard.</motion.p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 {GAMES.map((g, i) => (
                                     <motion.div key={g.id}
                                         initial={{ opacity: 0, y: 40 }}
@@ -188,7 +196,7 @@ export default function GamesPage() {
                                 )}
                                 {selectingMode.modes.includes('2player') && (
                                     <motion.button whileHover={{ scale: 1.02, x: 4 }} whileTap={{ scale: 0.98 }} onClick={() => startWithMode('2player')}
-                                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-6 flex items-center gap-5 shadow-xl shadow-purple-500/20 hover:shadow-purple-500/40 transition-shadow text-left">
+                                        className="w-full bg-gradient-to-r from-silver-400 to-pink-600 rounded-2xl p-6 flex items-center gap-5 shadow-xl shadow-white/[0.04] hover:shadow-silver-400/40 transition-shadow text-left">
                                         <div className="w-14 h-14 bg-white/15 rounded-xl flex items-center justify-center"><FiUsers className="w-7 h-7" /></div>
                                         <div><p className="font-bold text-lg">2 Players</p><p className="text-white/60 text-sm">Play with a friend locally</p></div>
                                         <FiZap className="w-5 h-5 ml-auto text-white/30" />
@@ -629,7 +637,7 @@ function SnakeGame({ goBack, saveScoreToDb }) {
                     const isSnake = displaySnake.some(s => s.x === x && s.y === y);
                     const isFood = displayFood.x === x && displayFood.y === y;
                     return (
-                        <div key={i} className={`w-[22px] h-[22px] rounded-[3px] transition-colors duration-75 ${isHead ? 'bg-green-400 shadow-md shadow-green-400/50' : isSnake ? 'bg-green-500/70' : isFood ? 'bg-red-400 shadow-md shadow-red-400/50 animate-pulse' : 'bg-white/[0.02]'}`} />
+                        <div key={i} className={`w-[16px] h-[16px] sm:w-[22px] sm:h-[22px] rounded-[3px] transition-colors duration-75 ${isHead ? 'bg-green-400 shadow-md shadow-green-400/50' : isSnake ? 'bg-green-500/70' : isFood ? 'bg-red-400 shadow-md shadow-red-400/50 animate-pulse' : 'bg-white/[0.02]'}`} />
                     );
                 })}
             </div>

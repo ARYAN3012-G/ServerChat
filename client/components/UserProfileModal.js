@@ -1,13 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiX, FiUsers, FiCalendar, FiMessageCircle, FiShield } from 'react-icons/fi';
+import { FiX, FiUsers, FiCalendar, FiMessageCircle, FiShield, FiSlash } from 'react-icons/fi';
 import api from '../services/api';
+import toast from 'react-hot-toast';
 
 export default function UserProfileModal({ userId, onClose }) {
+    const router = useRouter();
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isBlocked, setIsBlocked] = useState(false);
+    const [blocking, setBlocking] = useState(false);
 
     useEffect(() => {
         if (!userId) return;
@@ -21,6 +26,31 @@ export default function UserProfileModal({ userId, onClose }) {
     }, [userId]);
 
     if (!userId) return null;
+
+    const handleBlockUser = async () => {
+        if (blocking) return;
+        setBlocking(true);
+        try {
+            if (isBlocked) {
+                await api.delete(`/users/block/${userId}`);
+                setIsBlocked(false);
+                toast.success('User unblocked');
+            } else {
+                await api.post(`/users/block/${userId}`);
+                setIsBlocked(true);
+                toast.success('User blocked');
+            }
+        } catch (e) { toast.error('Failed to update block status'); }
+        setBlocking(false);
+    };
+
+    const handleMessageUser = async () => {
+        try {
+            await api.post('/channels/dm', { targetUserId: userId });
+            onClose();
+            router.push('/dms');
+        } catch (e) { toast.error('Failed to start DM'); }
+    };
 
     const roleBadges = {
         admin: { label: 'Admin', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
@@ -36,7 +66,7 @@ export default function UserProfileModal({ userId, onClose }) {
                     className="bg-[#111427] border border-white/10 rounded-2xl w-[360px] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
 
                     {/* Banner */}
-                    <div className="h-24 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 relative">
+                    <div className="h-24 bg-gradient-to-br from-indigo-600 via-silver-400 to-pink-500 relative">
                         <button onClick={onClose} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/30 flex items-center justify-center text-white/70 hover:text-white transition-colors">
                             <FiX className="w-4 h-4" />
                         </button>
@@ -117,6 +147,20 @@ export default function UserProfileModal({ userId, onClose }) {
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Message and Block Buttons */}
+                                <div className="mt-4 pt-3 border-t border-white/5 space-y-2">
+                                    <button onClick={handleMessageUser}
+                                        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-colors bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20">
+                                        <FiMessageCircle className="w-3.5 h-3.5" />
+                                        Send Message
+                                    </button>
+                                    <button onClick={handleBlockUser} disabled={blocking}
+                                        className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-colors ${isBlocked ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20'}`}>
+                                        <FiSlash className="w-3.5 h-3.5" />
+                                        {blocking ? 'Processing...' : isBlocked ? 'Unblock User' : 'Block User'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ) : (

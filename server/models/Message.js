@@ -24,7 +24,9 @@ const messageSchema = new mongoose.Schema({
         url: String,
         publicId: String,
         filename: String,
+        name: String,
         mimetype: String,
+        type: { type: String },
         size: Number,
     }],
     // Reply / Thread

@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
             >
                 <div className="text-center mb-8">
                     <Link href="/" className="inline-flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-white/90 to-silver-300/90 flex items-center justify-center">
                             <FiMessageSquare className="w-6 h-6 text-white" />
                         </div>
                         <span className="text-3xl font-display font-bold text-white">ServerChat</span>
@@ -68,7 +68,7 @@ export default function ForgotPasswordPage() {
                                     whileTap={{ scale: 0.98 }}
                                     type="submit"
                                     disabled={loading}
-                                    className="w-full bg-gradient-to-r from-primary-500 to-purple-600 text-white font-semibold py-3 rounded-lg disabled:opacity-50 flex items-center justify-center"
+                                    className="w-full bg-gradient-to-r from-white/90 to-silver-300/90 text-white font-semibold py-3 rounded-lg disabled:opacity-50 flex items-center justify-center"
                                 >
                                     {loading ? (
                                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -88,7 +88,7 @@ export default function ForgotPasswordPage() {
                         </div>
                     )}
 
-                    <Link href="/login" className="flex items-center justify-center gap-2 mt-6 text-primary-400 hover:text-primary-300 text-sm font-medium transition-colors">
+                    <Link href="/login" className="flex items-center justify-center gap-2 mt-6 text-silver-300 hover:text-silver-200 text-sm font-medium transition-colors">
                         <FiArrowLeft className="w-4 h-4" /> Back to Login
                     </Link>
                 </div>

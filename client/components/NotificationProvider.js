@@ -1,82 +1,98 @@
 'use client';
 
-import { useState, useEffect, createContext, useContext, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FiCheck, FiX, FiInfo, FiAlertTriangle, FiBell } from 'react-icons/fi';
+import { useEffect, useRef, useCallback } from 'react';
+import { useSelector } from 'react-redux';
+import { getSocket } from '../services/socket';
 
-const NotificationContext = createContext();
+export default function NotificationProvider() {
+    const { user } = useSelector(state => state.auth);
+    const audioRef = useRef(null);
+    const hasPermission = useRef(false);
 
-export function useNotification() {
-    return useContext(NotificationContext);
-}
-
-export function NotificationProvider({ children }) {
-    const [notifications, setNotifications] = useState([]);
-
-    const addNotification = useCallback((notification) => {
-        const id = Date.now() + Math.random();
-        setNotifications(prev => [...prev, { ...notification, id }]);
-        setTimeout(() => {
-            setNotifications(prev => prev.filter(n => n.id !== id));
-        }, notification.duration || 4000);
+    // Request browser notification permission on mount
+    useEffect(() => {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            if (Notification.permission === 'granted') {
+                hasPermission.current = true;
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    hasPermission.current = permission === 'granted';
+                });
+            }
+        }
     }, []);
 
-    const removeNotification = useCallback((id) => {
-        setNotifications(prev => prev.filter(n => n.id !== id));
+    const playSound = useCallback(() => {
+        try {
+            if (audioRef.current) {
+                audioRef.current.currentTime = 0;
+                audioRef.current.play().catch(() => { });
+            }
+        } catch (e) {
+            // Ignore autoplay restrictions
+        }
     }, []);
 
-    const notify = {
-        success: (title, message) => addNotification({ type: 'success', title, message }),
-        error: (title, message) => addNotification({ type: 'error', title, message }),
-        info: (title, message) => addNotification({ type: 'info', title, message }),
-        warning: (title, message) => addNotification({ type: 'warning', title, message }),
-    };
+    const showBrowserNotification = useCallback((title, body, icon) => {
+        if (!hasPermission.current || typeof window === 'undefined') return;
+        if (document.hasFocus()) return; // Don't show if user is focused
 
-    const icons = { success: FiCheck, error: FiX, info: FiInfo, warning: FiAlertTriangle };
-    const colors = {
-        success: 'bg-discord-green/20 border-discord-green/30 text-discord-green',
-        error: 'bg-red-500/20 border-red-500/30 text-red-400',
-        info: 'bg-blue-500/20 border-blue-500/30 text-blue-400',
-        warning: 'bg-amber-500/20 border-amber-500/30 text-amber-400',
-    };
-    const iconColors = {
-        success: 'bg-discord-green text-white',
-        error: 'bg-red-500 text-white',
-        info: 'bg-blue-500 text-white',
-        warning: 'bg-amber-500 text-white',
-    };
+        try {
+            const notification = new Notification(title, {
+                body,
+                icon: icon || '/favicon.ico',
+                badge: '/favicon.ico',
+                tag: 'disco-message',
+                renotify: true,
+            });
+
+            notification.onclick = () => {
+                window.focus();
+                notification.close();
+            };
+
+            // Auto-close after 5 seconds
+            setTimeout(() => notification.close(), 5000);
+        } catch (e) {
+            // Ignore notification errors
+        }
+    }, []);
+
+    // Listen for new messages via socket
+    useEffect(() => {
+        const socket = getSocket();
+        if (!socket || !user) return;
+
+        const handleNewMessage = (message) => {
+            // Don't notify for own messages
+            const senderId = message.sender?._id || message.sender;
+            if (senderId === user._id) return;
+
+            playSound();
+
+            const senderName = message.sender?.username || 'Someone';
+            const content = message.content || (message.attachments?.length > 0 ? '📎 Sent an attachment' : 'Sent a message');
+            showBrowserNotification(
+                `New message from ${senderName}`,
+                content.length > 100 ? content.slice(0, 100) + '…' : content
+            );
+        };
+
+        socket.on('message:new', handleNewMessage);
+
+        return () => {
+            socket.off('message:new', handleNewMessage);
+        };
+    }, [user, playSound, showBrowserNotification]);
 
     return (
-        <NotificationContext.Provider value={notify}>
-            {children}
-            {/* Toast container */}
-            <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
-                <AnimatePresence>
-                    {notifications.map(n => {
-                        const Icon = icons[n.type] || FiBell;
-                        return (
-                            <motion.div
-                                key={n.id}
-                                initial={{ opacity: 0, x: 100, scale: 0.9 }}
-                                animate={{ opacity: 1, x: 0, scale: 1 }}
-                                exit={{ opacity: 0, x: 100, scale: 0.9 }}
-                                className={`pointer-events-auto flex items-start gap-3 p-3 rounded-lg border backdrop-blur-sm shadow-xl ${colors[n.type]}`}
-                            >
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconColors[n.type]}`}>
-                                    <Icon className="w-4 h-4" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    {n.title && <p className="text-sm font-semibold text-white">{n.title}</p>}
-                                    {n.message && <p className="text-xs opacity-80 mt-0.5">{n.message}</p>}
-                                </div>
-                                <button onClick={() => removeNotification(n.id)} className="text-white/40 hover:text-white transition-colors flex-shrink-0">
-                                    <FiX className="w-4 h-4" />
-                                </button>
-                            </motion.div>
-                        );
-                    })}
-                </AnimatePresence>
-            </div>
-        </NotificationContext.Provider>
+        <>
+            {/* Notification sound - using a data URI for a short chime */}
+            <audio
+                ref={audioRef}
+                preload="auto"
+                src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJaetreogGpifI2dq7Kxnn1yc4SPnq2lnYZzaXKAi5igoZyLfHRydomWo6ernYx/c3N7iZWfoZ+UiX52d3uHkpuhop6Vi390dHyIk52hopyWi4F4dXqFkZyhoZ+Xjod+eHmDj5uhoKCamI6HgHl4gY6an6Cgm5mRioN8eX+MmZ+gn5yakIqEfXl+i5ieoJ+bnZKMhn97fIiXnZ+enZyTjYiCfXyGlZyfnp2dk4+KhX59hJObnp6dnZOQi4eBfYKRmpydnZ2UkYyIg36BkJmcnZydlZKOiYSAf4+YnJ2cnZWTj4qFgX6Ol5ucnZydlZOPi4aCf4yWm5ydnJ2VlJCMiIOAi5WanJ2cnZaVkY2JhIGKlJqcnZydlpWRjYqFgomTmZycnJ2WlZKOi4aCiJKZnJycnJaWk4+MiISHkZicnJycl5aTkI2KhYaQl5ucnJyXl5SRjouGhY+Wm5ycnJeXlJGOjIeEjpWam5ucl5eVkY+MiISNlJqbnJyXl5WSkI2JhYyTmZubnJeYlZOQjYqFi5KZm5ubl5iVk5COioaKkZibm5uXmJWUkY+Lh4mQl5qbm5iYlpSSj4yIiI+Xmpubm5iWlJOQjYmHjpaZm5ubmZeUk5GNioePl5mcm5uYl7aUko+NioeOnJeZmpualpaUkpCOjIqVnJqampqYlpSTkI+NjJWnmZqampiXlJOSkI+NlJiZmpqamJaUk5GQjo2TmpqampmYl5STkZCOjZKZmZqamZiXlZOSkY+OkpiZmpqZmJeVlJKRkI+RmJmampqYl5aUk5GQj5CXmZqamZiXlpSSkZCPkJaYmZmZmJeWlZOSkJGUl5iZmZmYl5aUk5KRkJOWmJmZmZiXlpSTkpGQk5aYmJmZmJeWlJOSkZCTlZiYmJiYl5aVk5OSkJGUl5iYmJiXlpaUk5KRkZOWl5iYmJeWlpSTk5KRkpWXmJiYmJaWlJSTkpGSlZeYmJiYlpaVk5OSkZGUlpeYmJiXlpaUk5OSkZKUlpiYmJiXlpWUk5OSkZKUlpeYmJeXlpWUk5OSkpOUlpiYmJeXlpWUlJOSkpOUlpeXl5eXlpWUlJOSkpOUlpd4eHeXlpaVlJSTk5OUlZaXl5eXlpaVlJSTk5OUlZaXl5eXlpaVlJST"
+            />
+        </>
     );
 }
