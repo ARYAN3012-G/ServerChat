@@ -21,11 +21,25 @@ router.delete('/face-descriptor', auth, authController.deleteFaceDescriptor);
 router.post('/face-login', authLimiter, authController.faceLogin);
 router.put('/phone', auth, authController.updatePhone);
 
-// OAuth Routes
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-router.get('/google/callback', passport.authenticate('google', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=oauth_failed` }), authController.oauthCallback);
+// OAuth Routes - Only load if configured to prevent "Unknown authentication strategy" crash
+router.get('/google', (req, res, next) => {
+    if (!process.env.GOOGLE_CLIENT_ID) return res.status(400).json({ message: 'Google Login is not configured on this server.' });
+    passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+});
 
-router.get('/github', passport.authenticate('github', { scope: ['user:email'] }));
-router.get('/github/callback', passport.authenticate('github', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=oauth_failed` }), authController.oauthCallback);
+router.get('/google/callback', (req, res, next) => {
+    if (!process.env.GOOGLE_CLIENT_ID) return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=oauth_not_configured`);
+    passport.authenticate('google', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=oauth_failed` })(req, res, next);
+}, authController.oauthCallback);
+
+router.get('/github', (req, res, next) => {
+    if (!process.env.GITHUB_CLIENT_ID) return res.status(400).json({ message: 'GitHub Login is not configured on this server.' });
+    passport.authenticate('github', { scope: ['user:email'] })(req, res, next);
+});
+
+router.get('/github/callback', (req, res, next) => {
+    if (!process.env.GITHUB_CLIENT_ID) return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=oauth_not_configured`);
+    passport.authenticate('github', { failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=oauth_failed` })(req, res, next);
+}, authController.oauthCallback);
 
 module.exports = router;
