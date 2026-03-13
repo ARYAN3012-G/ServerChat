@@ -1,9 +1,9 @@
 'use client';
 
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useEffect, useState, useRef } from 'react';
-import { FiMessageSquare, FiVideo, FiMusic, FiPlay, FiShield, FiZap, FiUsers, FiGlobe, FiArrowRight } from 'react-icons/fi';
+import { FiMessageSquare, FiVideo, FiMusic, FiPlay, FiShield, FiZap, FiUsers, FiGlobe, FiArrowRight, FiMenu, FiX } from 'react-icons/fi';
 
 const features = [
     { icon: FiMessageSquare, title: 'Real-Time Chat', desc: 'Instant messaging with channels, threads, reactions, and rich media sharing' },
@@ -144,6 +144,7 @@ export default function HomePage() {
     const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
     const heroY = useTransform(scrollYProgress, [0, 1], [0, 150]);
     const heroOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     return (
         <div className="min-h-screen bg-dark-950 overflow-hidden">
@@ -172,7 +173,7 @@ export default function HomePage() {
             />
 
             {/* Navigation */}
-            <nav className="relative z-10 flex items-center justify-between px-4 sm:px-8 py-5 max-w-7xl mx-auto">
+            <nav className="relative z-50 flex items-center justify-between px-4 sm:px-8 py-5 max-w-7xl mx-auto">
                 <motion.div
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -185,14 +186,15 @@ export default function HomePage() {
                     >
                         <FiMessageSquare className="w-5 h-5 text-dark-900" />
                     </motion.div>
-                    <span className="hidden sm:block text-2xl font-display font-bold text-white">ServerChat</span>
+                    <span className="text-xl sm:text-2xl font-display font-bold text-white">ServerChat</span>
                 </motion.div>
 
+                {/* Desktop Menu */}
                 <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                    className="flex items-center gap-2 sm:gap-4 shrink-0"
+                    className="hidden sm:flex items-center gap-2 sm:gap-4 shrink-0"
                 >
                     <Link href="/login" className="text-silver-400 hover:text-white transition-colors font-medium text-sm sm:text-base whitespace-nowrap">
                         Log In
@@ -207,7 +209,60 @@ export default function HomePage() {
                         </motion.button>
                     </Link>
                 </motion.div>
+
+                {/* Mobile Hamburger */}
+                <motion.button
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="sm:hidden p-2 text-white/70 hover:text-white"
+                    onClick={() => setIsMobileMenuOpen(true)}
+                >
+                    <FiMenu className="w-6 h-6" />
+                </motion.button>
             </nav>
+
+            {/* Mobile Menu Dropdown */}
+            <AnimatePresence>
+                {isMobileMenuOpen && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/60 z-40 sm:hidden"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: -20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: -20 }}
+                            className="absolute top-4 left-4 right-4 bg-dark-800 border border-white/10 rounded-2xl p-4 z-50 sm:hidden flex flex-col gap-4 shadow-2xl"
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-white to-silver-400 flex items-center justify-center">
+                                        <FiMessageSquare className="w-4 h-4 text-dark-900" />
+                                    </div>
+                                    <span className="text-lg font-display font-bold text-white">ServerChat</span>
+                                </div>
+                                <button onClick={() => setIsMobileMenuOpen(false)} className="p-1 text-white/50 hover:text-white">
+                                    <FiX className="w-5 h-5" />
+                                </button>
+                            </div>
+                            
+                            <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-white font-medium transition-colors">
+                                Home
+                            </Link>
+                            <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-white font-medium transition-colors">
+                                Log In
+                            </Link>
+                            <Link href="/register" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center justify-center w-full bg-white text-dark-900 font-bold py-3 px-4 rounded-xl mt-2 shadow-lg shadow-white/10">
+                                Get Started
+                            </Link>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
 
             {/* Hero */}
             <section ref={heroRef} className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 pt-12 sm:pt-20 pb-16 sm:pb-32 text-center">
