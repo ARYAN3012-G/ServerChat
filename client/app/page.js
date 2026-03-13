@@ -19,7 +19,7 @@ const features = [
 // Floating particles component (reduced for performance)
 function FloatingParticles() {
     return (
-        <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="fixed inset-0 pointer-events-none overflow-hidden hidden md:block">
             {Array.from({ length: 12 }).map((_, i) => (
                 <motion.div
                     key={i}
@@ -229,7 +229,7 @@ export default function HomePage() {
                         </motion.div>
 
                         <motion.h1 variants={itemVariants}
-                            className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-extrabold text-white mb-6 leading-tight"
+                            className="text-3xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-extrabold text-white mb-6 leading-tight break-words"
                         >
                             Where Teams
                             <br />
@@ -374,7 +374,7 @@ export default function HomePage() {
 
             {/* Stats Section */}
             <section className="relative z-10 max-w-4xl mx-auto px-4 sm:px-8 py-12 sm:py-16">
-                <div className="grid grid-cols-3 gap-4 sm:gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-8">
                     <AnimatedCounter target={10000} suffix="+" label="Active Users" />
                     <AnimatedCounter target={5000} suffix="+" label="Servers Created" />
                     <AnimatedCounter target={99} suffix="%" label="Uptime" />
