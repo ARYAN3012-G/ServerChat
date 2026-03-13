@@ -229,42 +229,54 @@ export default function HomePage() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-dark-950/80 backdrop-blur-sm z-[60] sm:hidden"
+                            className="fixed inset-0 bg-dark-950/60 backdrop-blur-sm z-[60] sm:hidden"
                             onClick={() => setIsMobileMenuOpen(false)}
                         />
                         <motion.div
-                            initial={{ y: '-100%' }}
-                            animate={{ y: 0 }}
-                            exit={{ y: '-100%' }}
+                            initial={{ x: '100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="fixed top-0 left-0 right-0 bg-dark-900/90 backdrop-blur-xl border-b border-white/10 z-[70] sm:hidden px-6 pt-24 pb-12 shadow-2xl"
+                            className="fixed top-0 right-0 bottom-0 w-[280px] bg-dark-900 border-l border-white/10 z-[70] sm:hidden flex flex-col shadow-2xl"
                         >
-                            <button 
-                                onClick={() => setIsMobileMenuOpen(false)} 
-                                className="absolute top-6 right-6 p-2 text-white/50 hover:text-white bg-white/5 rounded-full"
-                            >
-                                <FiX className="w-6 h-6" />
-                            </button>
+                            <div className="flex items-center justify-between p-6 border-b border-white/5">
+                                <Link 
+                                    href="/" 
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className="flex items-center gap-2"
+                                >
+                                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-white to-silver-400 flex items-center justify-center">
+                                        <FiMessageSquare className="w-4 h-4 text-dark-900" />
+                                    </div>
+                                    <span className="text-lg font-display font-bold text-white uppercase tracking-wider">ServerChat</span>
+                                </Link>
+                                <button 
+                                    onClick={() => setIsMobileMenuOpen(false)} 
+                                    className="p-2 text-white/50 hover:text-white bg-white/5 rounded-full"
+                                >
+                                    <FiX className="w-5 h-5" />
+                                </button>
+                            </div>
 
-                            <div className="flex flex-col gap-6">
+                            <div className="flex flex-col p-6 gap-2">
                                 <Link 
                                     href="/" 
                                     onClick={() => setIsMobileMenuOpen(false)} 
-                                    className="text-2xl font-display font-medium text-white hover:text-silver-400 transition-colors py-2"
+                                    className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-white font-medium transition-colors"
                                 >
                                     Home
                                 </Link>
                                 <Link 
                                     href="/login" 
                                     onClick={() => setIsMobileMenuOpen(false)} 
-                                    className="text-2xl font-display font-medium text-white hover:text-silver-400 transition-colors py-2"
+                                    className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-white font-medium transition-colors"
                                 >
                                     Log In
                                 </Link>
-                                <div className="h-px bg-white/10 my-2" />
+                                <div className="h-px bg-white/10 my-4" />
                                 <Link href="/register" onClick={() => setIsMobileMenuOpen(false)}>
-                                    <button className="w-full bg-white text-dark-900 font-bold py-4 px-6 rounded-2xl text-lg shadow-lg shadow-white/10 flex items-center justify-center gap-2">
-                                        Get Started <FiArrowRight className="w-5 h-5" />
+                                    <button className="w-full bg-white text-dark-900 font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-white/5 flex items-center justify-center gap-2">
+                                        Get Started <FiArrowRight className="w-4 h-4" />
                                     </button>
                                 </Link>
                             </div>
