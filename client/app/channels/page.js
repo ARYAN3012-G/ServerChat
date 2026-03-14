@@ -39,7 +39,7 @@ export default function ChannelsPage() {
     const [messageInput, setMessageInput] = useState('');
     const [showInputEmojiPicker, setShowInputEmojiPicker] = useState(false);
     const [showGifPicker, setShowGifPicker] = useState(false);
-    const [showMembers, setShowMembers] = useState(true);
+    const [showMembers, setShowMembers] = useState(false);
     const [showCreateServer, setShowCreateServer] = useState(false);
     const [showJoinServer, setShowJoinServer] = useState(false);
     const [showCreateChannel, setShowCreateChannel] = useState(false);
@@ -65,7 +65,7 @@ export default function ChannelsPage() {
     const [searchResults, setSearchResults] = useState([]);
     const [profileUser, setProfileUser] = useState(null);
     const [showServerSettings, setShowServerSettings] = useState(false);
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [pinnedMessages, setPinnedMessages] = useState([]);
     const [showPinned, setShowPinned] = useState(false);
     const [threadView, setThreadView] = useState(null);
@@ -438,15 +438,15 @@ export default function ChannelsPage() {
     return (
         <div className="flex h-screen bg-dark-900 text-white overflow-hidden">
             {/* Mobile Sidebar Overlay */}
-            {!sidebarOpen && (
+            {sidebarOpen && (
                 <div
                     className="md:hidden fixed inset-0 bg-black/60 z-40"
-                    onClick={() => setSidebarOpen(true)}
+                    onClick={() => setSidebarOpen(false)}
                 />
             )}
 
             {/* ─── SERVER SIDEBAR ─── */}
-            <div className={`fixed mt-12 md:mt-0 md:relative z-50 w-[72px] h-full bg-dark-950 flex flex-col items-center py-3 gap-2 border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? '-translate-x-full md:translate-x-0' : 'translate-x-0'}`} style={{ scrollbarWidth: 'none', overflowY: 'auto' }}>
+            <div className={`fixed mt-12 md:mt-0 md:relative z-50 w-[72px] h-full bg-dark-950 flex flex-col items-center py-3 gap-2 border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`} style={{ scrollbarWidth: 'none', overflowY: 'auto' }}>
                 <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/friends')}
                     className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-emerald-400 hover:text-white hover:bg-emerald-500 cursor-pointer transition-all duration-200" title="Friends">
                     <FiUsers className="w-6 h-6" />
@@ -493,7 +493,7 @@ export default function ChannelsPage() {
             </div>
 
             {/* ─── CHANNEL SIDEBAR ─── */}
-            <div className={`fixed mt-12 md:mt-0 md:relative z-40 left-[72px] md:left-0 h-full w-60 bg-dark-800 flex flex-col border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? '-translate-x-full md:translate-x-0' : 'translate-x-[0px]'}`}>
+            <div className={`fixed mt-12 md:mt-0 md:relative z-40 left-[72px] md:left-0 h-full w-60 bg-dark-800 flex flex-col border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
                 <div className="h-12 px-4 flex items-center justify-between border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
                     <span className="font-bold text-white truncate">{currentServer?.name || 'No Server'}</span>
                     {currentServer && (
@@ -751,15 +751,15 @@ export default function ChannelsPage() {
                                 <span className="font-bold truncate">{currentChannel.name}</span>
                                 {currentChannel.description && <span className="text-sm text-white/30 ml-2 border-l border-white/10 pl-2">{currentChannel.description}</span>}
                             </div>
-                            <div className="flex items-center gap-3">
-                                <FiPhone className="w-4.5 h-4.5 text-white/20 cursor-pointer hover:text-emerald-400 transition-colors" title="Voice Call"
+                            <div className="flex items-center gap-2 sm:gap-3">
+                                <FiPhone className="w-4.5 h-4.5 text-white/20 cursor-pointer hover:text-emerald-400 transition-colors hidden sm:block" title="Voice Call"
                                     onClick={() => setShowCallPicker('voice')} />
-                                <FiVideo className="w-4.5 h-4.5 text-white/20 cursor-pointer hover:text-indigo-400 transition-colors" title="Video Call"
+                                <FiVideo className="w-4.5 h-4.5 text-white/20 cursor-pointer hover:text-indigo-400 transition-colors hidden sm:block" title="Video Call"
                                     onClick={() => setShowCallPicker('video')} />
-                                <FiBookmark className={`w-4.5 h-4.5 cursor-pointer transition-colors ${showPinned ? 'text-amber-400' : 'text-white/20 hover:text-amber-400'}`} title="Pinned Messages"
+                                <FiBookmark className={`w-4.5 h-4.5 cursor-pointer transition-colors hidden sm:block ${showPinned ? 'text-amber-400' : 'text-white/20 hover:text-amber-400'}`} title="Pinned Messages"
                                     onClick={() => { setShowPinned(!showPinned); if (!showPinned) fetchPinnedMessages(currentChannel._id); }} />
                                 <FiSearch className={`w-5 h-5 cursor-pointer transition-colors ${showSearch ? 'text-indigo-400' : 'text-white/20 hover:text-white'}`} onClick={() => { setShowSearch(!showSearch); setSearchResults([]); setSearchQuery(''); }} />
-                                <FiUsers className={`w-5 h-5 cursor-pointer transition-colors ${showMembers ? 'text-white' : 'text-white/20 hover:text-white'}`} onClick={() => setShowMembers(!showMembers)} />
+                                <FiUsers className={`w-5 h-5 cursor-pointer transition-colors hidden md:block ${showMembers ? 'text-white' : 'text-white/20 hover:text-white'}`} onClick={() => setShowMembers(!showMembers)} />
                             </div>
                         </div>
 
@@ -994,7 +994,7 @@ export default function ChannelsPage() {
 
                             <AnimatePresence>
                                 {showMembers && currentServer && (
-                                    <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: 240, opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="bg-dark-800 border-l border-white/5 overflow-y-auto">
+                                    <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: 240, opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="hidden md:block bg-dark-800 border-l border-white/5 overflow-y-auto">
                                         <div className="p-4">
                                             <h3 className="text-[11px] font-semibold text-white/30 uppercase tracking-wider mb-3">Members — {currentServer.members?.length || 0}</h3>
                                             {(currentServer.members || []).map((m, i) => (
@@ -1027,7 +1027,7 @@ export default function ChannelsPage() {
                             {/* Thread Panel */}
                             <AnimatePresence>
                                 {threadView && (
-                                    <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: 340, opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="bg-dark-800 border-l border-white/5 flex flex-col overflow-hidden">
+                                    <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: 340, opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="hidden md:block bg-dark-800 border-l border-white/5 flex flex-col overflow-hidden">
                                         <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
                                             <h3 className="text-sm font-semibold text-white flex items-center gap-2"><FiMessageCircle className="w-4 h-4 text-indigo-400" /> Thread</h3>
                                             <FiX className="w-4 h-4 text-white/30 cursor-pointer hover:text-white" onClick={() => setThreadView(null)} />
