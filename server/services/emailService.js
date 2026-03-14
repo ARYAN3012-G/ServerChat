@@ -9,6 +9,8 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 exports.sendPasswordResetEmail = async (to, resetToken) => {
     const resetUrl = `${(process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/+$/, '')}/reset-password/${resetToken}`;
 
+    const siteUrl = (process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/+$/, '');
+
     try {
         const { data, error } = await resend.emails.send({
             from: 'ServerChat <onboarding@resend.dev>',
@@ -29,7 +31,7 @@ exports.sendPasswordResetEmail = async (to, resetToken) => {
                     <!-- Header -->
                     <tr>
                         <td style="padding:32px 32px 24px;text-align:center;background:linear-gradient(180deg,rgba(255,255,255,0.03) 0%,transparent 100%);">
-                            <div style="display:inline-block;width:48px;height:48px;background:linear-gradient(135deg,#fff,#a0a0a0);border-radius:12px;line-height:48px;font-size:24px;text-align:center;">💬</div>
+                            <img src="${siteUrl}/favicon.svg" alt="ServerChat" width="48" height="48" style="display:inline-block;width:48px;height:48px;border-radius:12px;" />
                             <h1 style="color:#ffffff;font-size:22px;margin:16px 0 0;font-weight:700;">ServerChat</h1>
                         </td>
                     </tr>
