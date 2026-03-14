@@ -203,10 +203,26 @@ export default function CallProvider({ children }) {
     }, []);
 
     // ── Toggle media ──
-    const toggleMedia = useCallback((sessionId, type, enabled) => {
+    const toggleMedia = useCallback((sessionId, type, enabled, newTrack = null) => {
         const socket = getSocket();
         if (socket) {
             socket.emit('call:toggle-media', { sessionId, type, enabled });
+        }
+        
+        // Handle adding/replacing the physical WebRTC track if it's new
+        if (type === 'video' && peerRef.current && newTrack) {
+            const transceivers = peerRef.current.getTransceivers();
+            const videoTransceiver = transceivers.find(t => t.receiver && t.receiver.track && t.receiver.track.kind === 'video');
+            
+            if (videoTransceiver && videoTransceiver.sender) {
+                videoTransceiver.sender.replaceTrack(newTrack).catch(console.error);
+                if (videoTransceiver.direction === 'recvonly') {
+                    videoTransceiver.direction = 'sendrecv';
+                }
+            } else {
+                // Fallback (triggers renegotiation if not handled, but we added transceivers upfront so we should be safe)
+                peerRef.current.addTrack(newTrack, localStreamRef.current);
+            }
         }
     }, []);
 
@@ -221,9 +237,17 @@ export default function CallProvider({ children }) {
 
             const videoTrack = screenStream.getVideoTracks()[0];
             if (peerRef.current) {
-                const sender = peerRef.current.getSenders().find((s) => s.track?.kind === 'video');
-                if (sender) {
-                    await sender.replaceTrack(videoTrack);
+                const transceivers = peerRef.current.getTransceivers();
+                const videoTransceiver = transceivers.find(t => t.receiver && t.receiver.track && t.receiver.track.kind === 'video');
+                
+                if (videoTransceiver && videoTransceiver.sender) {
+                    await videoTransceiver.sender.replaceTrack(videoTrack);
+                    if (videoTransceiver.direction === 'recvonly') {
+                        videoTransceiver.direction = 'sendrecv';
+                    }
+                } else {
+                    // Fallback
+                    peerRef.current.addTrack(videoTrack, screenStream);
                 }
             }
 
@@ -243,10 +267,16 @@ export default function CallProvider({ children }) {
         screenStreamRef.current = null;
 
         const videoTrack = localStreamRef.current?.getVideoTracks()[0];
-        if (videoTrack && peerRef.current) {
-            const sender = peerRef.current.getSenders().find((s) => s.track?.kind === 'video');
-            if (sender) {
-                await sender.replaceTrack(videoTrack);
+        if (peerRef.current) {
+            const transceivers = peerRef.current.getTransceivers();
+            const videoTransceiver = transceivers.find(t => t.receiver && t.receiver.track && t.receiver.track.kind === 'video');
+            
+            if (videoTransceiver && videoTransceiver.sender) {
+                await videoTransceiver.sender.replaceTrack(videoTrack || null);
+                if (!videoTrack && videoTransceiver.direction === 'sendrecv') {
+                    // If we stopped screen share and have no camera, revert to recvonly
+                    videoTransceiver.direction = 'recvonly';
+                }
             }
         }
     }, []);
@@ -303,12 +333,21 @@ export default function CallProvider({ children }) {
                     peerRef.current = pc;
 
                     // Add local tracks to the connection
+                    let hasVideo = false;
                     const stream = localStreamRef.current;
                     if (stream) {
                         stream.getTracks().forEach((track) => {
                             console.log('[CallProvider] Caller adding track:', track.kind);
                             pc.addTrack(track, stream);
+                            if (track.kind === 'video') hasVideo = true;
                         });
+                    }
+
+                    // Force an empty video transceiver if we only started with audio.
+                    // This allows mid-call upgrades (screen share / camera toggle) without renegotiating.
+                    if (!hasVideo && typeof pc.addTransceiver === 'function') {
+                        console.log('[CallProvider] Caller adding recvonly video transceiver');
+                        pc.addTransceiver('video', { direction: 'recvonly' });
                     }
 
                     const offer = await pc.createOffer({
@@ -362,11 +401,19 @@ export default function CallProvider({ children }) {
                     localStreamRef.current = stream;
                 }
 
+                let hasVideo = false;
                 if (stream) {
                     stream.getTracks().forEach((track) => {
                         console.log('[CallProvider] Answerer adding track:', track.kind);
                         pc.addTrack(track, stream);
+                        if (track.kind === 'video') hasVideo = true;
                     });
+                }
+                
+                // If answerer replied with voice only, ensure a transceiver exists for later upgrades
+                if (!hasVideo && typeof pc.addTransceiver === 'function') {
+                    console.log('[CallProvider] Answerer adding recvonly video transceiver');
+                    pc.addTransceiver('video', { direction: 'recvonly' });
                 }
 
                 const answer = await pc.createAnswer();
