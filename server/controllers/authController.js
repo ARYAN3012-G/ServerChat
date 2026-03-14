@@ -207,8 +207,10 @@ exports.forgotPassword = async (req, res, next) => {
         user.resetPasswordExpires = Date.now() + 30 * 60 * 1000; // 30 min
         await user.save();
 
-        // Send reset email
-        await sendPasswordResetEmail(email, resetToken);
+        // Send reset email (fire-and-forget — don't block the response)
+        sendPasswordResetEmail(email, resetToken).catch(err => 
+            logger.error(`Email send error: ${err.message}`)
+        );
 
         res.json({ message: 'If an account exists, a reset link has been sent' });
     } catch (error) {

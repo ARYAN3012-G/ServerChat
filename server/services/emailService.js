@@ -7,8 +7,10 @@ const createTransporter = () => {
         service: 'gmail',
         auth: {
             user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS, // Gmail App Password (NOT your regular password)
+            pass: process.env.EMAIL_PASS,
         },
+        connectionTimeout: 10000, // 10 seconds
+        greetingTimeout: 10000,
     });
 };
 
