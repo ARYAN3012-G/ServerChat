@@ -70,14 +70,20 @@ export default function CallProvider({ children }) {
         };
 
         pc.ontrack = (event) => {
-            console.log('[CallProvider] ontrack received!', event.streams.length, 'streams');
-            if (event.streams && event.streams[0]) {
-                setRemoteStream(event.streams[0]);
-            } else {
-                // Fallback: create a new MediaStream from the track
-                const stream = new MediaStream([event.track]);
-                setRemoteStream(stream);
-            }
+            console.log(`[CallProvider] ontrack received: ${event.track.kind}`, {
+                streamCount: event.streams.length,
+                trackId: event.track.id
+            });
+            
+            setRemoteStream(prev => {
+                const stream = prev || new MediaStream();
+                // If the track is already in the stream, don't add it again
+                if (stream.getTrackById(event.track.id)) return stream;
+                
+                stream.addTrack(event.track);
+                // Return a new MediaStream instance to trigger React re-render
+                return new MediaStream(stream.getTracks());
+            });
             setCallStatus('active');
         };
 
@@ -318,9 +324,10 @@ export default function CallProvider({ children }) {
         // When the callee answers → caller creates the WebRTC offer
         const handleAnswered = async ({ session, userId }) => {
             console.log('[CallProvider] CALL ANSWERED!', { session, userId });
+            setCallType(session.type || 'voice');
             setActiveCall(session);
             setIncomingCall(null);
-            setCallStatus('connecting');
+            setCallStatus('active');
             clearTimeout(incomingTimeoutRef.current);
 
             // Only the CALLER creates the offer (the one who initiated)
