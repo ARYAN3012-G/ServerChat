@@ -5,6 +5,7 @@ const QRCode = require('qrcode');
 const User = require('../models/User');
 const ActivityLog = require('../models/ActivityLog');
 const { logger } = require('../config/logger');
+const { sendPasswordResetEmail } = require('../services/emailService');
 
 // Generate tokens
 const generateTokens = (user) => {
@@ -206,11 +207,10 @@ exports.forgotPassword = async (req, res, next) => {
         user.resetPasswordExpires = Date.now() + 30 * 60 * 1000; // 30 min
         await user.save();
 
-        // In production, send email with reset link
-        const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
-        logger.info(`Password reset URL for ${email}: ${resetUrl}`);
+        // Send reset email
+        await sendPasswordResetEmail(email, resetToken);
 
-        res.json({ message: 'If an account exists, a reset link has been sent', resetUrl });
+        res.json({ message: 'If an account exists, a reset link has been sent' });
     } catch (error) {
         next(error);
     }
