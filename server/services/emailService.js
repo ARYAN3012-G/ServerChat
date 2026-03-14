@@ -31,7 +31,17 @@ exports.sendPasswordResetEmail = async (to, resetToken) => {
                     <!-- Header -->
                     <tr>
                         <td style="padding:32px 32px 24px;text-align:center;background:linear-gradient(180deg,rgba(255,255,255,0.03) 0%,transparent 100%);">
-                            <div style="display:inline-block;width:48px;height:48px;background:linear-gradient(135deg,#fff,#a0a0a0);border-radius:12px;line-height:48px;font-size:24px;text-align:center;">💬</div>
+                        <td style="padding:32px 32px 24px;text-align:center;background:linear-gradient(180deg,rgba(255,255,255,0.03) 0%,transparent 100%);">
+                            <div style="display:inline-block;width:48px;height:48px;background-color:#040407;border-radius:12px;position:relative;border:1px solid rgba(255,255,255,0.1);">
+                                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%, -50%);width:24px;height:24px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ffffff" style="width:100%;height:100%;">
+                                        <path d="M12 2C6.48 2 2 6.03 2 11C2 13.08 2.84 14.99 4.25 16.51L3.25 21L7.56 19.53C8.93 20.19 10.43 20.6 12 20.6C17.52 20.6 22 16.57 22 11C22 6.03 17.52 2 12 2Z" />
+                                        <circle cx="8" cy="11" r="1.5" fill="#040407"/>
+                                        <circle cx="12" cy="11" r="1.5" fill="#040407"/>
+                                        <circle cx="16" cy="11" r="1.5" fill="#040407"/>
+                                    </svg>
+                                </div>
+                            </div>
                             <h1 style="color:#ffffff;font-size:22px;margin:16px 0 0;font-weight:700;">ServerChat</h1>
                         </td>
                     </tr>
