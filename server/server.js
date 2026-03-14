@@ -20,6 +20,9 @@ const errorHandler = require('./middleware/errorHandler');
 const app = express();
 const server = http.createServer(app);
 
+// Trust proxy (required for Render, Heroku, etc. — behind reverse proxy)
+app.set('trust proxy', 1);
+
 // Connect to databases and services
 connectDB();
 connectRedis();
