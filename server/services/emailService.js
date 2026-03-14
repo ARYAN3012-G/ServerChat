@@ -1,30 +1,20 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const { logger } = require('../config/logger');
 
-// Create reusable transporter using Gmail SMTP
-const createTransporter = () => {
-    return nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
-        },
-        connectionTimeout: 10000, // 10 seconds
-        greetingTimeout: 10000,
-    });
-};
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 /**
- * Send password reset email
+ * Send password reset email via Resend (HTTP API — works on Render free tier)
  */
 exports.sendPasswordResetEmail = async (to, resetToken) => {
     const resetUrl = `${(process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/+$/, '')}/reset-password/${resetToken}`;
 
-    const mailOptions = {
-        from: `"ServerChat" <${process.env.EMAIL_USER}>`,
-        to,
-        subject: '🔑 Reset Your ServerChat Password',
-        html: `
+    try {
+        const { data, error } = await resend.emails.send({
+            from: 'ServerChat <onboarding@resend.dev>',
+            to: [to],
+            subject: '🔑 Reset Your ServerChat Password',
+            html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -73,7 +63,7 @@ exports.sendPasswordResetEmail = async (to, resetToken) => {
                     <!-- Footer -->
                     <tr>
                         <td style="padding:16px 32px;background:rgba(255,255,255,0.02);text-align:center;">
-                            <p style="color:#3a3a4e;font-size:11px;margin:0;">© 2026 ServerChat — Secure · Fast · Global</p>
+                            <p style="color:#3a3a4e;font-size:11px;margin:0;">&copy; 2026 ServerChat &mdash; Secure &middot; Fast &middot; Global</p>
                         </td>
                     </tr>
                 </table>
@@ -82,16 +72,17 @@ exports.sendPasswordResetEmail = async (to, resetToken) => {
     </table>
 </body>
 </html>`,
-    };
+        });
 
-    try {
-        const transporter = createTransporter();
-        await transporter.sendMail(mailOptions);
-        logger.info(`Password reset email sent to ${to}`);
+        if (error) {
+            logger.error(`Resend email error: ${JSON.stringify(error)}`);
+            return false;
+        }
+
+        logger.info(`Password reset email sent to ${to} (ID: ${data?.id})`);
         return true;
     } catch (error) {
         logger.error(`Failed to send password reset email to ${to}: ${error.message}`);
-        // Don't throw — we still return success to the user (security: don't reveal if email exists)
         return false;
     }
 };
