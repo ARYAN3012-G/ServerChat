@@ -156,8 +156,9 @@ export default function SettingsPage() {
                     <AnimatePresence mode="wait">
                         {/* ACCOUNT */}
                         {tab === 'account' && (
-                            <motion.div key="account" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                                <h3 className="text-2xl font-bold mb-8">My Account</h3>
+                            <>
+                                <motion.div key="account" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                                    <h3 className="text-2xl font-bold mb-8">My Account</h3>
                                 <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8">
                                     <div className="flex items-center gap-5 mb-8 pb-8 border-b border-white/5">
                                         <div className="relative group cursor-pointer" onClick={() => setShowAvatarPicker(true)}>
@@ -201,6 +202,7 @@ export default function SettingsPage() {
                                 onAvatarChange={(newAvatar) => setAvatarData(newAvatar)}
                                 username={user?.username || ''}
                             />
+                            </>
                         )}
 
                         {/* SECURITY */}
