@@ -3,7 +3,7 @@
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useEffect, useState, useRef } from 'react';
-import { FiMessageSquare, FiVideo, FiMusic, FiPlay, FiShield, FiZap, FiUsers, FiGlobe, FiArrowRight, FiMenu, FiX } from 'react-icons/fi';
+import { FiMessageSquare, FiVideo, FiMusic, FiPlay, FiShield, FiZap, FiUsers, FiGlobe, FiArrowRight, FiMenu, FiX, FiHome, FiLogIn, FiUserPlus } from 'react-icons/fi';
 
 const features = [
     { icon: FiMessageSquare, title: 'Real-Time Chat', desc: 'Instant messaging with channels, threads, reactions, and rich media sharing' },
@@ -237,48 +237,92 @@ export default function HomePage() {
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="fixed top-0 right-0 bottom-0 w-[280px] bg-dark-900 border-l border-white/10 z-[70] sm:hidden flex flex-col shadow-2xl"
+                            className="fixed top-0 right-0 bottom-0 w-[300px] bg-dark-900 border-l border-white/10 z-[70] sm:hidden flex flex-col shadow-2xl"
                         >
-                            <div className="flex items-center justify-between p-6 border-b border-white/5">
-                                <Link 
-                                    href="/" 
-                                    onClick={() => setIsMobileMenuOpen(false)}
-                                    className="flex items-center gap-2"
-                                >
-                                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-white to-silver-400 flex items-center justify-center">
-                                        <FiMessageSquare className="w-4 h-4 text-dark-900" />
-                                    </div>
-                                    <span className="text-lg font-display font-bold text-white">ServerChat</span>
-                                </Link>
-                                <button 
-                                    onClick={() => setIsMobileMenuOpen(false)} 
-                                    className="p-2 text-white/50 hover:text-white bg-white/5 rounded-full"
-                                >
-                                    <FiX className="w-5 h-5" />
-                                </button>
+                            {/* Header */}
+                            <div className="relative p-6 pb-5">
+                                <div className="absolute inset-0 bg-gradient-to-b from-white/[0.03] to-transparent" />
+                                <div className="relative flex items-center justify-between">
+                                    <Link 
+                                        href="/" 
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                        className="flex items-center gap-3"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-white to-silver-400 flex items-center justify-center shadow-lg shadow-white/10">
+                                            <FiMessageSquare className="w-5 h-5 text-dark-900" />
+                                        </div>
+                                        <div>
+                                            <span className="text-lg font-display font-bold text-white block leading-tight">ServerChat</span>
+                                            <span className="text-xs text-silver-400">Communication Platform</span>
+                                        </div>
+                                    </Link>
+                                    <button 
+                                        onClick={() => setIsMobileMenuOpen(false)} 
+                                        className="p-2.5 text-white/40 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
+                                    >
+                                        <FiX className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
 
-                            <div className="flex flex-col p-6 gap-2">
+                            {/* Navigation Links */}
+                            <div className="flex flex-col px-4 gap-1 flex-1">
                                 <Link 
                                     href="/" 
                                     onClick={() => setIsMobileMenuOpen(false)} 
-                                    className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-white font-medium transition-colors"
+                                    className="flex items-center gap-4 px-4 py-3.5 rounded-xl hover:bg-white/5 text-white/80 hover:text-white font-medium transition-all group"
                                 >
-                                    Home
+                                    <div className="w-10 h-10 rounded-lg bg-white/5 group-hover:bg-white/10 flex items-center justify-center transition-colors">
+                                        <FiHome className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <span className="block text-[15px]">Home</span>
+                                        <span className="block text-xs text-silver-400">Back to main page</span>
+                                    </div>
                                 </Link>
                                 <Link 
                                     href="/login" 
                                     onClick={() => setIsMobileMenuOpen(false)} 
-                                    className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-white font-medium transition-colors"
+                                    className="flex items-center gap-4 px-4 py-3.5 rounded-xl hover:bg-white/5 text-white/80 hover:text-white font-medium transition-all group"
                                 >
-                                    Log In
+                                    <div className="w-10 h-10 rounded-lg bg-white/5 group-hover:bg-white/10 flex items-center justify-center transition-colors">
+                                        <FiLogIn className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <span className="block text-[15px]">Log In</span>
+                                        <span className="block text-xs text-silver-400">Access your account</span>
+                                    </div>
                                 </Link>
-                                <div className="h-px bg-white/10 my-4" />
+
+                                <div className="h-px bg-white/5 my-3 mx-4" />
+
                                 <Link href="/register" onClick={() => setIsMobileMenuOpen(false)}>
-                                    <button className="w-full bg-white text-dark-900 font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-white/5 flex items-center justify-center gap-2">
-                                        Get Started <FiArrowRight className="w-4 h-4" />
-                                    </button>
+                                    <motion.button 
+                                        whileTap={{ scale: 0.97 }}
+                                        className="w-full bg-gradient-to-r from-white to-silver-200 text-dark-900 font-bold py-4 px-6 rounded-xl shadow-lg shadow-white/10 flex items-center justify-center gap-2 text-[15px]"
+                                    >
+                                        <FiUserPlus className="w-5 h-5" />
+                                        Create Account
+                                    </motion.button>
                                 </Link>
+                            </div>
+
+                            {/* Footer Features */}
+                            <div className="p-5 mx-4 mb-4 bg-white/[0.02] rounded-xl border border-white/5">
+                                <div className="grid grid-cols-3 gap-3 text-center">
+                                    <div>
+                                        <FiShield className="w-4 h-4 text-green-400 mx-auto mb-1" />
+                                        <span className="text-[10px] text-silver-400">Secure</span>
+                                    </div>
+                                    <div>
+                                        <FiZap className="w-4 h-4 text-yellow-400 mx-auto mb-1" />
+                                        <span className="text-[10px] text-silver-400">Fast</span>
+                                    </div>
+                                    <div>
+                                        <FiGlobe className="w-4 h-4 text-blue-400 mx-auto mb-1" />
+                                        <span className="text-[10px] text-silver-400">Global</span>
+                                    </div>
+                                </div>
                             </div>
                         </motion.div>
                     </>
