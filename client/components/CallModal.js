@@ -24,9 +24,10 @@ export default function CallModal({
     const [callDuration, setCallDuration] = useState(0);
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
+    const remoteAudioRef = useRef(null);
     const timerRef = useRef(null);
 
-    // Start call timer once active
+    // Start call timer
     useEffect(() => {
         if (callStatus === 'active' || callStatus === 'connecting') {
             timerRef.current = setInterval(() => {
@@ -36,23 +37,46 @@ export default function CallModal({
         return () => clearInterval(timerRef.current);
     }, [callStatus]);
 
-    // Attach local stream to local video element
+    // Attach local stream
     useEffect(() => {
         const stream = localStreamRef?.current;
         if (localVideoRef.current && stream) {
             localVideoRef.current.srcObject = stream;
-            // Explicitly play to bypass autoplay policies
-            localVideoRef.current.play().catch(e => console.error("Local video play failed:", e));
+            localVideoRef.current.play().catch(() => {});
         }
-    }, [localStreamRef?.current, isScreenSharing]);
+    }, [localStreamRef?.current, isScreenSharing, isVideoOn]);
 
-    // Attach remote stream
+    // Attach remote stream — key fix: handle both video and audio
     useEffect(() => {
-        if (remoteVideoRef.current && remoteStream) {
+        if (!remoteStream) return;
+
+        console.log('[CallModal] Setting remote stream, tracks:', remoteStream.getTracks().map(t => `${t.kind}:${t.readyState}`));
+
+        // Set video element
+        if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream;
-            // Explicitly play remote stream to ensure audio works
-            remoteVideoRef.current.play().catch(e => console.error("Remote video play failed:", e));
+            remoteVideoRef.current.play().catch(e => console.warn('Remote video play failed:', e));
         }
+
+        // Also set a hidden audio element as backup (ensures audio even if video element is paused)
+        if (remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = remoteStream;
+            remoteAudioRef.current.play().catch(e => console.warn('Remote audio play failed:', e));
+        }
+    }, [remoteStream]);
+
+    // Monitor remote stream track changes
+    useEffect(() => {
+        if (!remoteStream) return;
+        const handleTrackAdded = () => {
+            console.log('[CallModal] Track added to remote stream');
+            if (remoteVideoRef.current) {
+                remoteVideoRef.current.srcObject = remoteStream;
+                remoteVideoRef.current.play().catch(() => {});
+            }
+        };
+        remoteStream.addEventListener('addtrack', handleTrackAdded);
+        return () => remoteStream.removeEventListener('addtrack', handleTrackAdded);
     }, [remoteStream]);
 
     const formatDuration = (secs) => {
@@ -88,16 +112,11 @@ export default function CallModal({
             setIsVideoOn(!isVideoOn);
             onToggleMedia?.(callSession?._id, 'video', !isVideoOn);
         } else if (!isVideoOn) {
-            // No video track yet, try getting one
             try {
                 const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 const newTrack = newStream.getVideoTracks()[0];
-                if (stream) {
-                    stream.addTrack(newTrack);
-                }
-                if (localVideoRef.current) {
-                    localVideoRef.current.srcObject = stream || newStream;
-                }
+                if (stream) stream.addTrack(newTrack);
+                if (localVideoRef.current) localVideoRef.current.srcObject = stream || newStream;
                 setIsVideoOn(true);
                 onToggleMedia?.(callSession?._id, 'video', true);
             } catch (err) {
@@ -110,7 +129,6 @@ export default function CallModal({
         if (isScreenSharing) {
             await onStopScreenShare?.();
             setIsScreenSharing(false);
-            // Restore local camera to PiP
             if (localVideoRef.current && localStreamRef?.current) {
                 localVideoRef.current.srcObject = localStreamRef.current;
             }
@@ -118,9 +136,7 @@ export default function CallModal({
             const screenStream = await onStartScreenShare?.();
             if (screenStream) {
                 setIsScreenSharing(true);
-                if (localVideoRef.current) {
-                    localVideoRef.current.srcObject = screenStream;
-                }
+                if (localVideoRef.current) localVideoRef.current.srcObject = screenStream;
             }
         }
     };
@@ -131,6 +147,13 @@ export default function CallModal({
     };
 
     if (!callSession) return null;
+
+    // Get the other participant's info
+    const otherParticipant = callSession.participants?.find(
+        p => p.user?._id !== user?._id
+    )?.user || callSession.participants?.[0]?.user || { username: 'User' };
+
+    const hasVideoTracks = remoteStream && remoteStream.getVideoTracks().some(t => t.readyState === 'live' && t.enabled);
 
     // ── Minimized floating bar ──
     if (isMinimized) {
@@ -169,65 +192,67 @@ export default function CallModal({
         );
     }
 
-    // ── Full call modal ──
+    // ── Full call modal (responsive) ──
     return (
         <AnimatePresence>
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[150]"
+                className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[150] p-2 sm:p-4"
             >
                 <motion.div
                     initial={{ scale: 0.9, y: 20 }}
                     animate={{ scale: 1, y: 0 }}
-                    className="bg-[#0c0e1a] border border-white/10 rounded-2xl w-[720px] max-h-[85vh] overflow-hidden shadow-2xl"
+                    className="bg-[#0c0e1a] border border-white/10 rounded-2xl w-full max-w-[720px] max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
                 >
                     {/* Header */}
-                    <div className="px-5 py-3 flex items-center justify-between border-b border-white/5">
-                        <div className="flex items-center gap-3">
-                            <div className={`w-3 h-3 rounded-full animate-pulse ${callStatus === 'active' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                            <span className="text-sm font-medium text-white">
+                    <div className="px-4 sm:px-5 py-3 flex items-center justify-between border-b border-white/5 shrink-0">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                            <div className={`w-3 h-3 rounded-full animate-pulse shrink-0 ${callStatus === 'active' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                            <span className="text-sm font-medium text-white truncate">
                                 {type === 'video' ? 'Video Call' : 'Voice Call'} — {getStatusText()}
                             </span>
                             {isScreenSharing && (
-                                <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-medium animate-pulse">
+                                <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-medium animate-pulse shrink-0 hidden sm:inline">
                                     Screen Sharing
                                 </span>
                             )}
                             {callStatus === 'ringing' && (
-                                <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-medium">
+                                <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-medium shrink-0">
                                     Ringing
                                 </span>
                             )}
                         </div>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setIsMinimized(true)}
-                                className="p-1.5 rounded-lg hover:bg-white/10 text-white/30 hover:text-white transition-colors"
-                            >
-                                <FiMinimize2 className="w-4 h-4" />
-                            </button>
-                        </div>
+                        <button
+                            onClick={() => setIsMinimized(true)}
+                            className="p-1.5 rounded-lg hover:bg-white/10 text-white/30 hover:text-white transition-colors shrink-0"
+                        >
+                            <FiMinimize2 className="w-4 h-4" />
+                        </button>
                     </div>
 
                     {/* Video Area */}
-                    <div className="relative w-full aspect-video bg-dark-950">
+                    <div className="relative w-full aspect-video bg-dark-950 flex-1 min-h-0">
                         {/* Remote Video (main) */}
                         <div className="w-full h-full flex items-center justify-center">
                             <video
                                 ref={remoteVideoRef}
                                 autoPlay
                                 playsInline
-                                className={`w-full h-full object-cover ${!remoteStream ? 'hidden' : ''}`}
+                                className={`w-full h-full object-cover ${!remoteStream || !hasVideoTracks ? 'hidden' : ''}`}
                             />
-                            {!remoteStream && (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500/30 to-silver-400/30 flex items-center justify-center text-3xl font-bold text-indigo-400 mb-4 border-2 border-indigo-500/20">
-                                        {(callSession.participants?.[0]?.user?.username || 'U')[0].toUpperCase()}
+                            {/* Hidden audio element for guaranteed audio playback */}
+                            <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+
+                            {(!remoteStream || !hasVideoTracks) && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-dark-900/50 to-dark-950">
+                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-indigo-500/30 to-purple-400/30 flex items-center justify-center text-2xl sm:text-3xl font-bold text-indigo-400 mb-4 border-2 border-indigo-500/20">
+                                        {(otherParticipant.username || 'U')[0].toUpperCase()}
                                     </div>
-                                    <p className="text-white/50 text-sm">
-                                        {callStatus === 'ringing' ? 'Calling...' : callStatus === 'connecting' ? 'Connecting...' : type === 'video' ? 'Waiting for video...' : 'Voice call in progress'}
+                                    <p className="text-white/70 text-sm font-medium">{otherParticipant.username || 'User'}</p>
+                                    <p className="text-white/30 text-xs mt-1">
+                                        {callStatus === 'ringing' ? 'Calling...' : callStatus === 'connecting' ? 'Connecting...' : type === 'video' ? 'Camera off' : 'Voice call in progress'}
                                     </p>
                                     {(callStatus === 'ringing' || callStatus === 'connecting') && (
                                         <div className="flex gap-1 mt-3">
@@ -236,26 +261,35 @@ export default function CallModal({
                                             <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '400ms' }} />
                                         </div>
                                     )}
+                                    {callStatus === 'active' && type === 'voice' && (
+                                        <div className="mt-4 flex items-center gap-2">
+                                            <div className="w-1 h-4 bg-indigo-400 rounded-full animate-pulse" />
+                                            <div className="w-1 h-6 bg-indigo-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+                                            <div className="w-1 h-3 bg-indigo-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+                                            <div className="w-1 h-5 bg-indigo-400 rounded-full animate-pulse" style={{ animationDelay: '450ms' }} />
+                                            <div className="w-1 h-4 bg-indigo-400 rounded-full animate-pulse" style={{ animationDelay: '600ms' }} />
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
 
-                        {/* Local Video (draggable PiP) */}
+                        {/* Local Video (PiP) */}
                         <motion.div
                             drag
                             dragConstraints={{ top: -200, bottom: 200, left: -400, right: 0 }}
-                            className="absolute bottom-4 right-4 w-40 aspect-video rounded-xl overflow-hidden border-2 border-white/10 shadow-xl bg-dark-800 cursor-move"
+                            className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 w-28 sm:w-40 aspect-video rounded-xl overflow-hidden border-2 border-white/10 shadow-xl bg-dark-800 cursor-move z-10"
                         >
                             <video
                                 ref={localVideoRef}
                                 autoPlay
                                 playsInline
                                 muted
-                                className={`w-full h-full object-cover ${!isVideoOn && !isScreenSharing ? 'hidden' : ''}`}
+                                className={`w-full h-full object-cover scale-x-[-1] ${!isVideoOn && !isScreenSharing ? 'hidden' : ''}`}
                             />
                             {!isVideoOn && !isScreenSharing && (
                                 <div className="w-full h-full flex items-center justify-center">
-                                    <div className="w-10 h-10 rounded-full bg-indigo-500/60 flex items-center justify-center text-sm font-bold">
+                                    <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-full bg-indigo-500/60 flex items-center justify-center text-xs sm:text-sm font-bold">
                                         {(user?.username || 'U')[0].toUpperCase()}
                                     </div>
                                 </div>
@@ -264,43 +298,44 @@ export default function CallModal({
                                 {isMuted && <div className="bg-red-500/80 rounded px-1 py-0.5 text-[8px] text-white">MUTED</div>}
                                 {isScreenSharing && <div className="bg-indigo-500/80 rounded px-1 py-0.5 text-[8px] text-white">SCREEN</div>}
                             </div>
+                            <div className="absolute top-1 right-1 text-[9px] bg-black/50 text-white/60 px-1 rounded">You</div>
                         </motion.div>
                     </div>
 
                     {/* Controls */}
-                    <div className="px-5 py-4 flex items-center justify-center gap-3 border-t border-white/5 bg-dark-950/30">
+                    <div className="px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-center gap-2 sm:gap-3 border-t border-white/5 bg-dark-950/30 shrink-0">
                         <button
                             onClick={handleToggleMute}
-                            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isMuted ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all ${isMuted ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-white/10 text-white hover:bg-white/20'}`}
                             title={isMuted ? 'Unmute' : 'Mute'}
                         >
-                            {isMuted ? <FiMicOff className="w-5 h-5" /> : <FiMic className="w-5 h-5" />}
+                            {isMuted ? <FiMicOff className="w-4 sm:w-5 h-4 sm:h-5" /> : <FiMic className="w-4 sm:w-5 h-4 sm:h-5" />}
                         </button>
 
                         <button
                             onClick={handleToggleVideo}
-                            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${!isVideoOn ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all ${!isVideoOn ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-white/10 text-white hover:bg-white/20'}`}
                             title={isVideoOn ? 'Turn off camera' : 'Turn on camera'}
                         >
-                            {isVideoOn ? <FiVideo className="w-5 h-5" /> : <FiVideoOff className="w-5 h-5" />}
+                            {isVideoOn ? <FiVideo className="w-4 sm:w-5 h-4 sm:h-5" /> : <FiVideoOff className="w-4 sm:w-5 h-4 sm:h-5" />}
                         </button>
 
                         <button
                             onClick={handleScreenShare}
-                            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isScreenSharing ? 'bg-indigo-500 text-white ring-2 ring-indigo-400/50' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all hidden sm:flex ${isScreenSharing ? 'bg-indigo-500 text-white ring-2 ring-indigo-400/50' : 'bg-white/10 text-white hover:bg-white/20'}`}
                             title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
                         >
-                            <FiMonitor className="w-5 h-5" />
+                            <FiMonitor className="w-4 sm:w-5 h-4 sm:h-5" />
                         </button>
 
-                        <div className="w-px h-8 bg-white/10 mx-2" />
+                        <div className="w-px h-6 sm:h-8 bg-white/10 mx-1 sm:mx-2" />
 
                         <button
                             onClick={handleEndCall}
-                            className="w-14 h-12 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+                            className="w-12 h-10 sm:w-14 sm:h-12 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
                             title="End call"
                         >
-                            <FiPhoneOff className="w-5 h-5" />
+                            <FiPhoneOff className="w-4 sm:w-5 h-4 sm:h-5" />
                         </button>
                     </div>
                 </motion.div>

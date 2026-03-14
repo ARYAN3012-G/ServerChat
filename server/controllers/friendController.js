@@ -119,7 +119,41 @@ exports.getFriends = async (req, res, next) => {
         const user = await User.findById(req.user._id)
             .populate('friends', 'username avatar status lastSeen bio');
 
-        res.json({ friends: user.friends });
+        // Include nicknames in the response
+        const friendsWithNicknames = (user.friends || []).map(f => {
+            const obj = f.toObject ? f.toObject() : { ...f };
+            const nickname = user.friendNicknames?.get(f._id.toString());
+            if (nickname) obj.nickname = nickname;
+            return obj;
+        });
+
+        res.json({ friends: friendsWithNicknames });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Set friend nickname (only visible to the current user)
+exports.setNickname = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        const { nickname } = req.body;
+
+        // Verify they are friends
+        const user = await User.findById(req.user._id);
+        if (!user.friends.includes(userId)) {
+            return res.status(400).json({ message: 'Not a friend' });
+        }
+
+        // Set or remove nickname
+        if (nickname && nickname.trim()) {
+            user.friendNicknames.set(userId, nickname.trim().substring(0, 30));
+        } else {
+            user.friendNicknames.delete(userId);
+        }
+        await user.save();
+
+        res.json({ message: 'Nickname updated', nickname: nickname?.trim() || null });
     } catch (error) {
         next(error);
     }

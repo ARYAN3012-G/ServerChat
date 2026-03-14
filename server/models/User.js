@@ -111,6 +111,12 @@ const userSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
     }],
+    // Per-user friend nicknames (only visible to the user who set them)
+    friendNicknames: {
+        type: Map,
+        of: String,
+        default: new Map(),
+    },
 
     // Device sessions
     sessions: [{

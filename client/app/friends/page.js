@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUserPlus, FiUserCheck, FiUserX, FiSearch, FiMessageSquare, FiUsers, FiClock, FiX, FiCheck, FiMenu, FiLoader } from 'react-icons/fi';
+import { FiArrowLeft, FiUserPlus, FiUserCheck, FiUserX, FiSearch, FiMessageSquare, FiUsers, FiClock, FiX, FiCheck, FiMenu, FiLoader, FiEdit2 } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import { getSocket } from '../../services/socket';
@@ -19,6 +19,10 @@ export default function FriendsPage() {
     const [addUsername, setAddUsername] = useState('');
     const [addStatus, setAddStatus] = useState(null);
     const { onlineUsers } = useSelector((s) => s.chat);
+
+    // Nickname editing state
+    const [editingNickname, setEditingNickname] = useState(null); // friend ID being edited
+    const [nicknameInput, setNicknameInput] = useState('');
 
     // Auto-suggestion state
     const [suggestions, setSuggestions] = useState([]);
@@ -103,6 +107,23 @@ export default function FriendsPage() {
     const handleAccept = async (id) => { try { await api.put(`/friends/accept/${id}`); fetchFriends(); fetchRequests(); } catch (e) { console.error(e); } };
     const handleReject = async (id) => { try { await api.put(`/friends/reject/${id}`); fetchRequests(); } catch (e) { console.error(e); } };
     const handleRemove = async (id) => { if (!confirm('Remove friend?')) return; try { await api.delete(`/friends/${id}`); fetchFriends(); } catch (e) { console.error(e); } };
+
+    // Nickname handlers
+    const handleStartEditNickname = (friend) => {
+        setEditingNickname(friend._id);
+        setNicknameInput(friend.nickname || '');
+    };
+
+    const handleSaveNickname = async (friendId) => {
+        try {
+            await api.put(`/friends/nickname/${friendId}`, { nickname: nicknameInput });
+            // Update local state
+            setFriends(prev => prev.map(f => f._id === friendId ? { ...f, nickname: nicknameInput.trim() || undefined } : f));
+            setEditingNickname(null);
+        } catch (e) {
+            console.error(e);
+        }
+    };
     const handleMessageFriend = async (friendId) => {
         try {
             await api.post('/channels/dm', { targetUserId: friendId });
@@ -181,7 +202,33 @@ export default function FriendsPage() {
                                                         }`} />
                                                 </div>
                                                 <div className="flex-1">
-                                                    <p className="font-medium">{f.username}</p>
+                                                    {editingNickname === f._id ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="text"
+                                                                value={nicknameInput}
+                                                                onChange={(e) => setNicknameInput(e.target.value)}
+                                                                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveNickname(f._id); if (e.key === 'Escape') setEditingNickname(null); }}
+                                                                placeholder={f.username}
+                                                                className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-sm outline-none text-white placeholder-white/20 focus:ring-1 focus:ring-indigo-500 w-32"
+                                                                autoFocus
+                                                            />
+                                                            <button onClick={() => handleSaveNickname(f._id)} className="p-1 rounded bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30">
+                                                                <FiCheck className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button onClick={() => setEditingNickname(null)} className="p-1 rounded bg-white/5 text-white/30 hover:text-white">
+                                                                <FiX className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <p className="font-medium">{f.nickname || f.username}</p>
+                                                            {f.nickname && <span className="text-[10px] text-white/20">({f.username})</span>}
+                                                            <button onClick={() => handleStartEditNickname(f)} className="p-0.5 rounded text-white/10 hover:text-white/40 transition-colors opacity-0 group-hover:opacity-100" title="Set nickname">
+                                                                <FiEdit2 className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                     <p className="text-xs text-white/30">{
                                                         onlineUsers.includes(f._id) && f.status !== 'invisible'
                                                             ? (f.status === 'dnd' ? 'Do Not Disturb' : f.status === 'idle' ? 'Idle' : 'Online')
