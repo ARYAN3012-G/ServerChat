@@ -470,24 +470,51 @@ export default function DMsPage() {
                                 <h3 className="font-bold text-lg">New Message</h3>
                                 <FiX className="w-5 h-5 text-white/30 cursor-pointer hover:text-white" onClick={() => setShowNewDM(false)} />
                             </div>
+                            {/* Search input */}
+                            <div className="px-4 pt-3 pb-1">
+                                <div className="relative">
+                                    <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="Search by username..."
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white placeholder-white/20 focus:ring-2 focus:ring-indigo-500"
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
                             <div className="p-4 max-h-80 overflow-y-auto">
-                                {friends.length === 0 ? (
-                                    <p className="text-sm text-white/30 text-center py-4">No friends yet. Add friends first!</p>
-                                ) : friends.map(friend => {
-                                    const f = friend.user || friend;
-                                    return (
-                                        <div key={f._id} onClick={() => startDM(f._id)}
-                                            className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
-                                            <div className="relative">
-                                                <div className="w-9 h-9 rounded-full bg-indigo-500/60 flex items-center justify-center text-sm font-bold">
-                                                    {(f.username || 'U')[0].toUpperCase()}
-                                                </div>
-                                                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-dark-800 ${f.status === 'online' ? 'bg-emerald-400' : 'bg-gray-500'}`} />
-                                            </div>
-                                            <span className="text-sm text-white/80 font-medium">{f.username || 'Unknown'}</span>
+                                {(() => {
+                                    const filteredDMFriends = friends.filter(friend => {
+                                        const f = friend.user || friend;
+                                        return (f.username || '').toLowerCase().includes(searchQuery.toLowerCase());
+                                    });
+                                    if (friends.length === 0) return (
+                                        <p className="text-sm text-white/30 text-center py-4">No friends yet. Add friends first!</p>
+                                    );
+                                    if (filteredDMFriends.length === 0) return (
+                                        <div className="text-center py-6">
+                                            <FiSearch className="w-8 h-8 mx-auto text-white/10 mb-2" />
+                                            <p className="text-sm text-white/30">No friends matching &quot;{searchQuery}&quot;</p>
                                         </div>
                                     );
-                                })}
+                                    return filteredDMFriends.map(friend => {
+                                        const f = friend.user || friend;
+                                        return (
+                                            <div key={f._id} onClick={() => startDM(f._id)}
+                                                className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
+                                                <div className="relative">
+                                                    <div className="w-9 h-9 rounded-full bg-indigo-500/60 flex items-center justify-center text-sm font-bold">
+                                                        {(f.username || 'U')[0].toUpperCase()}
+                                                    </div>
+                                                    <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-dark-800 ${f.status === 'online' ? 'bg-emerald-400' : 'bg-gray-500'}`} />
+                                                </div>
+                                                <span className="text-sm text-white/80 font-medium">{f.username || 'Unknown'}</span>
+                                            </div>
+                                        );
+                                    });
+                                })()}
                             </div>
                         </motion.div>
                     </motion.div>
