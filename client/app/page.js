@@ -550,7 +550,7 @@ export default function HomePage() {
             </section>
 
             {/* CTA */}
-            <section className="relative z-10 max-w-4xl mx-auto px-4 sm:px-8 py-12 sm:py-24 text-center">
+            <section className="relative z-10 max-w-4xl mx-auto px-4 sm:px-8 py-10 sm:py-24 text-center">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     whileInView={{ opacity: 1, scale: 1 }}
@@ -558,31 +558,30 @@ export default function HomePage() {
                     transition={{ duration: 0.6 }}
                     className="relative overflow-hidden rounded-2xl"
                 >
-                    {/* CTA card with premium border */}
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-white/10 via-transparent to-white/10 p-[1px]">
                         <div className="w-full h-full rounded-2xl bg-dark-900" />
                     </div>
 
-                    <div className="relative glass p-12 md:p-16 border-0">
+                    <div className="relative glass p-8 sm:p-16 border-0">
                         <motion.h2
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
-                            className="text-4xl md:text-5xl font-display font-bold text-white mb-4"
+                            className="text-2xl sm:text-4xl md:text-5xl font-display font-bold text-white mb-3"
                         >
                             Ready to Get Started?
                         </motion.h2>
-                        <p className="text-xl text-silver-500 mb-8">
+                        <p className="text-sm sm:text-lg text-silver-500 mb-6 sm:mb-8">
                             Join thousands of users already on ServerChat
                         </p>
                         <Link href="/register">
                             <motion.button
                                 whileHover={{ scale: 1.05, boxShadow: '0 0 40px rgba(255,255,255,0.15)' }}
                                 whileTap={{ scale: 0.95 }}
-                                className="bg-white text-dark-900 font-bold py-4 px-12 rounded-2xl text-lg shadow-2xl shadow-white/10 inline-flex items-center gap-2 group"
+                                className="bg-white text-dark-900 font-bold py-3 px-8 sm:py-4 sm:px-12 rounded-xl sm:rounded-2xl text-sm sm:text-lg shadow-2xl shadow-white/10 inline-flex items-center gap-2 group"
                             >
                                 Create Your Account
-                                <FiArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                <FiArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
                             </motion.button>
                         </Link>
                     </div>
@@ -590,9 +589,22 @@ export default function HomePage() {
             </section>
 
             {/* Footer */}
-            <footer className="relative z-10 border-t border-white/[0.05] py-8 text-center text-silver-700 text-sm">
-                <p>© 2026 ServerChat. Built using Next.js, Express, and Socket.io</p>
+            <footer className="relative z-10 border-t border-white/[0.05] py-6 sm:py-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-white to-silver-400 flex items-center justify-center">
+                            <FiMessageSquare className="w-3 h-3 text-dark-900" />
+                        </div>
+                        <span className="text-sm text-silver-600">© 2026 ServerChat</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-silver-700">
+                        <span className="flex items-center gap-1"><FiShield className="w-3 h-3 text-green-500" /> Secure</span>
+                        <span className="flex items-center gap-1"><FiZap className="w-3 h-3 text-yellow-500" /> Fast</span>
+                        <span className="flex items-center gap-1"><FiGlobe className="w-3 h-3 text-blue-500" /> Global</span>
+                    </div>
+                </div>
             </footer>
         </div>
     );
 }
+
