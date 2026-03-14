@@ -22,6 +22,7 @@ export default function CallModal({
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
     const [callDuration, setCallDuration] = useState(0);
+    const [remoteVideoActive, setRemoteVideoActive] = useState(false);
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
     const remoteAudioRef = useRef(null);
@@ -68,16 +69,52 @@ export default function CallModal({
     // Monitor remote stream track changes
     useEffect(() => {
         if (!remoteStream) return;
-        const handleTrackAdded = () => {
-            console.log('[CallModal] Track added to remote stream');
+        
+        const checkVideoActive = () => {
+            const hasVideo = remoteStream.getVideoTracks().some(t => t.readyState === 'live' && t.enabled);
+            setRemoteVideoActive(hasVideo);
+        };
+        
+        checkVideoActive();
+
+        const handleTrackAdded = (e) => {
+            console.log('[CallModal] Track added to remote stream', e.track.kind);
             if (remoteVideoRef.current) {
                 remoteVideoRef.current.srcObject = remoteStream;
                 remoteVideoRef.current.play().catch(() => {});
             }
+            checkVideoActive();
         };
+
+        const handleTrackRemoved = () => {
+            console.log('[CallModal] Track removed from remote stream');
+            checkVideoActive();
+        };
+
         remoteStream.addEventListener('addtrack', handleTrackAdded);
-        return () => remoteStream.removeEventListener('addtrack', handleTrackAdded);
-    }, [remoteStream]);
+        remoteStream.addEventListener('removetrack', handleTrackRemoved);
+
+        // Also listen to un-muting of individual tracks
+        remoteStream.getVideoTracks().forEach(track => {
+            track.addEventListener('unmute', checkVideoActive);
+            track.addEventListener('mute', checkVideoActive);
+            track.addEventListener('ended', checkVideoActive);
+        });
+
+        // Set up an interval as a reliable fallback for catching enabled/disabled changes
+        const intervalId = setInterval(checkVideoActive, 1000);
+
+        return () => {
+            remoteStream.removeEventListener('addtrack', handleTrackAdded);
+            remoteStream.removeEventListener('removetrack', handleTrackRemoved);
+            remoteStream.getVideoTracks().forEach(track => {
+                track.removeEventListener('unmute', checkVideoActive);
+                track.removeEventListener('mute', checkVideoActive);
+                track.removeEventListener('ended', checkVideoActive);
+            });
+            clearInterval(intervalId);
+        };
+    }, [remoteStream, callStatus]);
 
     const formatDuration = (secs) => {
         const m = Math.floor(secs / 60).toString().padStart(2, '0');
@@ -152,8 +189,6 @@ export default function CallModal({
     const otherParticipant = callSession.participants?.find(
         p => p.user?._id !== user?._id
     )?.user || callSession.participants?.[0]?.user || { username: 'User' };
-
-    const hasVideoTracks = remoteStream && remoteStream.getVideoTracks().some(t => t.readyState === 'live' && t.enabled);
 
     // ── Minimized floating bar ──
     if (isMinimized) {
@@ -240,12 +275,12 @@ export default function CallModal({
                                 ref={remoteVideoRef}
                                 autoPlay
                                 playsInline
-                                className={`w-full h-full object-cover ${!remoteStream || !hasVideoTracks ? 'hidden' : ''}`}
+                                className={`w-full h-full object-cover ${!remoteStream || !remoteVideoActive ? 'hidden' : ''}`}
                             />
                             {/* Hidden audio element for guaranteed audio playback */}
                             <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
 
-                            {(!remoteStream || !hasVideoTracks) && (
+                            {(!remoteStream || !remoteVideoActive) && (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-dark-900/50 to-dark-950">
                                     <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-indigo-500/30 to-purple-400/30 flex items-center justify-center text-2xl sm:text-3xl font-bold text-indigo-400 mb-4 border-2 border-indigo-500/20">
                                         {(otherParticipant.username || 'U')[0].toUpperCase()}
