@@ -33,8 +33,9 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: false,
 }));
+const clientOrigin = (process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/+$/, '');
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: clientOrigin,
   credentials: true,
 }));
 
