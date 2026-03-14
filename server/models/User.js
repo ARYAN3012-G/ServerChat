@@ -117,6 +117,12 @@ const userSchema = new mongoose.Schema({
         of: String,
         default: new Map(),
     },
+    // Per-user custom avatars for friends (only visible to the user who set them)
+    friendAvatars: {
+        type: Map,
+        of: mongoose.Schema.Types.Mixed,
+        default: new Map(),
+    },
 
     // Device sessions
     sessions: [{

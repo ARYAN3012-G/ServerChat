@@ -119,15 +119,17 @@ exports.getFriends = async (req, res, next) => {
         const user = await User.findById(req.user._id)
             .populate('friends', 'username avatar status lastSeen bio');
 
-        // Include nicknames in the response
-        const friendsWithNicknames = (user.friends || []).map(f => {
+        // Include nicknames and custom avatars in the response
+        const friendsWithCustom = (user.friends || []).map(f => {
             const obj = f.toObject ? f.toObject() : { ...f };
             const nickname = user.friendNicknames?.get(f._id.toString());
             if (nickname) obj.nickname = nickname;
+            const customAvatar = user.friendAvatars?.get(f._id.toString());
+            if (customAvatar) obj.customAvatar = customAvatar;
             return obj;
         });
 
-        res.json({ friends: friendsWithNicknames });
+        res.json({ friends: friendsWithCustom });
     } catch (error) {
         next(error);
     }
@@ -154,6 +156,30 @@ exports.setNickname = async (req, res, next) => {
         await user.save();
 
         res.json({ message: 'Nickname updated', nickname: nickname?.trim() || null });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Set custom avatar for a friend (only visible to the current user)
+exports.setFriendAvatar = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        const { avatarId, bg, emoji } = req.body;
+
+        const user = await User.findById(req.user._id);
+        if (!user.friends.includes(userId)) {
+            return res.status(400).json({ message: 'Not a friend' });
+        }
+
+        if (avatarId) {
+            user.friendAvatars.set(userId, { id: avatarId, bg, emoji });
+        } else {
+            user.friendAvatars.delete(userId);
+        }
+        await user.save();
+
+        res.json({ message: 'Friend avatar updated', customAvatar: avatarId ? { id: avatarId, bg, emoji } : null });
     } catch (error) {
         next(error);
     }

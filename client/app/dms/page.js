@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiSend, FiSearch, FiMessageSquare, FiPlus, FiX, FiPaperclip, FiPhone, FiVideo, FiSmile, FiMenu, FiCheck } from 'react-icons/fi';
+import { FiArrowLeft, FiSend, FiSearch, FiMessageSquare, FiPlus, FiX, FiPaperclip, FiPhone, FiVideo, FiSmile, FiMenu, FiCheck, FiImage } from 'react-icons/fi';
 import { useSelector, useDispatch } from 'react-redux';
 import { setMessages, addMessage } from '../../redux/chatSlice';
 import { useAuth } from '../../hooks/useAuth';
@@ -14,6 +14,7 @@ import TypingIndicator from '../../components/TypingIndicator';
 import VoiceRecorder from '../../components/VoiceRecorder';
 import AudioPlayer from '../../components/AudioPlayer';
 import MessageSearch from '../../components/MessageSearch';
+const ChatBackgroundPicker = dynamic(() => import('../../components/ChatBackgroundPicker'), { ssr: false });
 import { MdGif } from 'react-icons/md';
 import api from '../../services/api';
 import { connectSocket } from '../../services/socket';
@@ -43,6 +44,8 @@ export default function DMsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearch, setShowSearch] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [showBgPicker, setShowBgPicker] = useState(false);
+    const [chatBg, setChatBg] = useState('');
     const quickEmojis = ['👍', '❤️', '😂', '🎉', '😮', '😢', '🔥', '👏'];
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -59,7 +62,12 @@ export default function DMsPage() {
     }, [isAuthenticated]);
 
     useEffect(() => {
-        if (selectedConvo) fetchMessages(selectedConvo._id);
+        if (selectedConvo) {
+            fetchMessages(selectedConvo._id);
+            // Load saved background for this DM
+            const savedBg = localStorage.getItem(`chat_bg_${selectedConvo._id}`);
+            setChatBg(savedBg || '');
+        }
     }, [selectedConvo?._id]);
 
     useEffect(() => {
@@ -109,7 +117,7 @@ export default function DMsPage() {
     };
 
     const handleReaction = (msgId, emoji) => {
-        if (reactToMessage) reactToMessage(msgId, emoji);
+        reactToMessage(msgId, emoji);
         setShowEmojiPicker(null);
     };
 
@@ -143,6 +151,19 @@ export default function DMsPage() {
             return uid !== user?._id;
         });
         return other?.user || other || {};
+    };
+
+    const handleSelectBackground = (bg) => {
+        const css = bg.css;
+        setChatBg(css);
+        if (selectedConvo) {
+            if (css) {
+                localStorage.setItem(`chat_bg_${selectedConvo._id}`, css);
+            } else {
+                localStorage.removeItem(`chat_bg_${selectedConvo._id}`);
+            }
+        }
+        setShowBgPicker(false);
     };
 
     if (loading) return <div className="flex h-screen items-center justify-center bg-dark-900"><div className="w-10 h-10 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
@@ -269,6 +290,10 @@ export default function DMsPage() {
                                     className="p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-indigo-400 transition-colors" title="Search Messages">
                                     <FiSearch className="w-4 h-4" />
                                 </button>
+                                <button onClick={() => setShowBgPicker(true)}
+                                    className="p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-pink-400 transition-colors" title="Change Background">
+                                    <FiImage className="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
 
@@ -281,7 +306,7 @@ export default function DMsPage() {
                         />
 
                         {/* Messages */}
-                        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+                        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 relative" style={{ background: chatBg || undefined }}>
                             <div className="mb-8 text-center">
                                 <div className="w-20 h-20 rounded-full bg-indigo-500/20 flex items-center justify-center mx-auto mb-3">
                                     <span className="text-3xl font-bold text-indigo-400">{(getOtherUser(selectedConvo).username || 'U')[0].toUpperCase()}</span>
@@ -463,9 +488,9 @@ export default function DMsPage() {
             {/* New DM Modal */}
             <AnimatePresence>
                 {showNewDM && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowNewDM(false)}>
                         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-dark-800 rounded-2xl border border-white/10 w-[380px] shadow-2xl">
+                            className="bg-dark-800 rounded-2xl border border-white/10 w-[380px] shadow-2xl" onClick={e => e.stopPropagation()}>
                             <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
                                 <h3 className="font-bold text-lg">New Message</h3>
                                 <FiX className="w-5 h-5 text-white/30 cursor-pointer hover:text-white" onClick={() => setShowNewDM(false)} />
@@ -519,6 +544,14 @@ export default function DMsPage() {
                         </motion.div>
                     </motion.div>
                 )}
+
+                {/* Chat Background Picker */}
+                <ChatBackgroundPicker
+                    isOpen={showBgPicker}
+                    onClose={() => setShowBgPicker(false)}
+                    currentBg={chatBg}
+                    onSelectBackground={handleSelectBackground}
+                />
             </AnimatePresence>
         </div>
     );

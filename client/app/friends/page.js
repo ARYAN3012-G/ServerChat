@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUserPlus, FiUserCheck, FiUserX, FiSearch, FiMessageSquare, FiUsers, FiClock, FiX, FiCheck, FiMenu, FiLoader, FiEdit2 } from 'react-icons/fi';
+import { FiArrowLeft, FiUserPlus, FiUserCheck, FiUserX, FiSearch, FiMessageSquare, FiUsers, FiClock, FiX, FiCheck, FiMenu, FiLoader, FiEdit2, FiImage } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import { getSocket } from '../../services/socket';
@@ -21,8 +21,25 @@ export default function FriendsPage() {
     const { onlineUsers } = useSelector((s) => s.chat);
 
     // Nickname editing state
-    const [editingNickname, setEditingNickname] = useState(null); // friend ID being edited
+    const [editingNickname, setEditingNickname] = useState(null);
     const [nicknameInput, setNicknameInput] = useState('');
+    // Friend avatar picker state
+    const [avatarPickerFriend, setAvatarPickerFriend] = useState(null);
+
+    const AVATAR_GALLERY = [
+        { id: 'avatar-blue', bg: 'linear-gradient(135deg, #667eea, #764ba2)', emoji: '😎' },
+        { id: 'avatar-green', bg: 'linear-gradient(135deg, #11998e, #38ef7d)', emoji: '🤩' },
+        { id: 'avatar-sunset', bg: 'linear-gradient(135deg, #fc5c7d, #6a82fb)', emoji: '🔥' },
+        { id: 'avatar-ocean', bg: 'linear-gradient(135deg, #2193b0, #6dd5ed)', emoji: '🌊' },
+        { id: 'avatar-neon', bg: 'linear-gradient(135deg, #f093fb, #f5576c)', emoji: '⚡' },
+        { id: 'avatar-aurora', bg: 'linear-gradient(135deg, #4facfe, #00f2fe)', emoji: '💫' },
+        { id: 'avatar-lava', bg: 'linear-gradient(135deg, #f12711, #f5af19)', emoji: '🎯' },
+        { id: 'avatar-forest', bg: 'linear-gradient(135deg, #134e5e, #71b280)', emoji: '🌿' },
+        { id: 'avatar-cosmic', bg: 'linear-gradient(135deg, #7f00ff, #e100ff)', emoji: '🚀' },
+        { id: 'avatar-royal', bg: 'linear-gradient(135deg, #4a00e0, #8e2de2)', emoji: '👑' },
+        { id: 'avatar-candy', bg: 'linear-gradient(135deg, #ff6fd8, #3813c2)', emoji: '🍬' },
+        { id: 'avatar-ice', bg: 'linear-gradient(135deg, #c3cfe2, #f5f7fa)', emoji: '❄️' },
+    ];
 
     // Auto-suggestion state
     const [suggestions, setSuggestions] = useState([]);
@@ -117,9 +134,23 @@ export default function FriendsPage() {
     const handleSaveNickname = async (friendId) => {
         try {
             await api.put(`/friends/nickname/${friendId}`, { nickname: nicknameInput });
-            // Update local state
             setFriends(prev => prev.map(f => f._id === friendId ? { ...f, nickname: nicknameInput.trim() || undefined } : f));
             setEditingNickname(null);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const handleSetFriendAvatar = async (friendId, avatar) => {
+        try {
+            if (avatar) {
+                await api.put(`/friends/avatar/${friendId}`, { avatarId: avatar.id, bg: avatar.bg, emoji: avatar.emoji });
+                setFriends(prev => prev.map(f => f._id === friendId ? { ...f, customAvatar: { id: avatar.id, bg: avatar.bg, emoji: avatar.emoji } } : f));
+            } else {
+                await api.put(`/friends/avatar/${friendId}`, {});
+                setFriends(prev => prev.map(f => f._id === friendId ? { ...f, customAvatar: undefined } : f));
+            }
+            setAvatarPickerFriend(null);
         } catch (e) {
             console.error(e);
         }
@@ -190,16 +221,48 @@ export default function FriendsPage() {
                                             <motion.div key={f._id || i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
                                                 className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 transition-colors group">
                                                 <div className="relative">
-                                                    <div className="w-10 h-10 rounded-full bg-indigo-500/60 flex items-center justify-center font-bold">{(f.username || '?')[0].toUpperCase()}</div>
-                                                    <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-dark-900 ${(() => {
+                                                    <div onClick={(e) => { e.stopPropagation(); setAvatarPickerFriend(avatarPickerFriend === f._id ? null : f._id); }} className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center font-bold cursor-pointer group/av border-2 border-transparent hover:border-indigo-500/40 transition-colors">
+                                                        {f.customAvatar?.bg ? (
+                                                            <div className="w-full h-full flex items-center justify-center text-lg" style={{ background: f.customAvatar.bg }}>{f.customAvatar.emoji}</div>
+                                                        ) : f.avatar?.url ? (
+                                                            <img src={f.avatar.url} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full bg-indigo-500/60 flex items-center justify-center">{(f.username || '?')[0].toUpperCase()}</div>
+                                                        )}
+                                                        <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover/av:opacity-100 transition-opacity">
+                                                            <FiImage className="w-3.5 h-3.5 text-white/80" />
+                                                        </div>
+                                                    </div>
+                                                    <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-dark-900 z-10 ${(() => {
                                                         if (!onlineUsers.includes(f._id)) return 'bg-white/20';
                                                         const s = f.status;
                                                         if (s === 'dnd') return 'bg-red-500';
                                                         if (s === 'idle') return 'bg-amber-400';
                                                         if (s === 'invisible') return 'bg-white/20';
                                                         return 'bg-emerald-400';
-                                                    })()
-                                                        }`} />
+                                                    })()}`} />
+
+                                                    {/* Mini avatar picker popover */}
+                                                    <AnimatePresence>
+                                                        {avatarPickerFriend === f._id && (
+                                                            <motion.div initial={{ opacity: 0, scale: 0.9, y: -5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
+                                                                className="absolute top-12 left-0 z-50 bg-dark-800 border border-white/10 rounded-xl shadow-2xl p-3 w-[220px]" onClick={(e) => e.stopPropagation()}>
+                                                                <p className="text-[10px] text-white/30 font-bold uppercase tracking-wider mb-2">Set Custom Avatar</p>
+                                                                <div className="grid grid-cols-6 gap-1.5 mb-2">
+                                                                    {AVATAR_GALLERY.map(av => (
+                                                                        <div key={av.id} onClick={() => handleSetFriendAvatar(f._id, av)}
+                                                                            className={`w-full aspect-square rounded-lg flex items-center justify-center text-sm cursor-pointer hover:scale-110 transition-transform border-2 ${f.customAvatar?.id === av.id ? 'border-indigo-500' : 'border-transparent'}`}
+                                                                            style={{ background: av.bg }}>{av.emoji}</div>
+                                                                    ))}
+                                                                </div>
+                                                                {f.customAvatar && (
+                                                                    <button onClick={() => handleSetFriendAvatar(f._id, null)} className="w-full text-[10px] text-red-400/60 hover:text-red-400 py-1 transition-colors">
+                                                                        Reset to original
+                                                                    </button>
+                                                                )}
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
                                                 </div>
                                                 <div className="flex-1">
                                                     {editingNickname === f._id ? (

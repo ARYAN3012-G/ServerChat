@@ -9,6 +9,7 @@ router.post('/request', auth, friendController.sendRequest);
 router.put('/accept/:requestId', auth, friendController.acceptRequest);
 router.put('/reject/:requestId', auth, friendController.rejectRequest);
 router.put('/nickname/:userId', auth, friendController.setNickname);
+router.put('/avatar/:userId', auth, friendController.setFriendAvatar);
 router.delete('/:userId', auth, friendController.removeFriend);
 
 module.exports = router;
