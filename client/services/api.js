@@ -45,7 +45,8 @@ api.interceptors.response.use(
             } catch (refreshError) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('refreshToken');
-                if (typeof window !== 'undefined') {
+                // Only redirect if NOT already on the login page (prevents OAuth token processing interruption)
+                if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
                     window.location.href = '/login';
                 }
                 return Promise.reject(refreshError);

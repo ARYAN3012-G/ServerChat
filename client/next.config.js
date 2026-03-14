@@ -47,7 +47,7 @@ const nextConfig = {
                             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
                             "font-src 'self' https://fonts.gstatic.com",
                             "img-src 'self' data: blob: https://res.cloudinary.com https://lh3.googleusercontent.com https://avatars.githubusercontent.com",
-                            "media-src 'self' blob: https://res.cloudinary.com https://*.onrender.com",
+                            "media-src 'self' data: blob: https://res.cloudinary.com https://*.onrender.com",
                             "connect-src 'self' https://*.onrender.com wss://*.onrender.com https://accounts.google.com https://api.github.com https://res.cloudinary.com https://api.cloudinary.com",
                             "frame-src 'self' https://accounts.google.com https://github.com",
                             "worker-src 'self' blob:",

@@ -45,64 +45,75 @@ export default function LoginPage() {
     // Welcome modal  (post-OAuth)
     const [showWelcome, setShowWelcome] = useState(false);
 
-    // ─── Hydrate Redux from tokens ───
-    const hydrateAndRedirect = useCallback(async (path, passedToken = null) => {
-        const storedToken = passedToken || localStorage.getItem('token');
-        if (storedToken) {
-            try {
-                // Ensure the interceptor uses the correct token immediately if it's fresh
-                if (passedToken) {
-                    api.defaults.headers.common['Authorization'] = `Bearer ${passedToken}`;
-                }
-                const { data } = await api.get('/auth/me');
-                dispatch(setCredentials({
-                    user: data.user,
-                    accessToken: storedToken,
-                    refreshToken: localStorage.getItem('refreshToken'),
-                }));
-            } catch (e) {
-                console.error('Failed to fetch user:', e);
-                const msg = e.response?.data?.message || e.message;
-                toast.error(`Authentication failed: ${msg}`);
-                localStorage.removeItem('token');
-                localStorage.removeItem('refreshToken');
-                return; // Stop the redirect if auth failed
-            }
-        }
-        router.push(path);
-    }, [dispatch, router]);
-
-    // ─── OAuth callback handler ───
+    // ─── OAuth callback handler (runs ONCE on mount) ───
     useEffect(() => {
-        // Prevent double execution in strict mode
-        if (window._oauthProcessed) return;
-
         const params = new URLSearchParams(window.location.search);
         const token = params.get('token');
         const rToken = params.get('refreshToken');
         const error = params.get('error');
         const needsPassword = params.get('needsPassword');
 
-        if (token && rToken) {
-            window._oauthProcessed = true;
-            
-            // Clean up the URL immediately to prevent reload loops
-            window.history.replaceState({}, document.title, window.location.pathname);
+        // If no OAuth params in URL, skip
+        if (!token && !rToken && !error) return;
 
+        // Clean URL immediately
+        window.history.replaceState({}, document.title, '/login');
+
+        if (error === 'oauth_failed') {
+            toast.error('OAuth Authentication failed');
+            return;
+        }
+
+        if (token && rToken) {
+            // Save tokens
             localStorage.setItem('token', token);
             localStorage.setItem('refreshToken', rToken);
 
             if (needsPassword === 'true') {
                 setShowWelcome(true);
-            } else {
-                toast.success('Welcome back!');
-                hydrateAndRedirect('/channels', token);
+                return;
             }
-        } else if (error === 'oauth_failed') {
-            window.history.replaceState({}, document.title, window.location.pathname);
-            toast.error('OAuth Authentication failed');
+
+            // Fetch user profile and redirect
+            const fetchAndRedirect = async () => {
+                try {
+                    const { data } = await api.get('/auth/me', {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    dispatch(setCredentials({
+                        user: data.user,
+                        accessToken: token,
+                        refreshToken: rToken,
+                    }));
+                    toast.success('Welcome back!');
+                    router.push('/channels');
+                } catch (e) {
+                    console.error('OAuth hydration failed:', e);
+                    toast.error(e.response?.data?.message || 'Login failed — please try again');
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('refreshToken');
+                }
+            };
+            fetchAndRedirect();
         }
-    }, [hydrateAndRedirect]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Empty deps — run once on mount only
+
+    // ─── Hydrate Redux from localStorage (for regular page loads) ───
+    const hydrateAndRedirect = useCallback(async (path) => {
+        const storedToken = localStorage.getItem('token');
+        if (storedToken) {
+            try {
+                const { data } = await api.get('/auth/me');
+                dispatch(setCredentials({
+                    user: data.user,
+                    accessToken: storedToken,
+                    refreshToken: localStorage.getItem('refreshToken'),
+                }));
+            } catch (e) { /* will redirect to login naturally */ }
+        }
+        router.push(path);
+    }, [dispatch, router]);
 
     // ─── Face API loading via npm dynamic import ───
     useEffect(() => {
