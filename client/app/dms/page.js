@@ -278,11 +278,11 @@ export default function DMsPage() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <button onClick={() => initiateCall && initiateCall(getOtherUser(selectedConvo)._id, 'audio')}
+                                <button onClick={() => initiateCall && initiateCall(getOtherUser(selectedConvo)._id, selectedConvo?._id, 'voice')}
                                     className="p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-emerald-400 transition-colors" title="Voice Call">
                                     <FiPhone className="w-4 h-4" />
                                 </button>
-                                <button onClick={() => initiateCall && initiateCall(getOtherUser(selectedConvo)._id, 'video')}
+                                <button onClick={() => initiateCall && initiateCall(getOtherUser(selectedConvo)._id, selectedConvo?._id, 'video')}
                                     className="p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-indigo-400 transition-colors" title="Video Call">
                                     <FiVideo className="w-4 h-4" />
                                 </button>
