@@ -35,6 +35,7 @@ export default function ChannelsPage() {
     const { user, isAuthenticated, loading, logout } = useAuth();
     const { channels, currentChannel, messages } = useSelector((s) => s.chat);
     const { servers, currentServer } = useSelector((s) => s.server);
+    const { session: gameSession } = useSelector((s) => s.game);
 
     const [messageInput, setMessageInput] = useState('');
     const [showInputEmojiPicker, setShowInputEmojiPicker] = useState(false);
@@ -102,6 +103,13 @@ export default function ChannelsPage() {
         return () => socket.off('presence:status-changed', handleFriendStatus);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Auto-show game launcher if a game starts in our channel
+    useEffect(() => {
+        if (gameSession && gameSession.status !== 'finished' && gameSession.channel === currentChannel?._id) {
+            setShowGameLauncher(true);
+        }
+    }, [gameSession, currentChannel?._id]);
 
     useEffect(() => {
         if (localVideoRef.current && localVideoStream) {
