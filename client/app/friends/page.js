@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUserPlus, FiUserCheck, FiUserX, FiSearch, FiMessageSquare, FiUsers, FiClock, FiX, FiCheck, FiMenu } from 'react-icons/fi';
+import { FiArrowLeft, FiUserPlus, FiUserCheck, FiUserX, FiSearch, FiMessageSquare, FiUsers, FiClock, FiX, FiCheck, FiMenu, FiLoader } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import { getSocket } from '../../services/socket';
@@ -20,6 +20,13 @@ export default function FriendsPage() {
     const [addStatus, setAddStatus] = useState(null);
     const { onlineUsers } = useSelector((s) => s.chat);
 
+    // Auto-suggestion state
+    const [suggestions, setSuggestions] = useState([]);
+    const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const suggestionsRef = useRef(null);
+    const debounceRef = useRef(null);
+
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
     useEffect(() => { if (isAuthenticated) { fetchFriends(); fetchRequests(); } }, [isAuthenticated]);
 
@@ -31,13 +38,66 @@ export default function FriendsPage() {
         return () => socket.off('presence:status-changed', handleStatus);
     }, []);
 
+    // Close suggestions when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (suggestionsRef.current && !suggestionsRef.current.contains(e.target)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     const fetchFriends = async () => { try { const { data } = await api.get('/friends'); setFriends(data.friends || data || []); } catch (e) { console.error(e); } };
     const fetchRequests = async () => { try { const { data } = await api.get('/friends/requests'); setRequests({ incoming: data.incoming || [], outgoing: data.outgoing || [] }); } catch (e) { console.error(e); } };
 
-    const handleSendRequest = async () => {
-        if (!addUsername.trim()) return;
-        try { await api.post('/friends/request', { username: addUsername }); setAddStatus({ type: 'success', msg: `Request sent to ${addUsername}!` }); setAddUsername(''); fetchRequests(); }
-        catch (e) { setAddStatus({ type: 'error', msg: e.response?.data?.message || 'Failed' }); }
+    // Debounced search for auto-suggestions
+    const searchUsers = useCallback(async (query) => {
+        if (!query || query.trim().length < 1) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+        setSuggestionsLoading(true);
+        try {
+            const { data } = await api.get(`/users/search?q=${encodeURIComponent(query)}&limit=8`);
+            setSuggestions(data.users || []);
+            setShowSuggestions(true);
+        } catch (e) {
+            console.error(e);
+            setSuggestions([]);
+        } finally {
+            setSuggestionsLoading(false);
+        }
+    }, []);
+
+    const handleAddUsernameChange = (value) => {
+        setAddUsername(value);
+        setAddStatus(null);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => searchUsers(value), 300);
+    };
+
+    const handleSendRequest = async (username) => {
+        const targetUsername = username || addUsername;
+        if (!targetUsername.trim()) return;
+        try {
+            await api.post('/friends/request', { username: targetUsername });
+            setAddStatus({ type: 'success', msg: `Request sent to ${targetUsername}!` });
+            setAddUsername('');
+            setSuggestions([]);
+            setShowSuggestions(false);
+            fetchRequests();
+        } catch (e) {
+            setAddStatus({ type: 'error', msg: e.response?.data?.message || 'Failed' });
+        }
+    };
+
+    const handleSelectSuggestion = (username) => {
+        setAddUsername(username);
+        setShowSuggestions(false);
+        handleSendRequest(username);
     };
 
     const handleAccept = async (id) => { try { await api.put(`/friends/accept/${id}`); fetchFriends(); fetchRequests(); } catch (e) { console.error(e); } };
@@ -177,13 +237,90 @@ export default function FriendsPage() {
                         {tab === 'add' && (
                             <motion.div key="add" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="max-w-lg">
                                 <h3 className="text-xl font-bold mb-2">Add a Friend</h3>
-                                <p className="text-white/40 text-sm mb-6">Enter their username to send a friend request.</p>
-                                <div className="flex flex-col sm:flex-row gap-3">
-                                    <input type="text" value={addUsername} onChange={(e) => { setAddUsername(e.target.value); setAddStatus(null); }}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleSendRequest()} placeholder="Enter a username"
-                                        className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white placeholder-white/20 focus:ring-2 focus:ring-indigo-500" />
-                                    <button onClick={handleSendRequest} disabled={!addUsername.trim()}
-                                        className="px-6 py-3 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 disabled:opacity-30 transition-colors shadow-lg shadow-indigo-500/20">Send Request</button>
+                                <p className="text-white/40 text-sm mb-6">Start typing a username to find people.</p>
+                                <div className="relative" ref={suggestionsRef}>
+                                    <div className="flex flex-col sm:flex-row gap-3">
+                                        <div className="relative flex-1">
+                                            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 z-10" />
+                                            <input type="text" value={addUsername}
+                                                onChange={(e) => handleAddUsernameChange(e.target.value)}
+                                                onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleSendRequest()}
+                                                placeholder="Search by username..."
+                                                className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm outline-none text-white placeholder-white/20 focus:ring-2 focus:ring-indigo-500" />
+                                            {suggestionsLoading && (
+                                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                    <div className="w-4 h-4 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button onClick={() => handleSendRequest()} disabled={!addUsername.trim()}
+                                            className="px-6 py-3 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 disabled:opacity-30 transition-colors shadow-lg shadow-indigo-500/20">Send Request</button>
+                                    </div>
+
+                                    {/* Auto-suggestions dropdown */}
+                                    <AnimatePresence>
+                                        {showSuggestions && suggestions.length > 0 && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: -5 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -5 }}
+                                                className="absolute z-50 left-0 right-0 sm:right-auto sm:w-[calc(100%-140px)] mt-2 bg-dark-800 border border-white/10 rounded-xl shadow-2xl shadow-black/50 overflow-hidden max-h-[320px] overflow-y-auto"
+                                            >
+                                                <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-4 pt-3 pb-1">
+                                                    {suggestions.length} user{suggestions.length !== 1 ? 's' : ''} found
+                                                </p>
+                                                {suggestions.map((u, i) => (
+                                                    <motion.div
+                                                        key={u._id}
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        transition={{ delay: i * 0.03 }}
+                                                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 cursor-pointer transition-colors group"
+                                                        onClick={() => handleSelectSuggestion(u.username)}
+                                                    >
+                                                        <div className="relative flex-shrink-0">
+                                                            {u.avatar?.url ? (
+                                                                <img src={u.avatar.url} alt="" className="w-9 h-9 rounded-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-9 h-9 rounded-full bg-indigo-500/40 flex items-center justify-center text-sm font-bold">
+                                                                    {(u.username || '?')[0].toUpperCase()}
+                                                                </div>
+                                                            )}
+                                                            <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-dark-800 ${
+                                                                u.status === 'online' ? 'bg-emerald-400' : u.status === 'idle' ? 'bg-amber-400' : u.status === 'dnd' ? 'bg-red-500' : 'bg-white/20'
+                                                            }`} />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium text-white truncate">{u.username}</p>
+                                                            {u.bio && <p className="text-[11px] text-white/25 truncate">{u.bio}</p>}
+                                                        </div>
+                                                        <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <span className="text-xs text-indigo-400 font-medium flex items-center gap-1">
+                                                                <FiUserPlus className="w-3.5 h-3.5" /> Add
+                                                            </span>
+                                                        </div>
+                                                    </motion.div>
+                                                ))}
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+
+                                    {/* No results */}
+                                    <AnimatePresence>
+                                        {showSuggestions && suggestions.length === 0 && addUsername.trim().length >= 2 && !suggestionsLoading && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: -5 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -5 }}
+                                                className="absolute z-50 left-0 right-0 sm:right-auto sm:w-[calc(100%-140px)] mt-2 bg-dark-800 border border-white/10 rounded-xl shadow-2xl shadow-black/50 p-6 text-center"
+                                            >
+                                                <FiSearch className="w-8 h-8 mx-auto text-white/10 mb-2" />
+                                                <p className="text-sm text-white/30">No users found for &quot;{addUsername}&quot;</p>
+                                                <p className="text-xs text-white/15 mt-1">Try a different username</p>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
                                 {addStatus && (
                                     <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
