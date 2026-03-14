@@ -436,7 +436,7 @@ export default function ChannelsPage() {
     if (loading) return <div className="flex h-screen items-center justify-center bg-dark-900"><div className="w-10 h-10 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
 
     return (
-        <div className="flex h-screen bg-dark-900 text-white overflow-hidden">
+        <div className="flex h-screen bg-dark-900 text-white overflow-hidden relative">
             {/* Mobile Sidebar Overlay */}
             {sidebarOpen && (
                 <div
@@ -446,7 +446,7 @@ export default function ChannelsPage() {
             )}
 
             {/* ─── SERVER SIDEBAR ─── */}
-            <div className={`fixed mt-12 md:mt-0 md:relative z-50 w-[72px] h-full bg-dark-950 flex flex-col items-center py-3 gap-2 border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`} style={{ scrollbarWidth: 'none', overflowY: 'auto' }}>
+            <div className={`fixed mt-12 md:mt-0 md:relative z-50 w-[72px] h-full bg-dark-950 flex flex-col items-center py-3 gap-2 border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} ${!sidebarOpen ? 'max-md:invisible' : ''}`} style={{ scrollbarWidth: 'none', overflowY: 'auto' }}>
                 <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/friends')}
                     className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-emerald-400 hover:text-white hover:bg-emerald-500 cursor-pointer transition-all duration-200" title="Friends">
                     <FiUsers className="w-6 h-6" />
@@ -493,7 +493,7 @@ export default function ChannelsPage() {
             </div>
 
             {/* ─── CHANNEL SIDEBAR ─── */}
-            <div className={`fixed mt-12 md:mt-0 md:relative z-40 left-[72px] md:left-0 h-full w-60 bg-dark-800 flex flex-col border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+            <div className={`fixed mt-12 md:mt-0 md:relative z-40 left-[72px] md:left-0 h-full w-60 bg-dark-800 flex flex-col border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} ${!sidebarOpen ? 'max-md:invisible' : ''}`}>
                 <div className="h-12 px-4 flex items-center justify-between border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
                     <span className="font-bold text-white truncate">{currentServer?.name || 'No Server'}</span>
                     {currentServer && (
@@ -736,7 +736,7 @@ export default function ChannelsPage() {
             </div>
 
             {/* ─── MAIN CHAT ─── */}
-            <div className="flex-1 flex flex-col min-w-0 bg-dark-900 h-full w-full">
+            <div className="flex-1 flex flex-col min-w-0 bg-dark-900 h-full w-full relative z-10">
                 {currentChannel ? (
                     <>
                         <div className="h-12 px-4 flex items-center justify-between border-b border-white/5 shrink-0 z-30 bg-dark-900 border-white/5 w-full">
