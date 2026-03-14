@@ -46,23 +46,37 @@ export default function LoginPage() {
     const [showWelcome, setShowWelcome] = useState(false);
 
     // ─── Hydrate Redux from tokens ───
-    const hydrateAndRedirect = useCallback(async (path) => {
-        const storedToken = localStorage.getItem('token');
+    const hydrateAndRedirect = useCallback(async (path, passedToken = null) => {
+        const storedToken = passedToken || localStorage.getItem('token');
         if (storedToken) {
             try {
+                // Ensure the interceptor uses the correct token immediately if it's fresh
+                if (passedToken) {
+                    api.defaults.headers.common['Authorization'] = `Bearer ${passedToken}`;
+                }
                 const { data } = await api.get('/auth/me');
                 dispatch(setCredentials({
                     user: data.user,
                     accessToken: storedToken,
                     refreshToken: localStorage.getItem('refreshToken'),
                 }));
-            } catch (e) { /* will redirect to login naturally */ }
+            } catch (e) {
+                console.error('Failed to fetch user:', e);
+                const msg = e.response?.data?.message || e.message;
+                toast.error(`Authentication failed: ${msg}`);
+                localStorage.removeItem('token');
+                localStorage.removeItem('refreshToken');
+                return; // Stop the redirect if auth failed
+            }
         }
         router.push(path);
     }, [dispatch, router]);
 
     // ─── OAuth callback handler ───
     useEffect(() => {
+        // Prevent double execution in strict mode
+        if (window._oauthProcessed) return;
+
         const params = new URLSearchParams(window.location.search);
         const token = params.get('token');
         const rToken = params.get('refreshToken');
@@ -70,6 +84,11 @@ export default function LoginPage() {
         const needsPassword = params.get('needsPassword');
 
         if (token && rToken) {
+            window._oauthProcessed = true;
+            
+            // Clean up the URL immediately to prevent reload loops
+            window.history.replaceState({}, document.title, window.location.pathname);
+
             localStorage.setItem('token', token);
             localStorage.setItem('refreshToken', rToken);
 
@@ -77,9 +96,10 @@ export default function LoginPage() {
                 setShowWelcome(true);
             } else {
                 toast.success('Welcome back!');
-                hydrateAndRedirect('/channels');
+                hydrateAndRedirect('/channels', token);
             }
         } else if (error === 'oauth_failed') {
+            window.history.replaceState({}, document.title, window.location.pathname);
             toast.error('OAuth Authentication failed');
         }
     }, [hydrateAndRedirect]);
