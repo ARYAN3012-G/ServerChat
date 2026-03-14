@@ -22,7 +22,7 @@ exports.getProfile = async (req, res, next) => {
 // Update profile
 exports.updateProfile = async (req, res, next) => {
     try {
-        const { username, bio, customStatus, preferences } = req.body;
+        const { username, bio, customStatus, preferences, prebuiltAvatar } = req.body;
         const updates = {};
 
         if (username) updates.username = username;
@@ -34,6 +34,10 @@ exports.updateProfile = async (req, res, next) => {
         if (req.body.status) {
             updates.status = req.body.status;
             updates.preferredStatus = req.body.status;
+        }
+        // Support pre-built avatar gallery selection
+        if (prebuiltAvatar) {
+            updates.avatar = { prebuilt: prebuiltAvatar };
         }
 
         const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true, runValidators: true });

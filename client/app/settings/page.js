@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiArrowLeft, FiUser, FiLock, FiMoon, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap, FiMenu, FiSmartphone, FiShield } from 'react-icons/fi';
+import dynamic from 'next/dynamic';
+const AvatarPicker = dynamic(() => import('../../components/AvatarPicker'), { ssr: false });
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -24,6 +26,8 @@ export default function SettingsPage() {
     const [notifSettings, setNotifSettings] = useState({ messages: true, friends: true, mentions: true, sounds: true });
     const [subscription, setSubscription] = useState(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+    const [avatarData, setAvatarData] = useState(null);
 
     // Phone & Face ID
     const [phoneNumber, setPhoneNumber] = useState('');
@@ -49,7 +53,7 @@ export default function SettingsPage() {
     }, [searchParams]);
 
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
-    useEffect(() => { if (user) { setUsername(user.username || ''); setBio(user.bio || ''); setCustomStatus(user.customStatus || ''); setBackground(user.preferences?.background || ''); setPhoneNumber(user.phone || ''); if (user.phone) setPhoneSaved(true); if (user.hasFaceId) setFaceRegistered(true); } }, [user]);
+    useEffect(() => { if (user) { setUsername(user.username || ''); setBio(user.bio || ''); setCustomStatus(user.customStatus || ''); setBackground(user.preferences?.background || ''); setPhoneNumber(user.phone || ''); if (user.phone) setPhoneSaved(true); if (user.hasFaceId) setFaceRegistered(true); setAvatarData(user.avatar || null); } }, [user]);
     useEffect(() => { if (isAuthenticated) fetchSubscription(); }, [isAuthenticated]);
 
     // Load face-api via npm dynamic import, forcing CPU backend to avoid WebGL hang
@@ -156,11 +160,23 @@ export default function SettingsPage() {
                                 <h3 className="text-2xl font-bold mb-8">My Account</h3>
                                 <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8">
                                     <div className="flex items-center gap-5 mb-8 pb-8 border-b border-white/5">
-                                        <div className="relative group">
-                                            <div className="w-20 h-20 rounded-full bg-indigo-500/60 flex items-center justify-center text-3xl font-bold">{user?.username?.[0]?.toUpperCase() || '?'}</div>
-                                            <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"><FiCamera className="w-5 h-5" /></div>
+                                        <div className="relative group cursor-pointer" onClick={() => setShowAvatarPicker(true)}>
+                                            <div className="w-20 h-20 rounded-full bg-indigo-500/60 flex items-center justify-center text-3xl font-bold overflow-hidden border-2 border-white/10">
+                                                {avatarData?.url ? (
+                                                    <img src={avatarData.url} alt="" className="w-full h-full object-cover" />
+                                                ) : avatarData?.prebuilt ? (
+                                                    <div className="w-full h-full flex items-center justify-center text-3xl" style={{ background: avatarData.bg }}>{avatarData.emoji}</div>
+                                                ) : (
+                                                    user?.username?.[0]?.toUpperCase() || '?'
+                                                )}
+                                            </div>
+                                            <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><FiCamera className="w-5 h-5" /></div>
                                         </div>
-                                        <div><p className="text-xl font-bold">{user?.username}</p><p className="text-sm text-white/30">{user?.email}</p></div>
+                                        <div>
+                                            <p className="text-xl font-bold">{user?.username}</p>
+                                            <p className="text-sm text-white/30">{user?.email}</p>
+                                            <button onClick={() => setShowAvatarPicker(true)} className="text-xs text-indigo-400 hover:text-indigo-300 mt-1 transition-colors">Change Avatar</button>
+                                        </div>
                                     </div>
                                     <div className="space-y-5">
                                         <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Username</label>
@@ -176,6 +192,15 @@ export default function SettingsPage() {
                                     </button>
                                 </div>
                             </motion.div>
+
+                            {/* Avatar Picker Modal */}
+                            <AvatarPicker
+                                isOpen={showAvatarPicker}
+                                onClose={() => setShowAvatarPicker(false)}
+                                currentAvatar={avatarData}
+                                onAvatarChange={(newAvatar) => setAvatarData(newAvatar)}
+                                username={user?.username || ''}
+                            />
                         )}
 
                         {/* SECURITY */}
