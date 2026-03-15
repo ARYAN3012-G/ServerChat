@@ -270,11 +270,14 @@ export default function ChannelsPage() {
 
     const handleEditMessage = async (msgId) => {
         if (!editContent.trim()) return;
-        try { await api.put(`/messages/${msgId}`, { content: editContent }); setEditingMsg(null); setEditContent(''); } catch (e) { console.error(e); }
+        const socket = getSocket();
+        if (socket) socket.emit('message:edit', { messageId: msgId, content: editContent });
+        setEditingMsg(null); setEditContent('');
     };
 
     const handleDeleteMessage = async (msgId) => {
-        try { await api.delete(`/messages/${msgId}`); } catch (e) { console.error(e); }
+        const socket = getSocket();
+        if (socket) socket.emit('message:delete', { messageId: msgId });
     };
 
     const handleReaction = (msgId, emoji) => {

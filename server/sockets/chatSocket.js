@@ -100,7 +100,15 @@ module.exports = (io, socket) => {
             ).populate('sender', 'username avatar status');
 
             if (message) {
-                io.to(`channel:${message.channel}`).emit('message:updated', message);
+                // Route through user: rooms for DMs, channel: room for server channels
+                const channel = await Channel.findById(message.channel);
+                if (channel && (channel.type === 'dm' || channel.type === 'group_dm')) {
+                    channel.members.forEach(member => {
+                        io.to(`user:${member.user.toString()}`).emit('message:updated', message);
+                    });
+                } else {
+                    io.to(`channel:${message.channel}`).emit('message:updated', message);
+                }
             }
         } catch (error) {
             logger.error(`Message edit error: ${error.message}`);
@@ -118,7 +126,15 @@ module.exports = (io, socket) => {
             );
 
             if (message) {
-                io.to(`channel:${message.channel}`).emit('message:deleted', { messageId, channelId: message.channel });
+                // Route through user: rooms for DMs, channel: room for server channels
+                const channel = await Channel.findById(message.channel);
+                if (channel && (channel.type === 'dm' || channel.type === 'group_dm')) {
+                    channel.members.forEach(member => {
+                        io.to(`user:${member.user.toString()}`).emit('message:deleted', { messageId, channelId: message.channel });
+                    });
+                } else {
+                    io.to(`channel:${message.channel}`).emit('message:deleted', { messageId, channelId: message.channel });
+                }
             }
         } catch (error) {
             logger.error(`Message delete error: ${error.message}`);

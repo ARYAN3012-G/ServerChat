@@ -37,6 +37,18 @@ export function useSocket() {
         const handleMusicSync = (data) => setMusicRoom(prev => ({ ...prev, ...data }));
         const handleStreamJoined = ({ userId, username }) => setMusicRoom(prev => prev ? { ...prev, users: [...(prev.users || []), { userId, username }] } : prev);
         const handleStreamLeft = ({ userId }) => setMusicRoom(prev => prev ? { ...prev, users: (prev.users || []).filter(u => u.userId !== userId) } : prev);
+        const handleStatusChanged = ({ userId, status }) => {
+            // Keep user in online list (they're still connected), status change is cosmetic
+            if (status !== 'offline') {
+                dispatch(addOnlineUser(userId));
+            } else {
+                dispatch(removeOnlineUser(userId));
+            }
+        };
+        const handleMessagePinned = ({ messageId }) => {
+            // Update the message in redux to show pin indicator
+            dispatch(updateMessage({ _id: messageId, isPinned: true }));
+        };
 
         // Attach listeners
         socket.on('message:new', handleNewMessage);
@@ -55,6 +67,8 @@ export function useSocket() {
         socket.on('music:sync', handleMusicSync);
         socket.on('stream:user-joined', handleStreamJoined);
         socket.on('stream:user-left', handleStreamLeft);
+        socket.on('presence:status-changed', handleStatusChanged);
+        socket.on('message:pinned', handleMessagePinned);
 
         return () => {
             if (socket) {
@@ -74,6 +88,8 @@ export function useSocket() {
                 socket.off('music:sync', handleMusicSync);
                 socket.off('stream:user-joined', handleStreamJoined);
                 socket.off('stream:user-left', handleStreamLeft);
+                socket.off('presence:status-changed', handleStatusChanged);
+                socket.off('message:pinned', handleMessagePinned);
             }
         };
     }, [token, dispatch]);

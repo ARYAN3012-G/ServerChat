@@ -14,7 +14,16 @@ async function postCallSystemMessage(io, channelId, senderId, content) {
             type: 'system',
         });
         const populated = await msg.populate('sender', 'username avatar');
-        io.to(channelId).emit('message:new', populated);
+        // Check if DM channel — route through user: rooms; otherwise use channel: room
+        const Channel = require('../models/Channel');
+        const channel = await Channel.findById(channelId);
+        if (channel && (channel.type === 'dm' || channel.type === 'group_dm')) {
+            channel.members.forEach(member => {
+                io.to(`user:${member.user.toString()}`).emit('message:new', populated);
+            });
+        } else {
+            io.to(`channel:${channelId}`).emit('message:new', populated);
+        }
     } catch (err) {
         logger.error(`Failed to post call system message: ${err.message}`);
     }

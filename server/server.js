@@ -94,7 +94,6 @@ app.get('/api/health', (req, res) => {
 app.use(errorHandler);
 
 // Start server
-// Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
   logger.info(`🚀 ServerChat API running on port ${PORT}`);
