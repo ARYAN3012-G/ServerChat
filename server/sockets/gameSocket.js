@@ -15,12 +15,23 @@ module.exports = (io, socket) => {
                 state: getInitialState(game),
             });
 
+            // Creator joins the game socket room
             socket.join(`game:${session._id}`);
+
+            const populated = await session.populate('players.user', 'username avatar');
+
+            // Notify the channel so other players can join
             io.to(`channel:${channelId}`).emit('game:created', {
-                session: await session.populate('players.user', 'username avatar'),
+                session: populated,
             });
+
+            // Also send to the creator directly (in case they're not in the channel room)
+            socket.emit('game:updated', { session: populated });
+
+            logger.debug(`${socket.username} created game ${game} in channel ${channelId}`);
         } catch (error) {
             logger.error(`Game create error: ${error.message}`);
+            socket.emit('error', { message: 'Failed to create game' });
         }
     });
 
@@ -34,7 +45,11 @@ module.exports = (io, socket) => {
                 return socket.emit('error', { message: 'Game not available' });
             }
 
-            session.players.push({ user: socket.userId, isReady: true });
+            // Check if already joined
+            const alreadyJoined = session.players.some(p => p.user.toString() === socket.userId);
+            if (!alreadyJoined) {
+                session.players.push({ user: socket.userId, isReady: true });
+            }
 
             // Auto-start when enough players
             const minPlayers = getMinPlayers(session.game);
@@ -48,9 +63,17 @@ module.exports = (io, socket) => {
             socket.join(`game:${sessionId}`);
 
             const populated = await session.populate('players.user', 'username avatar');
+
+            // Broadcast to all players in the game room AND the channel
             io.to(`game:${sessionId}`).emit('game:updated', { session: populated });
+            if (session.channel) {
+                io.to(`channel:${session.channel.toString()}`).emit('game:updated', { session: populated });
+            }
+
+            logger.debug(`${socket.username} joined game ${sessionId}`);
         } catch (error) {
             logger.error(`Game join error: ${error.message}`);
+            socket.emit('error', { message: 'Failed to join game' });
         }
     });
 
@@ -60,7 +83,16 @@ module.exports = (io, socket) => {
             const { sessionId, move } = data;
             const session = await GameSession.findById(sessionId);
 
-            if (!session || session.status !== 'in_progress') return;
+            if (!session || session.status !== 'in_progress') {
+                return socket.emit('error', { message: 'Game not in progress' });
+            }
+
+            // Verify it's the player's turn (for turn-based games)
+            if (session.game === 'tic-tac-toe') {
+                if (session.currentTurn?.toString() !== socket.userId) {
+                    return socket.emit('error', { message: 'Not your turn' });
+                }
+            }
 
             // Process move based on game type
             const result = processMove(session, socket.userId, move);
@@ -86,7 +118,12 @@ module.exports = (io, socket) => {
             await session.save();
 
             const populated = await session.populate('players.user', 'username avatar');
+
+            // Broadcast to all players in game room AND channel
             io.to(`game:${sessionId}`).emit('game:updated', { session: populated });
+            if (session.channel) {
+                io.to(`channel:${session.channel.toString()}`).emit('game:updated', { session: populated });
+            }
         } catch (error) {
             logger.error(`Game move error: ${error.message}`);
         }
@@ -100,22 +137,45 @@ module.exports = (io, socket) => {
 
             if (!oldSession) return;
 
+            // Create new session with players ready and auto-started
             const newSession = await GameSession.create({
                 game: oldSession.game,
                 channel: oldSession.channel,
                 players: oldSession.players.map(p => ({
                     user: p.user,
                     score: p.score,
-                    isReady: false,
+                    isReady: true,
                 })),
                 state: getInitialState(oldSession.game),
+                status: 'in_progress', // Auto-start rematch
+                currentTurn: oldSession.players[0].user,
+                startedAt: new Date(),
                 round: oldSession.round + 1,
                 maxRounds: oldSession.maxRounds,
                 settings: oldSession.settings,
             });
 
+            // Move all players from old game room to new game room
+            const oldRoomId = `game:${sessionId}`;
+            const newRoomId = `game:${newSession._id}`;
+
+            // Get all sockets in old room and move them
+            const socketsInRoom = await io.in(oldRoomId).fetchSockets();
+            for (const s of socketsInRoom) {
+                s.leave(oldRoomId);
+                s.join(newRoomId);
+            }
+
             const populated = await newSession.populate('players.user', 'username avatar');
-            io.to(`game:${sessionId}`).emit('game:rematch', { session: populated });
+
+            // Broadcast new session to both old room sockets (now in new room) and channel
+            io.to(newRoomId).emit('game:rematch', { session: populated });
+            io.to(newRoomId).emit('game:updated', { session: populated });
+            if (oldSession.channel) {
+                io.to(`channel:${oldSession.channel.toString()}`).emit('game:updated', { session: populated });
+            }
+
+            logger.debug(`Game rematch created from ${sessionId} -> ${newSession._id}`);
         } catch (error) {
             logger.error(`Game rematch error: ${error.message}`);
         }

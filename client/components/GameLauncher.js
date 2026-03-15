@@ -24,10 +24,18 @@ export default function GameLauncher({ channelId, onClose, createGame, joinGame,
 
     const handleCreate = (gameName) => {
         createGame(gameName, channelId);
+        setView('playing');
+    };
+
+    const handleJoin = () => {
+        if (gameSession?._id) {
+            joinGame(gameSession._id);
+        }
     };
 
     const isMyTurn = gameSession?.currentTurn?.toString() === user?._id?.toString();
     const myPlayerIndex = gameSession?.players?.findIndex(p => (p.user?._id || p.user)?.toString() === user?._id?.toString());
+    const isInGame = myPlayerIndex !== undefined && myPlayerIndex >= 0;
 
     return (
         <AnimatePresence>
@@ -104,9 +112,25 @@ export default function GameLauncher({ channelId, onClose, createGame, joinGame,
                             )}
                             {(!gameSession || gameSession.status === 'waiting') && (
                                 <div className="text-center py-8">
-                                    <div className="w-12 h-12 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                                    <p className="text-white/50">Waiting for another player to join...</p>
-                                    <p className="text-xs text-white/20 mt-1">Share with server members!</p>
+                                    {isInGame ? (
+                                        <>
+                                            <div className="w-12 h-12 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                                            <p className="text-white/50">Waiting for another player to join...</p>
+                                            <p className="text-xs text-white/20 mt-1">Share with server members!</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-3xl mx-auto mb-4">🎮</div>
+                                            <p className="text-white/60 font-medium mb-1">
+                                                {gameSession?.players?.[0]?.user?.username || 'A player'} wants to play!
+                                            </p>
+                                            <p className="text-sm text-white/30 mb-4">{gameSession?.game?.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}</p>
+                                            <button onClick={handleJoin}
+                                                className="px-6 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20">
+                                                🎮 Join Game
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             )}
                             <button onClick={() => setView('lobby')} className="mt-4 text-sm text-white/30 hover:text-white transition-colors">

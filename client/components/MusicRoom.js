@@ -39,6 +39,13 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
         };
     }, [serverId]);
 
+    // Volume control
+    useEffect(() => {
+        if (audioRef.current) {
+            audioRef.current.volume = volume / 100;
+        }
+    }, [volume]);
+
     const sendChatMessage = () => {
         if (!chatInput.trim()) return;
         const socket = getSocket();
@@ -63,14 +70,18 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
 
     // Audio Playback Control
     useEffect(() => {
-        if (audioRef.current) {
-            if (isPlaying) {
-                audioRef.current.play().catch(e => console.error('Audio play failed:', e));
-            } else {
-                audioRef.current.pause();
+        if (!audioRef.current) return;
+        if (isPlaying && currentTrack) {
+            // Need to set src if it changed
+            if (audioRef.current.src !== currentTrack.url) {
+                audioRef.current.src = currentTrack.url;
+                audioRef.current.load();
             }
+            audioRef.current.play().catch(e => console.error('Audio play failed:', e));
+        } else {
+            audioRef.current.pause();
         }
-    }, [isPlaying, currentTrack]);
+    }, [isPlaying, currentTrack?.id]);
 
     const handleTimeUpdate = () => {
         if (audioRef.current) {
@@ -192,7 +203,7 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                                 </button>
                                 <div className="flex items-center gap-2 ml-4">
                                     <FiVolume2 className="w-4 h-4 text-white/30" />
-                                    <input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(e.target.value)}
+                                    <input type="range" min="0" max="100" value={volume} onChange={(e) => { setVolume(Number(e.target.value)); }}
                                         className="w-20 h-1 accent-indigo-500 cursor-pointer" />
                                 </div>
                             </div>
