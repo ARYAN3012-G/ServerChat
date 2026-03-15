@@ -84,6 +84,7 @@ app.use('/api/games', require('./routes/gameRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/calls', require('./routes/callRoutes'));
+app.use('/api/gifs', require('./routes/gifRoutes'));
 
 // Health check
 app.get('/api/health', (req, res) => {

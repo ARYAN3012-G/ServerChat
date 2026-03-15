@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { FiSearch } from 'react-icons/fi';
+import api from '../utils/api';
 
 export default function GifPicker({ onSelect }) {
     const [query, setQuery] = useState('');
     const [gifs, setGifs] = useState([]);
     const [loading, setLoading] = useState(false);
-
-    // Using Tenor public key
-    const API_KEY = 'LIVDSRZULELA';
 
     useEffect(() => {
         fetchTrending();
@@ -16,8 +14,7 @@ export default function GifPicker({ onSelect }) {
     const fetchTrending = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`https://g.tenor.com/v1/trending?key=${API_KEY}&limit=20`);
-            const data = await res.json();
+            const { data } = await api.get('/gifs/trending?limit=20');
             setGifs(data.results || []);
         } catch (e) {
             console.error(e);
@@ -30,8 +27,7 @@ export default function GifPicker({ onSelect }) {
         if (!query.trim()) return fetchTrending();
         setLoading(true);
         try {
-            const res = await fetch(`https://g.tenor.com/v1/search?q=${encodeURIComponent(query)}&key=${API_KEY}&limit=20`);
-            const data = await res.json();
+            const { data } = await api.get(`/gifs/search?q=${encodeURIComponent(query)}&limit=20`);
             setGifs(data.results || []);
         } catch (e) {
             console.error(e);
