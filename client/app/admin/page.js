@@ -90,7 +90,7 @@ export default function AdminPage() {
     const maxMessages = Math.max(...weeklyActivity.map(d => d.messages), 1);
 
     return (
-        <div className="flex h-screen bg-[#040407] text-white overflow-hidden">
+        <div className="flex h-[100dvh] bg-[#040407] text-white overflow-hidden">
             {/* Mobile overlay */}
             {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />}
 

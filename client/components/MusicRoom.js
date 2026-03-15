@@ -128,7 +128,7 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
                 <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                    className="bg-[#0c0e1a] border border-white/10 rounded-2xl w-[600px] max-h-[85vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                    className="bg-[#0c0e1a] border border-white/10 rounded-2xl w-full max-w-[600px] mx-4 max-h-[85vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
 
                     {/* Header */}
                     <div className="px-6 py-4 flex items-center justify-between border-b border-white/5 bg-gradient-to-r from-indigo-500/10 to-silver-400/10">

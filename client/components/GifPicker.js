@@ -40,7 +40,7 @@ export default function GifPicker({ onSelect }) {
     };
 
     return (
-        <div className="w-[300px] h-[400px] bg-dark-800 border border-white/10 rounded-xl flex flex-col overflow-hidden shadow-2xl">
+        <div className="w-[300px] max-w-[90vw] h-[400px] bg-dark-800 border border-white/10 rounded-xl flex flex-col overflow-hidden shadow-2xl">
             <div className="p-2 border-b border-white/5 bg-dark-900">
                 <form onSubmit={handleSearch} className="relative">
                     <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />

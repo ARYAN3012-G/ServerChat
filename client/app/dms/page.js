@@ -612,7 +612,7 @@ export default function DMsPage() {
                 {showNewDM && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowNewDM(false)}>
                         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-dark-800 rounded-2xl border border-white/10 w-[380px] shadow-2xl" onClick={e => e.stopPropagation()}>
+                            className="bg-dark-800 rounded-2xl border border-white/10 w-full max-w-[380px] mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
                             <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
                                 <h3 className="font-bold text-lg">New Message</h3>
                                 <FiX className="w-5 h-5 text-white/30 cursor-pointer hover:text-white" onClick={() => setShowNewDM(false)} />

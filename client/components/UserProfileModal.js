@@ -63,7 +63,7 @@ export default function UserProfileModal({ userId, onClose }) {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
                 <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                    className="bg-[#111427] border border-white/10 rounded-2xl w-[360px] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                    className="bg-[#111427] border border-white/10 rounded-2xl w-full max-w-[360px] mx-4 overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
 
                     {/* Banner */}
                     <div className="h-24 bg-gradient-to-br from-indigo-600 via-silver-400 to-pink-500 relative">

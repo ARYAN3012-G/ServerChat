@@ -42,7 +42,7 @@ export default function GameLauncher({ channelId, onClose, createGame, joinGame,
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
                 <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                    className="bg-[#111427] border border-white/10 rounded-2xl w-[500px] max-h-[80vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                    className="bg-[#111427] border border-white/10 rounded-2xl w-full max-w-[500px] mx-4 max-h-[80vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
 
                     {/* Header */}
                     <div className="px-6 py-4 flex items-center justify-between border-b border-white/5">

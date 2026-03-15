@@ -59,7 +59,7 @@ export default function GamesPage() {
     };
 
     return (
-        <div className="flex h-screen bg-[#0c0e1a] text-white overflow-hidden">
+        <div className="flex h-[100dvh] bg-[#0c0e1a] text-white overflow-hidden">
             {/* Mobile overlay */}
             {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
