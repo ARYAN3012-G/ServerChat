@@ -114,7 +114,7 @@ export default function SettingsPage() {
     if (loading) return <div className="flex h-screen items-center justify-center bg-dark-900"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
 
     return (
-        <div className="flex h-screen bg-dark-900 text-white overflow-hidden relative">
+        <div className="flex h-[100dvh] bg-dark-900 text-white overflow-hidden relative">
             {/* Mobile Sidebar Overlay */}
             {sidebarOpen && (
                 <div

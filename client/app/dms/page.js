@@ -169,7 +169,7 @@ export default function DMsPage() {
     if (loading) return <div className="flex h-screen items-center justify-center bg-dark-900"><div className="w-10 h-10 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
 
     return (
-        <div className="flex h-screen bg-dark-900 text-white overflow-hidden relative">
+        <div className="flex h-[100dvh] bg-dark-900 text-white overflow-hidden relative">
             {/* Mobile Sidebar Overlay */}
             {isSidebarOpen && (
                 <div
@@ -251,11 +251,11 @@ export default function DMsPage() {
             </div>
 
             {/* Chat Area */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
                 {selectedConvo ? (
                     <>
-                        {/* Header */}
-                        <div className="h-12 px-4 flex items-center justify-between border-b border-white/5 bg-dark-900">
+                        {/* Header - sticky */}
+                        <div className="h-12 px-4 flex items-center justify-between border-b border-white/5 bg-dark-900 shrink-0 z-10">
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => setIsSidebarOpen(true)}
@@ -305,8 +305,8 @@ export default function DMsPage() {
                             onJumpToMessage={(msg) => toast.success(`Jump to: ${msg.content.substring(0, 20)}...`)}
                         />
 
-                        {/* Messages */}
-                        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 relative" style={{ background: chatBg || undefined }}>
+                        {/* Messages - scrollable */}
+                        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 relative min-h-0" style={{ background: chatBg || undefined }}>
                             <div className="mb-8 text-center">
                                 <div className="w-20 h-20 rounded-full bg-indigo-500/20 flex items-center justify-center mx-auto mb-3">
                                     <span className="text-3xl font-bold text-indigo-400">{(getOtherUser(selectedConvo).username || 'U')[0].toUpperCase()}</span>
@@ -417,8 +417,8 @@ export default function DMsPage() {
                             <TypingIndicator users={Object.values(typingUsers[selectedConvo._id]).map(u => ({ username: u }))} />
                         )}
 
-                        {/* Input */}
-                        <div className="px-4 pb-6 pt-2 relative">
+                        {/* Input - sticky at bottom */}
+                        <div className="px-4 pb-4 pt-2 relative shrink-0 bg-dark-900">
                             <div className="bg-white/5 border border-white/10 rounded-xl flex items-center px-4">
                                 <button onClick={() => { setShowInputEmojiPicker(!showInputEmojiPicker); setShowGifPicker(false); }} className="text-white/20 hover:text-amber-400 transition-colors mr-2 cursor-pointer" title="Emoji">
                                     <FiSmile className="w-5 h-5" />

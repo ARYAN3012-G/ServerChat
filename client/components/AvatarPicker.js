@@ -97,7 +97,7 @@ export default function AvatarPicker({ isOpen, onClose, currentAvatar, onAvatarC
             const blob = await res.blob();
             const formData = new FormData();
             formData.append('avatar', blob, 'camera-avatar.jpg');
-            const { data } = await api.post('/users/avatar', formData, {
+            const { data } = await api.put('/users/avatar', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             onAvatarChange(data.user?.avatar);
@@ -121,7 +121,7 @@ export default function AvatarPicker({ isOpen, onClose, currentAvatar, onAvatarC
         try {
             const formData = new FormData();
             formData.append('avatar', file);
-            const { data } = await api.post('/users/avatar', formData, {
+            const { data } = await api.put('/users/avatar', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             onAvatarChange(data.user?.avatar);

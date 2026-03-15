@@ -444,7 +444,7 @@ export default function ChannelsPage() {
     if (loading) return <div className="flex h-screen items-center justify-center bg-dark-900"><div className="w-10 h-10 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
 
     return (
-        <div className="flex h-screen bg-dark-900 text-white overflow-hidden relative">
+        <div className="flex h-[100dvh] bg-dark-900 text-white overflow-hidden relative">
             {/* Mobile Sidebar Overlay */}
             {sidebarOpen && (
                 <div
@@ -744,7 +744,7 @@ export default function ChannelsPage() {
             </div>
 
             {/* ─── MAIN CHAT ─── */}
-            <div className="flex-1 flex flex-col min-w-0 bg-dark-900 h-full w-full relative z-10">
+            <div className="flex-1 flex flex-col min-w-0 bg-dark-900 h-full w-full relative z-10 overflow-hidden">
                 {currentChannel ? (
                     <>
                         <div className="h-12 px-4 flex items-center justify-between border-b border-white/5 shrink-0 z-30 bg-dark-900 border-white/5 w-full">
@@ -891,8 +891,8 @@ export default function ChannelsPage() {
                             )}
                         </AnimatePresence>
 
-                        <div className="flex-1 flex">
-                            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+                        <div className="flex-1 flex min-h-0">
+                            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 min-h-0">
                                 <div className="mb-8">
                                     <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-3"><FiHash className="w-8 h-8 text-white/20" /></div>
                                     <h2 className="text-3xl font-bold">Welcome to #{currentChannel.name}!</h2>
@@ -1084,7 +1084,7 @@ export default function ChannelsPage() {
                             <TypingIndicator users={Object.values(typingUsers[currentChannel._id]).map(u => ({ username: u }))} />
                         )}
 
-                        <div className="px-4 pb-6 pt-2 relative">
+                        <div className="px-4 pb-4 pt-2 relative shrink-0 bg-dark-900">
                             {/* @Mention Autocomplete */}
                             <AnimatePresence>
                                 {showMentions && (

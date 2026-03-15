@@ -173,7 +173,7 @@ export default function FriendsPage() {
     if (loading) return <div className="flex h-screen items-center justify-center bg-dark-900"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
 
     return (
-        <div className="flex h-screen bg-dark-900 text-white overflow-hidden">
+        <div className="flex h-[100dvh] bg-dark-900 text-white overflow-hidden">
             {/* Sidebar - hidden on mobile */}
             <div className="hidden md:flex w-[72px] bg-dark-950 flex-col items-center py-3 gap-2 border-r border-white/5">
                 <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/channels')}
