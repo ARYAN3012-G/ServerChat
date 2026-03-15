@@ -265,7 +265,7 @@ export default function DMsPage() {
             <div className={`
                 fixed inset-y-0 left-0 z-50
                 w-72 bg-dark-800 flex flex-col border-r border-white/5
-                transition-transform duration-300 ease-in-out
+                transition-transform duration-300 ease-in-out md:relative md:translate-x-0 shrink-0
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
                 <div className="h-12 px-4 flex items-center justify-between border-b border-white/5">
