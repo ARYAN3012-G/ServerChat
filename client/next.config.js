@@ -62,7 +62,7 @@ const nextConfig = {
     },
     // Compression & performance
     compress: true,
-    poweredBy: false,
+    poweredByHeader: false,
 };
 
 module.exports = nextConfig;

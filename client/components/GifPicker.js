@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FiSearch } from 'react-icons/fi';
-import api from '../utils/api';
+import api from '../services/api';
 
 export default function GifPicker({ onSelect }) {
     const [query, setQuery] = useState('');
