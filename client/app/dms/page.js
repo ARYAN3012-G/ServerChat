@@ -75,6 +75,17 @@ export default function DMsPage() {
         }
     }, [selectedConvo?._id]);
 
+    // Parse chatBg - could be plain CSS string or JSON {css, size}
+    const parseBg = (bg) => {
+        if (!bg) return { css: '', size: '' };
+        try {
+            const parsed = JSON.parse(bg);
+            return { css: parsed.css || '', size: parsed.size || '' };
+        } catch {
+            return { css: bg, size: '' };
+        }
+    };
+
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
@@ -214,12 +225,13 @@ export default function DMsPage() {
     };
 
     const handleSelectBackground = (bg) => {
-        const css = bg.css;
-        setChatBg(css);
+        // Store as JSON with both css and size for pattern backgrounds
+        const value = bg.size ? JSON.stringify({ css: bg.css, size: bg.size }) : bg.css;
+        setChatBg(value);
         if (selectedConvo) {
             // Save locally
-            if (css) {
-                localStorage.setItem(`chat_bg_${selectedConvo._id}`, css);
+            if (value) {
+                localStorage.setItem(`chat_bg_${selectedConvo._id}`, value);
             } else {
                 localStorage.removeItem(`chat_bg_${selectedConvo._id}`);
             }
@@ -228,7 +240,7 @@ export default function DMsPage() {
             if (socket) {
                 socket.emit('dm:background', {
                     channelId: selectedConvo._id,
-                    background: css || null
+                    background: value || null
                 });
             }
             // Send system message
@@ -244,17 +256,17 @@ export default function DMsPage() {
             {/* Mobile Sidebar Overlay */}
             {isSidebarOpen && (
                 <div
-                    className="md:hidden fixed inset-0 bg-black/60 z-40"
+                    className="fixed inset-0 bg-black/60 z-40"
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
 
             {/* DM List Sidebar */}
             <div className={`
-                fixed md:static inset-y-0 left-0 z-50
+                fixed inset-y-0 left-0 z-50
                 w-72 bg-dark-800 flex flex-col border-r border-white/5
                 transition-transform duration-300 ease-in-out
-                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
                 <div className="h-12 px-4 flex items-center justify-between border-b border-white/5">
                     <button onClick={() => router.push('/channels')} className="flex items-center gap-2 text-white/50 hover:text-white transition-colors">
@@ -266,7 +278,7 @@ export default function DMsPage() {
                         <button onClick={() => setShowNewDM(true)} className="p-1 rounded hover:bg-white/10 text-white/30 hover:text-white transition-colors" title="New DM">
                             <FiPlus className="w-4 h-4" />
                         </button>
-                        <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-1 rounded hover:bg-white/10 text-white/30 hover:text-white transition-colors" title="Close">
+                        <button onClick={() => setIsSidebarOpen(false)} className="p-1 rounded hover:bg-white/10 text-white/30 hover:text-white transition-colors" title="Close">
                             <FiX className="w-4 h-4" />
                         </button>
                     </div>
@@ -339,7 +351,7 @@ export default function DMsPage() {
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => setIsSidebarOpen(true)}
-                                    className="md:hidden p-1.5 -ml-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                                    className="p-1.5 -ml-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors"
                                 >
                                     <FiMenu className="w-5 h-5" />
                                 </button>
@@ -398,7 +410,7 @@ export default function DMsPage() {
                         />
 
                         {/* Messages - scrollable */}
-                        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 relative min-h-0" style={{ background: chatBg || undefined }}>
+                        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 relative min-h-0" style={(() => { const bg = parseBg(chatBg); const s = {}; if (bg.css) s.background = bg.css; if (bg.size) s.backgroundSize = bg.size; return s; })()}>
                             <div className="mb-8 text-center">
                                 {(() => { const other = getOtherUser(selectedConvo); const otherId = other._id || other; const customAv = getFriendAvatar(otherId); const dispName = getDisplayName(otherId, other.username); return (<>
                                 <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-3 cursor-pointer" onClick={() => setProfilePopupUser({ userId: otherId, username: other.username, status: other.status, bio: other.bio })} style={customAv ? { background: customAv.bg } : {}} className2="">
