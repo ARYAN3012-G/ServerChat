@@ -476,9 +476,9 @@ export default function DMsPage() {
                                                 {msg.attachments?.length > 0 && (
                                                     <div className="flex flex-wrap gap-2">
                                                         {msg.attachments.map((att, ai) => {
-                                                            const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(att.url || '');
-                                                            const isVideo = att.type?.startsWith('video/') || /\.(mp4|webm|mov)(\?|$)/i.test(att.url || '');
                                                             const isAudio = att.type?.startsWith('audio/');
+                                                            const isImage = !isAudio && (att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(att.url || ''));
+                                                            const isVideo = !isAudio && !isImage && (att.type?.startsWith('video/') || /\.(mp4|webm|mov)(\?|$)/i.test(att.url || ''));
                                                             return (
                                                             <div key={ai} className="max-w-xs rounded-lg overflow-hidden border border-white/10 bg-black/20">
                                                                 {isImage ? (

@@ -943,12 +943,12 @@ export default function ChannelsPage() {
                                                         <div className="mt-2 flex flex-wrap gap-2">
                                                             {msg.attachments.map((att, ai) => (
                                                                 <div key={ai} className="max-w-xs rounded-lg overflow-hidden border border-white/10 bg-black/20">
-                                                                {att.type?.startsWith('image/') ? (
-                                                                        <a href={att.url} target="_blank" rel="noopener noreferrer"><img src={att.url} alt={att.name} className="w-full h-auto object-cover max-h-60" /></a>
-                                                                    ) : att.type?.startsWith('video/') ? (
-                                                                        <video src={att.url} controls className="w-full h-auto max-h-60" />
-                                                                    ) : att.type?.startsWith('audio/') ? (
+                                                                {att.type?.startsWith('audio/') ? (
                                                                         <AudioPlayer src={att.url} isMine={msg.sender?._id === user?._id} />
+                                                                    ) : att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(att.url || '') ? (
+                                                                        <a href={att.url} target="_blank" rel="noopener noreferrer"><img src={att.url} alt={att.name} className="w-full h-auto object-cover max-h-60" /></a>
+                                                                    ) : att.type?.startsWith('video/') || /\.(mp4|webm|mov)(\?|$)/i.test(att.url || '') ? (
+                                                                        <video src={att.url} controls className="w-full h-auto max-h-60" />
                                                                     ) : (
                                                                         <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 hover:bg-white/5 transition-colors">
                                                                             <FiPaperclip className="w-4 h-4 text-indigo-400" />
