@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { store } from '../redux/store';
 import { Toaster } from 'react-hot-toast';
@@ -9,6 +10,17 @@ import BackgroundRenderer from '../components/BackgroundRenderer';
 import './globals.css';
 
 export default function RootLayout({ children }) {
+    const [toastPosition, setToastPosition] = useState('top-right');
+
+    useEffect(() => {
+        const handleResize = () => {
+            setToastPosition(window.innerWidth < 768 ? 'top-center' : 'top-right');
+        };
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     return (
         <html lang="en" className="dark">
             <head>
@@ -49,7 +61,7 @@ export default function RootLayout({ children }) {
                         {children}
                     </CallProvider>
                     <Toaster
-                        position="top-right"
+                        position={toastPosition}
                         toastOptions={{
                             duration: 3000,
                             style: {
