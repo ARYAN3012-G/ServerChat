@@ -6,8 +6,8 @@ export default function GifPicker({ onSelect }) {
     const [gifs, setGifs] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // Using a Giphy public beta key for demonstration
-    const API_KEY = 'Gc7131jiJuvI7IdN0HZ1D7nh0ow5BU6g';
+    // Using Tenor public key
+    const API_KEY = 'LIVDSRZULELA';
 
     useEffect(() => {
         fetchTrending();
@@ -16,9 +16,9 @@ export default function GifPicker({ onSelect }) {
     const fetchTrending = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${API_KEY}&limit=20`);
+            const res = await fetch(`https://g.tenor.com/v1/trending?key=${API_KEY}&limit=20`);
             const data = await res.json();
-            setGifs(data.data || []);
+            setGifs(data.results || []);
         } catch (e) {
             console.error(e);
         }
@@ -30,9 +30,9 @@ export default function GifPicker({ onSelect }) {
         if (!query.trim()) return fetchTrending();
         setLoading(true);
         try {
-            const res = await fetch(`https://api.giphy.com/v1/gifs/search?q=${encodeURIComponent(query)}&api_key=${API_KEY}&limit=20`);
+            const res = await fetch(`https://g.tenor.com/v1/search?q=${encodeURIComponent(query)}&key=${API_KEY}&limit=20`);
             const data = await res.json();
-            setGifs(data.data || []);
+            setGifs(data.results || []);
         } catch (e) {
             console.error(e);
         }
@@ -48,7 +48,7 @@ export default function GifPicker({ onSelect }) {
                         type="text"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search Giphy..."
+                        placeholder="Search Tenor..."
                         className="w-full bg-dark-800 text-sm text-white rounded-lg pl-9 pr-3 py-2 outline-none border border-white/5 focus:border-indigo-500 transition-colors"
                     />
                 </form>
@@ -61,10 +61,10 @@ export default function GifPicker({ onSelect }) {
                         {gifs.map((gif) => (
                             <img
                                 key={gif.id}
-                                src={gif.images.fixed_height_small.url}
-                                alt={gif.title}
+                                src={gif.media[0].tinygif.url}
+                                alt={gif.content_description || 'GIF'}
                                 className="w-full rounded cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => onSelect(gif.images.original.url)}
+                                onClick={() => onSelect(gif.media[0].gif.url)}
                             />
                         ))}
                     </div>
