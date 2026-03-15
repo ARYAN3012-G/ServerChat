@@ -265,8 +265,8 @@ export default function DMsPage() {
             <div className={`
                 fixed inset-y-0 left-0 z-50
                 w-72 bg-dark-800 flex flex-col border-r border-white/5
-                transition-all duration-300 ease-in-out md:relative shrink-0
-                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:-ml-72 md:border-none'}
+                transition-transform duration-300 ease-in-out md:relative md:translate-x-0 shrink-0
+                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
                 <div className="h-12 px-4 flex items-center justify-between border-b border-white/5">
                     <button onClick={() => router.push('/channels')} className="flex items-center gap-2 text-white/50 hover:text-white transition-colors">
@@ -351,7 +351,7 @@ export default function DMsPage() {
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => setIsSidebarOpen(true)}
-                                    className={`p-1.5 -ml-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors ${isSidebarOpen ? 'hidden md:hidden' : 'block'}`}
+                                    className="p-1.5 -ml-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors"
                                 >
                                     <FiMenu className="w-5 h-5" />
                                 </button>
