@@ -68,6 +68,13 @@ exports.uploadAvatar = async (req, res, next) => {
         }
 
         const result = await uploadToCloudinary(req.file.path, 'serverchat/avatars');
+
+        // Remove local temp file after upload
+        const fs = require('fs');
+        fs.unlink(req.file.path, (err) => {
+            if (err) console.error('Error deleting temp avatar file:', err);
+        });
+
         const user = await User.findByIdAndUpdate(
             req.user._id,
             { avatar: result },
@@ -76,6 +83,11 @@ exports.uploadAvatar = async (req, res, next) => {
 
         res.json({ user });
     } catch (error) {
+        // Clean up temp file on error
+        if (req.file) {
+            const fs = require('fs');
+            fs.unlink(req.file.path, () => {});
+        }
         next(error);
     }
 };

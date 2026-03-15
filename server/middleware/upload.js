@@ -1,9 +1,26 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
+
+// Use OS temp directory in production (Render uses ephemeral filesystem)
+// Use local uploads/ folder in development
+const uploadDir = process.env.NODE_ENV === 'production'
+    ? path.join(os.tmpdir(), 'serverchat-uploads')
+    : path.join(__dirname, '../uploads');
+
+// Ensure upload directory exists
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, path.join(__dirname, '../uploads'));
+        // Re-check directory exists (it could be cleaned up on ephemeral filesystems)
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
         const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
