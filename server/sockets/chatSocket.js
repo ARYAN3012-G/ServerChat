@@ -208,4 +208,33 @@ module.exports = (io, socket) => {
             logger.error(`Pin error: ${error.message}`);
         }
     });
+
+    // DM Chat Background sync
+    socket.on('dm:background', async (data) => {
+        try {
+            const { channelId, background } = data;
+            if (!channelId) return;
+
+            // Save background to channel
+            await Channel.findByIdAndUpdate(channelId, {
+                $set: { background: background || '' }
+            });
+
+            // Broadcast to all members in the channel (including the sender so they get confirmation)
+            const channel = await Channel.findById(channelId);
+            if (channel && (channel.type === 'dm' || channel.type === 'group_dm')) {
+                channel.members.forEach(member => {
+                    io.to(`user:${member.user.toString()}`).emit('dm:background:changed', {
+                        channelId,
+                        background: background || '',
+                        changedBy: socket.userId,
+                    });
+                });
+            }
+
+            logger.debug(`${socket.username} changed background for channel ${channelId}`);
+        } catch (error) {
+            logger.error(`Background change error: ${error.message}`);
+        }
+    });
 };

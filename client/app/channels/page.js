@@ -22,6 +22,7 @@ import VoiceRecorder from '../../components/VoiceRecorder';
 
 // Lazy-load heavy components (only loaded when user opens them)
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false, loading: () => <div className="w-[350px] h-[400px] bg-dark-800 rounded-xl animate-pulse" /> });
+import { EmojiStyle } from 'emoji-picker-react';
 const GameLauncher = dynamic(() => import('../../components/GameLauncher'), { ssr: false });
 const MusicRoom = dynamic(() => import('../../components/MusicRoom'), { ssr: false });
 const GifPicker = dynamic(() => import('../../components/GifPicker'), { ssr: false });
@@ -990,7 +991,7 @@ export default function ChannelsPage() {
                                                 <div className="absolute top-8 right-0 z-50">
                                                     <div className="fixed inset-0" onClick={() => setShowEmojiPicker(null)} />
                                                     <div className="relative">
-                                                        <EmojiPicker onEmojiClick={(emojiObject) => handleReaction(msg._id, emojiObject.emoji)} theme="dark" />
+                                                        <EmojiPicker onEmojiClick={(emojiObject) => handleReaction(msg._id, emojiObject.emoji)} theme="dark" emojiStyle={EmojiStyle.NATIVE} />
                                                     </div>
                                                 </div>
                                             )}
@@ -1133,7 +1134,7 @@ export default function ChannelsPage() {
                                     <>
                                         <div className="fixed inset-0 z-40" onClick={() => setShowInputEmojiPicker(false)} />
                                         <div className="absolute bottom-16 left-4 z-50 shadow-2xl">
-                                            <EmojiPicker onEmojiClick={onEmojiClick} theme="dark" />
+                                            <EmojiPicker onEmojiClick={onEmojiClick} theme="dark" emojiStyle={EmojiStyle.NATIVE} />
                                         </div>
                                     </>
                                 )}

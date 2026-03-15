@@ -14,13 +14,15 @@ import TypingIndicator from '../../components/TypingIndicator';
 import VoiceRecorder from '../../components/VoiceRecorder';
 import AudioPlayer from '../../components/AudioPlayer';
 import MessageSearch from '../../components/MessageSearch';
+import UserProfilePopup from '../../components/UserProfilePopup';
 const ChatBackgroundPicker = dynamic(() => import('../../components/ChatBackgroundPicker'), { ssr: false });
 import { MdGif } from 'react-icons/md';
 import api from '../../services/api';
-import { connectSocket } from '../../services/socket';
+import { connectSocket, getSocket } from '../../services/socket';
 
 // Lazy-load heavy components
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false, loading: () => <div className="w-[350px] h-[400px] bg-dark-800 rounded-xl animate-pulse" /> });
+import { EmojiStyle } from 'emoji-picker-react';
 const GifPicker = dynamic(() => import('../../components/GifPicker'), { ssr: false });
 import toast from 'react-hot-toast';
 
@@ -46,6 +48,8 @@ export default function DMsPage() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [showBgPicker, setShowBgPicker] = useState(false);
     const [chatBg, setChatBg] = useState('');
+    const [profilePopupUser, setProfilePopupUser] = useState(null);
+    const [friendMap, setFriendMap] = useState({});
     const quickEmojis = ['👍', '❤️', '😂', '🎉', '😮', '😢', '🔥', '👏'];
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -64,9 +68,10 @@ export default function DMsPage() {
     useEffect(() => {
         if (selectedConvo) {
             fetchMessages(selectedConvo._id);
-            // Load saved background for this DM
-            const savedBg = localStorage.getItem(`chat_bg_${selectedConvo._id}`);
-            setChatBg(savedBg || '');
+            // Load background from server (synced between both users), fallback to localStorage
+            const serverBg = selectedConvo.background;
+            const localBg = localStorage.getItem(`chat_bg_${selectedConvo._id}`);
+            setChatBg(serverBg || localBg || '');
         }
     }, [selectedConvo?._id]);
 
@@ -87,9 +92,64 @@ export default function DMsPage() {
     const fetchFriends = async () => {
         try {
             const { data } = await api.get('/friends');
-            setFriends(data.friends || data || []);
+            const list = data.friends || data || [];
+            setFriends(list);
+            // Build lookup map: userId -> { nickname, customAvatar, ... }
+            const map = {};
+            list.forEach(f => {
+                const u = f.user || f;
+                map[u._id] = { nickname: f.nickname, customAvatar: f.customAvatar, ...u };
+            });
+            setFriendMap(map);
         } catch (e) { console.error(e); }
     };
+
+    // Helper: get display name for a user (nickname if set, else username)
+    const getDisplayName = (userId, fallbackUsername) => {
+        return friendMap[userId]?.nickname || fallbackUsername || 'User';
+    };
+
+    // Helper: get custom avatar for a user
+    const getFriendAvatar = (userId) => {
+        return friendMap[userId]?.customAvatar || null;
+    };
+
+    // Handle nickname change from profile popup
+    const handleNicknameChange = (userId, newNickname) => {
+        setFriendMap(prev => ({
+            ...prev,
+            [userId]: { ...prev[userId], nickname: newNickname }
+        }));
+        setFriends(prev => prev.map(f => {
+            const u = f.user || f;
+            return u._id === userId ? { ...f, nickname: newNickname } : f;
+        }));
+    };
+
+    // Handle avatar change from profile popup
+    const handleFriendAvatarChange = (userId, newAvatar) => {
+        setFriendMap(prev => ({
+            ...prev,
+            [userId]: { ...prev[userId], customAvatar: newAvatar }
+        }));
+        setFriends(prev => prev.map(f => {
+            const u = f.user || f;
+            return u._id === userId ? { ...f, customAvatar: newAvatar } : f;
+        }));
+    };
+
+    // Listen for background changes from the other user
+    useEffect(() => {
+        const socket = getSocket();
+        if (!socket) return;
+        const handleBgChange = ({ channelId, background, changedBy }) => {
+            if (selectedConvo?._id === channelId) {
+                setChatBg(background || '');
+            }
+        };
+        socket.on('dm:background:changed', handleBgChange);
+        return () => socket.off('dm:background:changed', handleBgChange);
+    }, [selectedConvo?._id]);
 
     const fetchMessages = async (channelId) => {
         try {
@@ -157,11 +217,22 @@ export default function DMsPage() {
         const css = bg.css;
         setChatBg(css);
         if (selectedConvo) {
+            // Save locally
             if (css) {
                 localStorage.setItem(`chat_bg_${selectedConvo._id}`, css);
             } else {
                 localStorage.removeItem(`chat_bg_${selectedConvo._id}`);
             }
+            // Sync to other user via socket
+            const socket = getSocket();
+            if (socket) {
+                socket.emit('dm:background', {
+                    channelId: selectedConvo._id,
+                    background: css || null
+                });
+            }
+            // Send system message
+            sendMessage(selectedConvo._id, `${user?.username || 'Someone'} changed the chat background`, 'system');
         }
         setShowBgPicker(false);
     };
@@ -222,23 +293,32 @@ export default function DMsPage() {
                         .filter(c => {
                             if (!searchQuery) return true;
                             const other = getOtherUser(c);
-                            return (other.username || '').toLowerCase().includes(searchQuery.toLowerCase());
+                            const otherId = other._id || other;
+                            const name = getDisplayName(otherId, other.username);
+                            return (name || other.username || '').toLowerCase().includes(searchQuery.toLowerCase());
                         })
                         .map(convo => {
                             const other = getOtherUser(convo);
+                            const otherId = other._id || other;
+                            const displayName = getDisplayName(otherId, other.username);
+                            const customAv = getFriendAvatar(otherId);
                             const isActive = selectedConvo?._id === convo._id;
                             return (
                                 <motion.div key={convo._id} onClick={() => { setSelectedConvo(convo); setIsSidebarOpen(false); }}
                                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${isActive ? 'bg-white/10' : 'hover:bg-white/5'}`}>
                                     <div className="relative">
-                                        <div className="w-9 h-9 rounded-full bg-indigo-500/60 flex items-center justify-center text-sm font-bold">
-                                            {(other.username || 'U')[0].toUpperCase()}
-                                        </div>
+                                        {customAv ? (
+                                            <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm" style={{ background: customAv.bg }}>{customAv.emoji}</div>
+                                        ) : (
+                                            <div className="w-9 h-9 rounded-full bg-indigo-500/60 flex items-center justify-center text-sm font-bold">
+                                                {(displayName || 'U')[0].toUpperCase()}
+                                            </div>
+                                        )}
                                         <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-dark-800 ${other.status === 'online' ? 'bg-emerald-400' : other.status === 'idle' ? 'bg-amber-400' : other.status === 'dnd' ? 'bg-red-500' : 'bg-gray-500'
                                             }`} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className={`text-sm truncate ${isActive ? 'text-white font-medium' : 'text-white/70'}`}>{other.username || 'Unknown'}</p>
+                                        <p className={`text-sm truncate ${isActive ? 'text-white font-medium' : 'text-white/70'}`}>{displayName}</p>
                                         {convo.lastMessage && (
                                             <p className="text-[11px] text-white/30 truncate">{typeof convo.lastMessage === 'string' ? convo.lastMessage : convo.lastMessage.content || ''}</p>
                                         )}
@@ -263,15 +343,27 @@ export default function DMsPage() {
                                 >
                                     <FiMenu className="w-5 h-5" />
                                 </button>
-                                <div className="relative">
-                                    <div className="w-7 h-7 rounded-full bg-indigo-500/60 flex items-center justify-center text-xs font-bold">
-                                        {(getOtherUser(selectedConvo).username || 'U')[0].toUpperCase()}
-                                    </div>
+                                <div className="relative cursor-pointer" onClick={() => {
+                                    const other = getOtherUser(selectedConvo);
+                                    const otherId = other._id || other;
+                                    setProfilePopupUser({ userId: otherId, username: other.username, status: other.status, bio: other.bio });
+                                }}>
+                                    {(() => { const other = getOtherUser(selectedConvo); const otherId = other._id || other; const customAv = getFriendAvatar(otherId); return customAv ? (
+                                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs" style={{ background: customAv.bg }}>{customAv.emoji}</div>
+                                    ) : (
+                                        <div className="w-7 h-7 rounded-full bg-indigo-500/60 flex items-center justify-center text-xs font-bold">
+                                            {(getDisplayName(otherId, other.username) || 'U')[0].toUpperCase()}
+                                        </div>
+                                    ); })()}
                                     <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-dark-900 ${getOtherUser(selectedConvo).status === 'online' ? 'bg-emerald-400' : 'bg-gray-500'
                                         }`} />
                                 </div>
-                                <div>
-                                    <p className="font-bold text-sm">{getOtherUser(selectedConvo).username || 'User'}</p>
+                                <div className="cursor-pointer" onClick={() => {
+                                    const other = getOtherUser(selectedConvo);
+                                    const otherId = other._id || other;
+                                    setProfilePopupUser({ userId: otherId, username: other.username, status: other.status, bio: other.bio });
+                                }}>
+                                    <p className="font-bold text-sm">{(() => { const o = getOtherUser(selectedConvo); return getDisplayName(o._id || o, o.username); })()}</p>
                                     <p className={`text-[10px] ${getOtherUser(selectedConvo).status === 'online' ? 'text-emerald-400' : 'text-white/30'}`}>
                                         {getOtherUser(selectedConvo).status === 'online' ? 'Online' : getOtherUser(selectedConvo).status || 'Offline'}
                                     </p>
@@ -308,10 +400,19 @@ export default function DMsPage() {
                         {/* Messages - scrollable */}
                         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 relative min-h-0" style={{ background: chatBg || undefined }}>
                             <div className="mb-8 text-center">
-                                <div className="w-20 h-20 rounded-full bg-indigo-500/20 flex items-center justify-center mx-auto mb-3">
-                                    <span className="text-3xl font-bold text-indigo-400">{(getOtherUser(selectedConvo).username || 'U')[0].toUpperCase()}</span>
+                                {(() => { const other = getOtherUser(selectedConvo); const otherId = other._id || other; const customAv = getFriendAvatar(otherId); const dispName = getDisplayName(otherId, other.username); return (<>
+                                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-3 cursor-pointer" onClick={() => setProfilePopupUser({ userId: otherId, username: other.username, status: other.status, bio: other.bio })} style={customAv ? { background: customAv.bg } : {}} className2="">
+                                    {customAv ? (
+                                        <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl cursor-pointer" style={{ background: customAv.bg }} onClick={() => setProfilePopupUser({ userId: otherId, username: other.username, status: other.status, bio: other.bio })}>{customAv.emoji}</div>
+                                    ) : (
+                                        <div className="w-20 h-20 rounded-full bg-indigo-500/20 flex items-center justify-center cursor-pointer" onClick={() => setProfilePopupUser({ userId: otherId, username: other.username, status: other.status, bio: other.bio })}>
+                                            <span className="text-3xl font-bold text-indigo-400">{(dispName || 'U')[0].toUpperCase()}</span>
+                                        </div>
+                                    )}
                                 </div>
-                                <h2 className="text-xl font-bold">{getOtherUser(selectedConvo).username}</h2>
+                                <h2 className="text-xl font-bold">{dispName}</h2>
+                                {friendMap[otherId]?.nickname && <p className="text-xs text-white/30">{other.username}</p>}
+                                </>); })()}
                                 <p className="text-white/30 text-sm mt-1">This is the beginning of your direct message history.</p>
                             </div>
                             {messages.map((msg, idx) => {
@@ -329,14 +430,18 @@ export default function DMsPage() {
                                     );
                                 }
 
-                                return (
+                                    return (
                                     <div key={msg._id || idx} className={`flex items-start gap-3 ${isMine ? 'flex-row-reverse' : ''} group hover:bg-white/[0.02] px-2 py-1.5 rounded-lg relative`}>
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${isMine ? 'bg-emerald-500/60' : 'bg-indigo-500/60'}`}>
-                                            {(msg.sender?.username || 'U')[0].toUpperCase()}
-                                        </div>
+                                        {(() => { const senderId = msg.sender?._id || msg.sender; const senderCustomAv = !isMine ? getFriendAvatar(senderId) : null; return senderCustomAv ? (
+                                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 cursor-pointer" style={{ background: senderCustomAv.bg }} onClick={() => !isMine && setProfilePopupUser({ userId: senderId, username: msg.sender?.username, status: msg.sender?.status, bio: msg.sender?.bio })}>{senderCustomAv.emoji}</div>
+                                        ) : (
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 cursor-pointer ${isMine ? 'bg-emerald-500/60' : 'bg-indigo-500/60'}`} onClick={() => !isMine && setProfilePopupUser({ userId: senderId, username: msg.sender?.username, status: msg.sender?.status, bio: msg.sender?.bio })}>
+                                                {(getDisplayName(senderId, msg.sender?.username) || 'U')[0].toUpperCase()}
+                                            </div>
+                                        ); })()}
                                         <div className={`max-w-[70%] ${isMine ? 'text-right' : ''}`}>
                                             <div className={`flex items-baseline gap-2 ${isMine ? 'justify-end' : ''}`}>
-                                                <span className="font-medium text-sm">{msg.sender?.username || 'User'}</span>
+                                                <span className="font-medium text-sm cursor-pointer hover:underline" onClick={() => { const sid = msg.sender?._id || msg.sender; if (!isMine) setProfilePopupUser({ userId: sid, username: msg.sender?.username, status: msg.sender?.status, bio: msg.sender?.bio }); }}>{isMine ? (msg.sender?.username || 'You') : getDisplayName(msg.sender?._id || msg.sender, msg.sender?.username)}</span>
                                                 <span className="text-[10px] text-white/20 flex items-center gap-1">
                                                     {new Date(msg.createdAt || Date.now()).toLocaleTimeString()}
                                                     {isMine && msg.readBy?.length > 0 && (
@@ -358,13 +463,17 @@ export default function DMsPage() {
                                                 )}
                                                 {msg.attachments?.length > 0 && (
                                                     <div className="flex flex-wrap gap-2">
-                                                        {msg.attachments.map((att, ai) => (
+                                                        {msg.attachments.map((att, ai) => {
+                                                            const isImage = att.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(att.url || '');
+                                                            const isVideo = att.type?.startsWith('video/') || /\.(mp4|webm|mov)(\?|$)/i.test(att.url || '');
+                                                            const isAudio = att.type?.startsWith('audio/');
+                                                            return (
                                                             <div key={ai} className="max-w-xs rounded-lg overflow-hidden border border-white/10 bg-black/20">
-                                                                {att.type?.startsWith('image/') ? (
-                                                                    <a href={att.url} target="_blank" rel="noopener noreferrer"><img src={att.url} alt={att.name} className="w-full h-auto object-cover max-h-60" /></a>
-                                                                ) : att.type?.startsWith('video/') ? (
+                                                                {isImage ? (
+                                                                    <img src={att.url} alt={att.name} className="w-full h-auto object-cover max-h-60 cursor-pointer" onClick={() => window.open(att.url, '_blank')} />
+                                                                ) : isVideo ? (
                                                                     <video src={att.url} controls className="w-full h-auto max-h-60" />
-                                                                ) : att.type?.startsWith('audio/') ? (
+                                                                ) : isAudio ? (
                                                                     <AudioPlayer src={att.url} isMine={isMine} />
                                                                 ) : (
                                                                     <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 hover:bg-white/5 transition-colors">
@@ -373,7 +482,8 @@ export default function DMsPage() {
                                                                     </a>
                                                                 )}
                                                             </div>
-                                                        ))}
+                                                            );
+                                                        })}
                                                     </div>
                                                 )}
                                                 {msg.reactions?.length > 0 && (
@@ -400,7 +510,7 @@ export default function DMsPage() {
                                                     <div className={`absolute top-8 ${isMine ? 'left-0' : 'right-0'} z-50`}>
                                                         <div className="fixed inset-0" onClick={() => setShowEmojiPicker(null)} />
                                                         <div className="relative">
-                                                            <EmojiPicker onEmojiClick={(emojiObject) => handleReaction(msg._id, emojiObject.emoji)} theme="dark" />
+                                                            <EmojiPicker onEmojiClick={(emojiObject) => handleReaction(msg._id, emojiObject.emoji)} theme="dark" emojiStyle={EmojiStyle.NATIVE} />
                                                         </div>
                                                     </div>
                                                 )}
@@ -430,7 +540,7 @@ export default function DMsPage() {
                                 <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
                                 <input type="text" value={messageInput} onChange={e => setMessageInput(e.target.value)}
                                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); setShowInputEmojiPicker(false); setShowGifPicker(false); } if (e.key === 'Escape') { setShowInputEmojiPicker(false); setShowGifPicker(false); } }}
-                                    placeholder={`Message @${getOtherUser(selectedConvo).username || 'User'}`}
+                                    placeholder={`Message @${(() => { const o = getOtherUser(selectedConvo); return getDisplayName(o._id || o, o.username); })()}`}
                                     className="flex-1 bg-transparent py-3 px-3 text-sm outline-none text-white placeholder-white/30" />
                                 <button onClick={handleSendMessage} className="text-white/20 hover:text-indigo-400 transition-colors"><FiSend className="w-5 h-5" /></button>
                                 <VoiceRecorder onSend={async (blob) => {
@@ -449,7 +559,7 @@ export default function DMsPage() {
                                     <>
                                         <div className="fixed inset-0 z-40" onClick={() => setShowInputEmojiPicker(false)} />
                                         <div className="absolute bottom-16 left-4 z-50 shadow-2xl">
-                                            <EmojiPicker onEmojiClick={onEmojiClick} theme="dark" />
+                                            <EmojiPicker onEmojiClick={onEmojiClick} theme="dark" emojiStyle={EmojiStyle.NATIVE} />
                                         </div>
                                     </>
                                 )}
@@ -553,6 +663,20 @@ export default function DMsPage() {
                     onSelectBackground={handleSelectBackground}
                 />
             </AnimatePresence>
+
+            {/* User Profile Popup */}
+            <UserProfilePopup
+                isOpen={!!profilePopupUser}
+                onClose={() => setProfilePopupUser(null)}
+                userId={profilePopupUser?.userId}
+                username={profilePopupUser?.username}
+                status={profilePopupUser?.status}
+                bio={profilePopupUser?.bio}
+                nickname={profilePopupUser ? friendMap[profilePopupUser.userId]?.nickname : null}
+                customAvatar={profilePopupUser ? friendMap[profilePopupUser.userId]?.customAvatar : null}
+                onNicknameChange={handleNicknameChange}
+                onAvatarChange={handleFriendAvatarChange}
+            />
         </div>
     );
 }

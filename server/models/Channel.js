@@ -69,6 +69,10 @@ const channelSchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
     },
+    background: {
+        type: String,
+        default: '',
+    },
 }, { timestamps: true });
 
 // Indexes
