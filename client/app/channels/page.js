@@ -728,12 +728,12 @@ export default function ChannelsPage() {
                         )}
                     </AnimatePresence>
                     <div className="flex items-center gap-2">
-                        <div className="relative cursor-pointer" onClick={() => setShowStatusPicker(!showStatusPicker)}>
+                        <div className="relative cursor-pointer" onClick={() => router.push('/settings')}>
                             <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-sm font-bold">{user?.username?.[0]?.toUpperCase() || '?'}</div>
-                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-dark-950 ${user?.status === 'dnd' ? 'bg-red-500' : user?.status === 'idle' ? 'bg-amber-400' : user?.status === 'invisible' ? 'bg-gray-400' : 'bg-emerald-400'
-                                }`} />
+                            <div onClick={(e) => { e.stopPropagation(); setShowStatusPicker(!showStatusPicker); }} className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-dark-950 cursor-pointer hover:scale-125 transition-transform ${user?.status === 'dnd' ? 'bg-red-500' : user?.status === 'idle' ? 'bg-amber-400' : user?.status === 'invisible' ? 'bg-gray-400' : 'bg-emerald-400'
+                                }`} title="Change Status" />
                         </div>
-                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowStatusPicker(!showStatusPicker)}>
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push('/settings')}>
                             <p className="text-sm font-medium truncate">{user?.username || 'User'}</p>
                             <p className={`text-[10px] ${user?.status === 'dnd' ? 'text-red-400' : user?.status === 'idle' ? 'text-amber-400' : user?.status === 'invisible' ? 'text-gray-400' : 'text-emerald-400'}`}>
                                 {user?.customStatus?.text || (user?.status === 'dnd' ? 'Do Not Disturb' : user?.status === 'idle' ? 'Idle' : user?.status === 'invisible' ? 'Invisible' : 'Online')}
@@ -1353,6 +1353,16 @@ export default function ChannelsPage() {
                     />
                 )
             }
+
+            {/* User Profile Modal */}
+            {profileUser && (
+                <UserProfileModal
+                    userId={profileUser}
+                    onClose={() => setProfileUser(null)}
+                    onVoiceCall={(userId) => { setProfileUser(null); initiateCall?.(userId, currentChannel?._id, 'voice'); }}
+                    onVideoCall={(userId) => { setProfileUser(null); initiateCall?.(userId, currentChannel?._id, 'video'); }}
+                />
+            )}
         </div >
     );
 }

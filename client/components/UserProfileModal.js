@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiX, FiUsers, FiCalendar, FiMessageCircle, FiShield, FiSlash } from 'react-icons/fi';
+import { FiX, FiUsers, FiCalendar, FiMessageCircle, FiShield, FiSlash, FiPhone, FiVideo } from 'react-icons/fi';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
-export default function UserProfileModal({ userId, onClose }) {
+export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideoCall }) {
     const router = useRouter();
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -148,13 +148,25 @@ export default function UserProfileModal({ userId, onClose }) {
                                     </div>
                                 )}
 
-                                {/* Message and Block Buttons */}
+                                {/* Action Buttons */}
                                 <div className="mt-4 pt-3 border-t border-white/5 space-y-2">
                                     <button onClick={handleMessageUser}
                                         className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-colors bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20">
                                         <FiMessageCircle className="w-3.5 h-3.5" />
                                         Send Message
                                     </button>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button onClick={() => onVoiceCall?.(userId)}
+                                            className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-colors bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20">
+                                            <FiPhone className="w-3.5 h-3.5" />
+                                            Voice Call
+                                        </button>
+                                        <button onClick={() => onVideoCall?.(userId)}
+                                            className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-colors bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20">
+                                            <FiVideo className="w-3.5 h-3.5" />
+                                            Video Call
+                                        </button>
+                                    </div>
                                     <button onClick={handleBlockUser} disabled={blocking}
                                         className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-colors ${isBlocked ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20'}`}>
                                         <FiSlash className="w-3.5 h-3.5" />
