@@ -54,6 +54,21 @@ const initializeSocket = (server) => {
         // Handle disconnect
         socket.on('disconnect', (reason) => {
             logger.info(`🔌 User disconnected: ${socket.username} - ${reason}`);
+            
+            // Clean up voice channel if user was in one
+            if (socket.currentVoiceChannel) {
+                const channelId = socket.currentVoiceChannel;
+                io.to(`channel:${channelId}`).emit('voice:user-left', {
+                    channelId,
+                    userId: socket.userId,
+                });
+                io.to(`voice:${channelId}`).emit('voice:peer-left', {
+                    channelId,
+                    userId: socket.userId,
+                });
+                socket.currentVoiceChannel = null;
+            }
+            
             presenceSocket.handleDisconnect(io, socket);
         });
 

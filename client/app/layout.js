@@ -7,6 +7,7 @@ import { Toaster } from 'react-hot-toast';
 import NotificationProvider from '../components/NotificationProvider';
 import CallProvider from '../components/CallProvider';
 import BackgroundRenderer from '../components/BackgroundRenderer';
+import VoiceProvider from '../components/VoiceProvider';
 import './globals.css';
 
 export default function RootLayout({ children }) {
@@ -56,9 +57,11 @@ export default function RootLayout({ children }) {
             <body className="bg-transparent text-[var(--text-primary)] antialiased">
                 <Provider store={store}>
                     <CallProvider>
-                        <BackgroundRenderer />
-                        <NotificationProvider />
-                        {children}
+                        <VoiceProvider>
+                            <BackgroundRenderer />
+                            <NotificationProvider />
+                            {children}
+                        </VoiceProvider>
                     </CallProvider>
                     <Toaster
                         position={toastPosition}

@@ -10,6 +10,7 @@ import { IoGameControllerOutline } from 'react-icons/io5';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
 import { useCall } from '../../components/CallProvider';
+import { useVoice } from '../../components/VoiceProvider';
 import { setChannels, setCurrentChannel, setMessages } from '../../redux/chatSlice';
 import { setServers, setCurrentServer, addServer } from '../../redux/serverSlice';
 import { updateUser } from '../../redux/authSlice';
@@ -81,10 +82,11 @@ export default function ChannelsPage() {
         createGame, joinGame, makeGameMove, requestRematch,
         joinMusicRoom, syncMusic, leaveMusicRoom, musicRoom } = useSocket();
     const { initiateCall } = useCall() || {};
+    const { joinVoice, leaveVoice, toggleMute: voiceToggleMute, toggleDeafen: voiceToggleDeafen, isMuted: voiceIsMuted, isDeafened: voiceIsDeafened, connectedChannel: voiceConnectedChannel } = useVoice() || {};
     const { typingUsers, onlineUsers } = useSelector((s) => s.chat);
     const [connectedVoice, setConnectedVoice] = useState(null);
-    const [isMuted, setIsMuted] = useState(false);
-    const [isDeafened, setIsDeafened] = useState(false);
+    const isMuted = voiceIsMuted;
+    const isDeafened = voiceIsDeafened;
     const [isVideoOn, setIsVideoOn] = useState(false);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [localVideoStream, setLocalVideoStream] = useState(null);
@@ -566,14 +568,14 @@ export default function ChannelsPage() {
                                             <motion.div key={ch._id} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
                                                 <div onClick={() => {
                                                     if (connectedVoice === ch._id) {
-                                                        leaveVoiceChannel(ch._id); setConnectedVoice(null);
+                                                        leaveVoice(ch._id); leaveVoiceChannel(ch._id); setConnectedVoice(null);
                                                         if (localVideoStream) { localVideoStream.getTracks().forEach(t => t.stop()); setLocalVideoStream(null); setIsVideoOn(false); }
                                                         if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); setScreenStream(null); setIsScreenSharing(false); }
                                                     } else {
-                                                        if (connectedVoice) leaveVoiceChannel(connectedVoice);
+                                                        if (connectedVoice) { leaveVoice(connectedVoice); leaveVoiceChannel(connectedVoice); }
                                                         if (localVideoStream) { localVideoStream.getTracks().forEach(t => t.stop()); setLocalVideoStream(null); setIsVideoOn(false); }
                                                         if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); setScreenStream(null); setIsScreenSharing(false); }
-                                                        joinVoiceChannel(ch._id); setConnectedVoice(ch._id);
+                                                        joinVoice(ch._id); joinVoiceChannel(ch._id); setConnectedVoice(ch._id);
                                                     }
                                                 }}
                                                     className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-all duration-150 group ${connectedVoice === ch._id ? 'bg-emerald-500/10 text-emerald-400' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
@@ -636,12 +638,12 @@ export default function ChannelsPage() {
                             <span className="text-xs text-emerald-400 font-medium">Voice Connected</span>
                         </div>
                         <div className="grid grid-cols-4 gap-1 mb-1">
-                            <button onClick={() => setIsMuted(!isMuted)}
+                            <button onClick={() => voiceToggleMute()}
                                 className={`p-1.5 rounded-lg text-xs transition-colors flex flex-col items-center gap-0.5 ${isMuted ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
                                 {isMuted ? '🔇' : '🎤'}
                                 <span className="text-[9px]">{isMuted ? 'Muted' : 'Mic'}</span>
                             </button>
-                            <button onClick={() => setIsDeafened(!isDeafened)}
+                            <button onClick={() => voiceToggleDeafen()}
                                 className={`p-1.5 rounded-lg text-xs transition-colors flex flex-col items-center gap-0.5 ${isDeafened ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
                                 {isDeafened ? '🔇' : '🎧'}
                                 <span className="text-[9px]">{isDeafened ? 'Deaf' : 'Audio'}</span>
@@ -689,7 +691,7 @@ export default function ChannelsPage() {
                                 <span className="text-[9px]">{isScreenSharing ? 'Stop' : 'Share'}</span>
                             </button>
                         </div>
-                        <button onClick={() => { leaveVoiceChannel(connectedVoice); setConnectedVoice(null); if (localVideoStream) { localVideoStream.getTracks().forEach(t => t.stop()); setLocalVideoStream(null); setIsVideoOn(false); } if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); setScreenStream(null); setIsScreenSharing(false); } }}
+                        <button onClick={() => { leaveVoice(connectedVoice); leaveVoiceChannel(connectedVoice); setConnectedVoice(null); if (localVideoStream) { localVideoStream.getTracks().forEach(t => t.stop()); setLocalVideoStream(null); setIsVideoOn(false); } if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); setScreenStream(null); setIsScreenSharing(false); } }}
                             className="w-full p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs transition-colors flex items-center justify-center gap-1">
                             📞 Disconnect
                         </button>

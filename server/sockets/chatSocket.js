@@ -15,7 +15,7 @@ module.exports = (io, socket) => {
     });
 
     // Voice channel join (enforces single channel at a time)
-    socket.on('voice:join', ({ channelId }) => {
+    socket.on('voice:join', async ({ channelId }) => {
         // Auto-leave previous voice channel
         if (socket.currentVoiceChannel && socket.currentVoiceChannel !== channelId) {
             socket.leave(`voice:${socket.currentVoiceChannel}`);
@@ -26,12 +26,44 @@ module.exports = (io, socket) => {
         }
         socket.currentVoiceChannel = channelId;
         socket.join(`voice:${channelId}`);
+
+        // Get list of existing users in this voice channel (before broadcasting join)
+        const room = io.sockets.adapter.rooms.get(`voice:${channelId}`);
+        const existingUsers = [];
+        if (room) {
+            for (const socketId of room) {
+                const memberSocket = io.sockets.sockets.get(socketId);
+                if (memberSocket && memberSocket.userId !== socket.userId) {
+                    existingUsers.push({
+                        userId: memberSocket.userId,
+                        username: memberSocket.username,
+                        socketId: memberSocket.id,
+                    });
+                }
+            }
+        }
+
+        // Tell the joining user who is already in the channel (so they can create peer connections)
+        socket.emit('voice:existing-users', {
+            channelId,
+            users: existingUsers,
+        });
+
+        // Tell everyone else that a new user joined
+        socket.to(`voice:${channelId}`).emit('voice:user-joined', {
+            channelId,
+            userId: socket.userId,
+            username: socket.username,
+            socketId: socket.id,
+        });
+        // Also emit to the channel room for sidebar display
         io.to(`channel:${channelId}`).emit('voice:user-joined', {
             channelId,
             userId: socket.userId,
             username: socket.username,
         });
-        logger.debug(`${socket.username} joined voice channel ${channelId}`);
+
+        logger.debug(`${socket.username} joined voice channel ${channelId} (${existingUsers.length} existing users)`);
     });
 
     // Voice channel leave
@@ -41,6 +73,39 @@ module.exports = (io, socket) => {
         io.to(`channel:${channelId}`).emit('voice:user-left', {
             channelId,
             userId: socket.userId,
+        });
+        // Also notify voice room peers so they tear down peer connections
+        io.to(`voice:${channelId}`).emit('voice:peer-left', {
+            channelId,
+            userId: socket.userId,
+        });
+    });
+
+    // WebRTC signaling for voice channels (mesh networking)
+    socket.on('voice:offer', ({ targetSocketId, offer, channelId }) => {
+        io.to(targetSocketId).emit('voice:offer', {
+            offer,
+            from: socket.userId,
+            fromSocketId: socket.id,
+            channelId,
+        });
+    });
+
+    socket.on('voice:answer', ({ targetSocketId, answer, channelId }) => {
+        io.to(targetSocketId).emit('voice:answer', {
+            answer,
+            from: socket.userId,
+            fromSocketId: socket.id,
+            channelId,
+        });
+    });
+
+    socket.on('voice:ice-candidate', ({ targetSocketId, candidate, channelId }) => {
+        io.to(targetSocketId).emit('voice:ice-candidate', {
+            candidate,
+            from: socket.userId,
+            fromSocketId: socket.id,
+            channelId,
         });
     });
 
