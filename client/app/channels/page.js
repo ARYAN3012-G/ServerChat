@@ -74,8 +74,7 @@ export default function ChannelsPage() {
     const [threadView, setThreadView] = useState(null);
     const [threadMessages, setThreadMessages] = useState([]);
     const [threadInput, setThreadInput] = useState('');
-    const localVideoRef = useRef(null);
-    const screenVideoRef = useRef(null);
+    // Video refs use callback pattern to bind VoiceProvider streams
 
     const { sendMessage, joinChannel, leaveChannel, startTyping, stopTyping, reactToMessage,
         joinVoiceChannel, leaveVoiceChannel, voiceUsers,
@@ -115,19 +114,20 @@ export default function ChannelsPage() {
         }
     }, [gameSession, currentChannel?._id]);
 
-    useEffect(() => {
-        if (localVideoRef.current && localVideoStream) {
-            localVideoRef.current.srcObject = localVideoStream;
-            localVideoRef.current.play().catch(() => { });
+    // Callback refs to bind VoiceProvider video/screen streams to video elements
+    const localVideoCallbackRef = useCallback((el) => {
+        if (el && localVideoStream) {
+            el.srcObject = localVideoStream;
+            el.play().catch(() => {});
         }
     }, [localVideoStream]);
 
-    useEffect(() => {
-        if (screenVideoRef.current && screenStream) {
-            screenVideoRef.current.srcObject = screenStream;
-            screenVideoRef.current.play().catch(() => { });
+    const screenVideoCallbackRef = useCallback((el) => {
+        if (el && localScreenStream) {
+            el.srcObject = localScreenStream;
+            el.play().catch(() => {});
         }
-    }, [screenStream]);
+    }, [localScreenStream]);
 
     useEffect(() => {
         if (!loading && !isAuthenticated) router.push('/login');
@@ -826,7 +826,7 @@ export default function ChannelsPage() {
                                         {isScreenSharing && (
                                             <div className="relative w-full" style={{ maxHeight: '45vh' }}>
                                                 <video
-                                                    ref={screenVideoRef}
+                                                    ref={screenVideoCallbackRef}
                                                     autoPlay
                                                     playsInline
                                                     muted
@@ -838,13 +838,7 @@ export default function ChannelsPage() {
                                                     <span className="text-xs text-white font-medium">Screen Sharing</span>
                                                 </div>
                                                 <button
-                                                    onClick={() => {
-                                                        if (screenStream) {
-                                                            screenStream.getTracks().forEach(t => t.stop());
-                                                            setScreenStream(null);
-                                                        }
-                                                        setIsScreenSharing(false);
-                                                    }}
+                                                    onClick={() => stopScreenShare && stopScreenShare()}
                                                     className="absolute top-3 right-3 bg-red-500/80 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
                                                 >
                                                     <FiX className="w-3 h-3" /> Stop Sharing
@@ -864,7 +858,7 @@ export default function ChannelsPage() {
                                                 style={!isScreenSharing ? { maxHeight: '35vh' } : {}}
                                             >
                                                 <video
-                                                    ref={localVideoRef}
+                                                    ref={localVideoCallbackRef}
                                                     autoPlay
                                                     playsInline
                                                     muted
@@ -879,13 +873,7 @@ export default function ChannelsPage() {
                                                     {user?.username || 'You'} • Camera
                                                 </div>
                                                 <button
-                                                    onClick={() => {
-                                                        if (localVideoStream) {
-                                                            localVideoStream.getTracks().forEach(t => t.stop());
-                                                            setLocalVideoStream(null);
-                                                        }
-                                                        setIsVideoOn(false);
-                                                    }}
+                                                    onClick={() => stopVideo && stopVideo()}
                                                     className="absolute top-2 right-2 bg-dark-900/70 hover:bg-red-500/80 text-white/60 hover:text-white p-1 rounded-lg text-xs transition-colors"
                                                 >
                                                     <FiX className="w-3 h-3" />

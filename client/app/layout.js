@@ -38,7 +38,7 @@ export default function RootLayout({ children }) {
                 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
                 <link rel="manifest" href="/manifest.json" />
                 <meta name="theme-color" content="#040407" />
-                <meta name="apple-mobile-web-app-capable" content="yes" />
+                <meta name="mobile-web-app-capable" content="yes" />
                 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
                 {/* Open Graph (Facebook, WhatsApp, Discord link previews) */}
