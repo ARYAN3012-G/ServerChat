@@ -109,6 +109,18 @@ module.exports = (io, socket) => {
         });
     });
 
+    // Broadcast user media state changes (mute/video/screen) to voice channel peers
+    socket.on('voice:user-state', ({ channelId, isMuted, isVideoOn, isScreenSharing }) => {
+        if (channelId) {
+            socket.to(`voice:${channelId}`).emit('voice:user-state', {
+                userId: socket.userId,
+                isMuted,
+                isVideoOn,
+                isScreenSharing,
+            });
+        }
+    });
+
     // Send a message
     socket.on('message:send', async (data) => {
         try {

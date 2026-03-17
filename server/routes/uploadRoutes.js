@@ -16,11 +16,23 @@ router.post('/', auth, upload.single('file'), async (req, res, next) => {
 
         console.log(`Receiving file upload: ${req.file.originalname} (${req.file.mimetype})`);
 
-        // Determine if it's an audio webm file
+        // Determine the correct Cloudinary resource_type
         const isAudioWebm = req.file.mimetype === 'audio/webm' || req.file.originalname.endsWith('.weba');
+        const isDocument = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/zip',
+            'text/plain',
+        ].includes(req.file.mimetype);
 
-        // Pass resource_type manually if it's audio/webm (Cloudinary needs 'video' for webm audio)
-        const resourceType = isAudioWebm ? 'video' : 'auto';
+        let resourceType = 'auto';
+        if (isAudioWebm) resourceType = 'video';
+        else if (isDocument) resourceType = 'raw';
 
         // Upload to Cloudinary
         const result = await uploadToCloudinary(req.file.path, 'serverchat', resourceType);

@@ -82,15 +82,16 @@ export default function ChannelsPage() {
         createGame, joinGame, makeGameMove, requestRematch,
         joinMusicRoom, syncMusic, leaveMusicRoom, musicRoom } = useSocket();
     const { initiateCall } = useCall() || {};
-    const { joinVoice, leaveVoice, toggleMute: voiceToggleMute, toggleDeafen: voiceToggleDeafen, isMuted: voiceIsMuted, isDeafened: voiceIsDeafened, connectedChannel: voiceConnectedChannel } = useVoice() || {};
+    const voice = useVoice() || {};
+    const { joinVoice, leaveVoice, toggleMute: voiceToggleMute, toggleDeafen: voiceToggleDeafen,
+        isMuted: voiceIsMuted, isDeafened: voiceIsDeafened, connectedChannel: voiceConnectedChannel,
+        voiceUsers: vcUsers, isVideoOn, isScreenSharing, localVideoStream, localScreenStream,
+        peerVideoStreams, startVideo, stopVideo, switchCamera, facingMode,
+        startScreenShare, stopScreenShare } = voice;
     const { typingUsers, onlineUsers } = useSelector((s) => s.chat);
     const [connectedVoice, setConnectedVoice] = useState(null);
     const isMuted = voiceIsMuted;
     const isDeafened = voiceIsDeafened;
-    const [isVideoOn, setIsVideoOn] = useState(false);
-    const [isScreenSharing, setIsScreenSharing] = useState(false);
-    const [localVideoStream, setLocalVideoStream] = useState(null);
-    const [screenStream, setScreenStream] = useState(null);
     const [showGameLauncher, setShowGameLauncher] = useState(false);
     const [showMusicRoom, setShowMusicRoom] = useState(false);
     const [showCallPicker, setShowCallPicker] = useState(null); // 'voice' | 'video' | null
@@ -636,6 +637,36 @@ export default function ChannelsPage() {
                         <div className="flex items-center gap-2 mb-2">
                             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                             <span className="text-xs text-emerald-400 font-medium">Voice Connected</span>
+                            <span className="text-[9px] text-white/20 ml-auto">{(vcUsers || []).length + 1} users</span>
+                        </div>
+                        {/* Connected Users List */}
+                        <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
+                            {/* Self */}
+                            <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-white/5">
+                                <div className="w-5 h-5 rounded-full bg-indigo-500/60 flex items-center justify-center text-[8px] font-bold">
+                                    {(user?.username?.[0] || 'U').toUpperCase()}
+                                </div>
+                                <span className="text-[10px] text-white/70 flex-1 truncate">{user?.username} (You)</span>
+                                <div className="flex gap-0.5">
+                                    {isMuted && <span className="text-[8px]">🔇</span>}
+                                    {isVideoOn && <span className="text-[8px]">📹</span>}
+                                    {isScreenSharing && <span className="text-[8px]">🖥️</span>}
+                                </div>
+                            </div>
+                            {/* Peers */}
+                            {(vcUsers || []).map(u => (
+                                <div key={u.userId} className="flex items-center gap-2 px-2 py-1 rounded-lg bg-white/[0.02]">
+                                    <div className="w-5 h-5 rounded-full bg-emerald-500/40 flex items-center justify-center text-[8px] font-bold">
+                                        {(u.username?.[0] || 'U').toUpperCase()}
+                                    </div>
+                                    <span className="text-[10px] text-white/50 flex-1 truncate">{u.username}</span>
+                                    <div className="flex gap-0.5">
+                                        {u.isMuted && <span className="text-[8px]">🔇</span>}
+                                        {u.isVideoOn && <span className="text-[8px]">📹</span>}
+                                        {u.isScreenSharing && <span className="text-[8px]">🖥️</span>}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                         <div className="grid grid-cols-4 gap-1 mb-1">
                             <button onClick={() => voiceToggleMute()}
@@ -648,50 +679,26 @@ export default function ChannelsPage() {
                                 {isDeafened ? '🔇' : '🎧'}
                                 <span className="text-[9px]">{isDeafened ? 'Deaf' : 'Audio'}</span>
                             </button>
-                            <button onClick={async () => {
-                                try {
-                                    if (!isVideoOn) {
-                                        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                                        setLocalVideoStream(stream);
-                                        setIsVideoOn(true);
-                                    } else {
-                                        if (localVideoStream) {
-                                            localVideoStream.getTracks().forEach(t => t.stop());
-                                            setLocalVideoStream(null);
-                                        }
-                                        setIsVideoOn(false);
-                                    }
-                                } catch (err) { console.error('Video error:', err); }
-                            }}
+                            <button onClick={() => isVideoOn ? stopVideo() : startVideo(facingMode || 'user')}
+                                onContextMenu={(e) => { e.preventDefault(); if (switchCamera) switchCamera(); }}
                                 className={`p-1.5 rounded-lg text-xs transition-colors flex flex-col items-center gap-0.5 ${isVideoOn ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
                                 📹
                                 <span className="text-[9px]">{isVideoOn ? 'On' : 'Video'}</span>
                             </button>
-                            <button onClick={async () => {
-                                try {
-                                    if (!isScreenSharing) {
-                                        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-                                        setScreenStream(stream);
-                                        setIsScreenSharing(true);
-                                        stream.getVideoTracks()[0].onended = () => {
-                                            setScreenStream(null);
-                                            setIsScreenSharing(false);
-                                        };
-                                    } else {
-                                        if (screenStream) {
-                                            screenStream.getTracks().forEach(t => t.stop());
-                                            setScreenStream(null);
-                                        }
-                                        setIsScreenSharing(false);
-                                    }
-                                } catch (err) { console.error('Screen share error:', err); }
-                            }}
+                            <button onClick={() => isScreenSharing ? stopScreenShare() : startScreenShare()}
                                 className={`p-1.5 rounded-lg text-xs transition-colors flex flex-col items-center gap-0.5 ${isScreenSharing ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
                                 🖥️
                                 <span className="text-[9px]">{isScreenSharing ? 'Stop' : 'Share'}</span>
                             </button>
                         </div>
-                        <button onClick={() => { leaveVoice(connectedVoice); leaveVoiceChannel(connectedVoice); setConnectedVoice(null); if (localVideoStream) { localVideoStream.getTracks().forEach(t => t.stop()); setLocalVideoStream(null); setIsVideoOn(false); } if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); setScreenStream(null); setIsScreenSharing(false); } }}
+                        {/* Camera switch button (visible when video is on) */}
+                        {isVideoOn && (
+                            <button onClick={() => switchCamera && switchCamera()}
+                                className="w-full p-1 rounded-lg bg-white/5 text-white/40 hover:text-white text-[9px] mb-1 transition-colors">
+                                🔄 Switch Camera ({facingMode === 'user' ? 'Front' : 'Back'})
+                            </button>
+                        )}
+                        <button onClick={() => { leaveVoice(connectedVoice); leaveVoiceChannel(connectedVoice); setConnectedVoice(null); }}
                             className="w-full p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs transition-colors flex items-center justify-center gap-1">
                             📞 Disconnect
                         </button>
