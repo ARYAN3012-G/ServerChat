@@ -13,14 +13,20 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
     const [loading, setLoading] = useState(true);
     const [isBlocked, setIsBlocked] = useState(false);
     const [blocking, setBlocking] = useState(false);
+    const [error, setError] = useState(false);
 
     useEffect(() => {
         if (!userId) return;
+        setLoading(true);
+        setError(false);
         (async () => {
             try {
                 const { data } = await api.get(`/users/${userId}`);
                 setProfile(data.user || data);
-            } catch (e) { console.error(e); }
+            } catch (e) {
+                console.error('Profile fetch error:', e);
+                setError(true);
+            }
             setLoading(false);
         })();
     }, [userId]);
@@ -52,11 +58,39 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
         } catch (e) { toast.error('Failed to start DM'); }
     };
 
+    // Safely extract customStatus text
+    const getStatusText = (status) => {
+        if (!status) return null;
+        if (typeof status === 'string') return status;
+        if (typeof status === 'object' && status.text) return status.text;
+        return null;
+    };
+
+    // Safely format a date
+    const formatDate = (dateStr) => {
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return 'Unknown';
+            return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        } catch {
+            return 'Unknown';
+        }
+    };
+
+    // Safely get friends list (filter out non-populated entries)
+    const getFriends = (friends) => {
+        if (!Array.isArray(friends)) return [];
+        return friends.filter(f => f && typeof f === 'object' && f.username);
+    };
+
     const roleBadges = {
         admin: { label: 'Admin', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
         moderator: { label: 'Moderator', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
         user: { label: 'Member', color: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' },
     };
+
+    const statusText = profile ? getStatusText(profile.customStatus) : null;
+    const friends = profile ? getFriends(profile.friends) : [];
 
     return (
         <AnimatePresence>
@@ -66,7 +100,7 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
                     className="bg-[#111427] border border-white/10 rounded-2xl w-full max-w-[360px] mx-4 overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
 
                     {/* Banner */}
-                    <div className="h-24 bg-gradient-to-br from-indigo-600 via-silver-400 to-pink-500 relative">
+                    <div className="h-24 bg-gradient-to-br from-indigo-600 via-purple-500 to-pink-500 relative">
                         <button onClick={onClose} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/30 flex items-center justify-center text-white/70 hover:text-white transition-colors">
                             <FiX className="w-4 h-4" />
                         </button>
@@ -76,7 +110,11 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
                         <div className="p-8 text-center">
                             <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
                         </div>
-                    ) : profile ? (
+                    ) : error || !profile ? (
+                        <div className="p-8 text-center text-white/30">
+                            {error ? 'Failed to load profile' : 'User not found'}
+                        </div>
+                    ) : (
                         <div className="relative">
                             {/* Avatar */}
                             <div className="absolute -top-10 left-5">
@@ -91,7 +129,7 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
                             <div className="pt-12 px-5 pb-5">
                                 {/* Name & Role */}
                                 <div className="flex items-center gap-2 mb-1">
-                                    <h2 className="text-xl font-bold text-white">{profile.username}</h2>
+                                    <h2 className="text-xl font-bold text-white">{profile.username || 'Unknown User'}</h2>
                                     {profile.role && roleBadges[profile.role] && (
                                         <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${roleBadges[profile.role].color}`}>
                                             {roleBadges[profile.role].label}
@@ -100,8 +138,8 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
                                 </div>
 
                                 {/* Status */}
-                                {profile.customStatus && (
-                                    <p className="text-sm text-white/40 mb-3">{profile.customStatus}</p>
+                                {statusText && (
+                                    <p className="text-sm text-white/40 mb-3">{statusText}</p>
                                 )}
 
                                 <div className="w-full h-px bg-white/10 my-3" />
@@ -110,7 +148,7 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
                                 {profile.bio && (
                                     <div className="mb-3">
                                         <h4 className="text-[11px] font-semibold text-white/30 uppercase tracking-wider mb-1">About Me</h4>
-                                        <p className="text-sm text-white/60">{profile.bio}</p>
+                                        <p className="text-sm text-white/60">{typeof profile.bio === 'string' ? profile.bio : ''}</p>
                                     </div>
                                 )}
 
@@ -118,22 +156,22 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-2 text-sm text-white/40">
                                         <FiCalendar className="w-4 h-4" />
-                                        <span>Joined {new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+                                        <span>Joined {formatDate(profile.createdAt)}</span>
                                     </div>
-                                    {profile.friends && (
+                                    {friends.length > 0 && (
                                         <div className="flex items-center gap-2 text-sm text-white/40">
                                             <FiUsers className="w-4 h-4" />
-                                            <span>{profile.friends.length} friends</span>
+                                            <span>{friends.length} friends</span>
                                         </div>
                                     )}
                                 </div>
 
-                                {/* Mutual Friends */}
-                                {profile.friends?.length > 0 && (
+                                {/* Friends */}
+                                {friends.length > 0 && (
                                     <div className="mt-3">
                                         <h4 className="text-[11px] font-semibold text-white/30 uppercase tracking-wider mb-2">Friends</h4>
                                         <div className="flex flex-wrap gap-1">
-                                            {profile.friends.slice(0, 6).map((f, i) => (
+                                            {friends.slice(0, 6).map((f, i) => (
                                                 <div key={i} className="flex items-center gap-1.5 bg-white/5 rounded-full px-2 py-1">
                                                     <div className="w-5 h-5 rounded-full bg-indigo-500/60 flex items-center justify-center text-[9px] font-bold">
                                                         {(f.username || 'U')[0].toUpperCase()}
@@ -141,8 +179,8 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
                                                     <span className="text-xs text-white/50">{f.username}</span>
                                                 </div>
                                             ))}
-                                            {profile.friends.length > 6 && (
-                                                <span className="text-xs text-white/20 self-center ml-1">+{profile.friends.length - 6} more</span>
+                                            {friends.length > 6 && (
+                                                <span className="text-xs text-white/20 self-center ml-1">+{friends.length - 6} more</span>
                                             )}
                                         </div>
                                     </div>
@@ -175,8 +213,6 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
                                 </div>
                             </div>
                         </div>
-                    ) : (
-                        <div className="p-8 text-center text-white/30">User not found</div>
                     )}
                 </motion.div>
             </motion.div>
