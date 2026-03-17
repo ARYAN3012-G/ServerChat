@@ -155,15 +155,18 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                         </div>
                     </div>
 
+                    {/* Audio element always rendered to avoid re-creation */}
+                    <audio
+                        ref={audioRef}
+                        crossOrigin="anonymous"
+                        onTimeUpdate={handleTimeUpdate}
+                        onEnded={handleNext}
+                        preload="auto"
+                    />
+
                     {/* Now Playing */}
                     {currentTrack && (
                         <div className="px-6 py-4 border-b border-white/5">
-                            <audio
-                                ref={audioRef}
-                                src={currentTrack.url}
-                                onTimeUpdate={handleTimeUpdate}
-                                onEnded={handleNext}
-                            />
                             <div className="flex items-center gap-4">
                                 <div className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl"
                                     style={{ background: `linear-gradient(135deg, ${currentTrack.color}40, ${currentTrack.color}10)`, border: `1px solid ${currentTrack.color}30` }}>
