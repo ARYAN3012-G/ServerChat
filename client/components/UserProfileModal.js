@@ -52,9 +52,10 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
 
     const handleMessageUser = async () => {
         try {
-            await api.post('/channels/dm', { targetUserId: userId });
+            const { data } = await api.post('/channels/dm', { targetUserId: userId });
+            const dmChannel = data.channel || data;
             onClose();
-            router.push('/dms');
+            router.push(`/dms?open=${dmChannel._id}`);
         } catch (e) { toast.error('Failed to start DM'); }
     };
 

@@ -153,6 +153,17 @@ exports.unblockUser = async (req, res, next) => {
     }
 };
 
+// Get blocked users list
+exports.getBlockedUsers = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.user._id)
+            .populate('blockedUsers', 'username avatar status');
+        res.json({ blockedUsers: user.blockedUsers || [] });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Get online users
 exports.getOnlineUsers = async (req, res, next) => {
     try {

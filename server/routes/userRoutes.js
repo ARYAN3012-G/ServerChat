@@ -12,5 +12,6 @@ router.put('/profile', auth, userController.updateProfile);
 router.put('/avatar', auth, upload.single('avatar'), userController.uploadAvatar);
 router.post('/block/:userId', auth, userController.blockUser);
 router.delete('/block/:userId', auth, userController.unblockUser);
+router.get('/blocked', auth, userController.getBlockedUsers);
 
 module.exports = router;

@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUser, FiLock, FiMoon, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap, FiMenu, FiSmartphone, FiShield } from 'react-icons/fi';
+import { FiArrowLeft, FiUser, FiLock, FiMoon, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap, FiMenu, FiSmartphone, FiShield, FiSlash } from 'react-icons/fi';
 import dynamic from 'next/dynamic';
 const AvatarPicker = dynamic(() => import('../../components/AvatarPicker'), { ssr: false });
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import BlockedUsersTab from '../../components/BlockedUsersTab';
 
 export default function SettingsPage() {
     const router = useRouter();
@@ -42,12 +43,14 @@ export default function SettingsPage() {
     const faceApiRef = useRef(null);
     const [cameraActive, setCameraActive] = useState(false);
     const [faceDeleting, setFaceDeleting] = useState(false);
+    const [blockedUsers, setBlockedUsers] = useState([]);
+    const [blockedLoading, setBlockedLoading] = useState(false);
 
     // Read ?tab= query param
     const searchParams = useSearchParams();
     useEffect(() => {
         const urlTab = searchParams.get('tab');
-        if (urlTab && ['account', 'security', 'subscription', 'appearance', 'notifications'].includes(urlTab)) {
+        if (urlTab && ['account', 'security', 'subscription', 'appearance', 'notifications', 'blocked'].includes(urlTab)) {
             setTab(urlTab);
         }
     }, [searchParams]);
@@ -109,6 +112,7 @@ export default function SettingsPage() {
         { id: 'subscription', label: 'Subscription', icon: FiStar },
         { id: 'appearance', label: 'Appearance', icon: FiMoon },
         { id: 'notifications', label: 'Notifications', icon: FiBell },
+        { id: 'blocked', label: 'Blocked Users', icon: FiSlash },
     ];
 
     if (loading) return <div className="flex h-screen items-center justify-center bg-dark-900"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
@@ -501,6 +505,11 @@ export default function SettingsPage() {
                                 </div>
                                 <p className="text-white/20 text-xs mt-4 text-center">Payment processing requires Stripe configuration</p>
                             </motion.div>
+                        )}
+
+                        {/* BLOCKED USERS */}
+                        {tab === 'blocked' && (
+                            <BlockedUsersTab />
                         )}
                     </AnimatePresence>
                 </div>

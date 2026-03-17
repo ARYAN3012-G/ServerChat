@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiArrowLeft, FiSend, FiSearch, FiMessageSquare, FiPlus, FiX, FiPaperclip, FiPhone, FiVideo, FiSmile, FiMenu, FiCheck, FiImage } from 'react-icons/fi';
@@ -28,6 +28,7 @@ import toast from 'react-hot-toast';
 
 export default function DMsPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { user, isAuthenticated, loading } = useAuth();
     const { sendMessage, reactToMessage } = useSocket();
     const { initiateCall } = useCall() || {};
@@ -64,6 +65,18 @@ export default function DMsPage() {
             fetchFriends();
         }
     }, [isAuthenticated]);
+
+    // Auto-open a DM conversation when redirected with ?open=channelId
+    useEffect(() => {
+        const openId = searchParams.get('open');
+        if (openId && conversations.length > 0) {
+            const targetConvo = conversations.find(c => c._id === openId);
+            if (targetConvo) {
+                setSelectedConvo(targetConvo);
+                setIsSidebarOpen(false);
+            }
+        }
+    }, [searchParams, conversations]);
 
     useEffect(() => {
         if (selectedConvo) {
