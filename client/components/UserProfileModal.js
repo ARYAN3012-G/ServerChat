@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiUsers, FiCalendar, FiMessageCircle, FiShield, FiSlash, FiPhone, FiVideo } from 'react-icons/fi';
+import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
 export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideoCall }) {
     const router = useRouter();
+    const { user: currentUser, fetchUser } = useAuth();
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isBlocked, setIsBlocked] = useState(false);
@@ -27,9 +29,18 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
                 console.error('Profile fetch error:', e);
                 setError(true);
             }
+            
+            // Initialize block state based on current user's list
+            if (currentUser?.blockedUsers) {
+                const isUserBlocked = currentUser.blockedUsers.some(b => 
+                    (typeof b === 'string' ? b : b._id) === userId
+                );
+                setIsBlocked(isUserBlocked);
+            }
+            
             setLoading(false);
         })();
-    }, [userId]);
+    }, [userId, currentUser]);
 
     if (!userId) return null;
 
@@ -46,6 +57,8 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
                 setIsBlocked(true);
                 toast.success('User blocked');
             }
+            // Update current user state globally so Settings page sees it immediately
+            if (fetchUser) await fetchUser();
         } catch (e) { toast.error('Failed to update block status'); }
         setBlocking(false);
     };
