@@ -158,7 +158,6 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                     {/* Audio element always rendered to avoid re-creation */}
                     <audio
                         ref={audioRef}
-                        crossOrigin="anonymous"
                         onTimeUpdate={handleTimeUpdate}
                         onEnded={handleNext}
                         preload="auto"

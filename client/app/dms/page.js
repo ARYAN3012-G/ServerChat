@@ -46,7 +46,7 @@ export default function DMsPage() {
     const [showNewDM, setShowNewDM] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearch, setShowSearch] = useState(false);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [showBgPicker, setShowBgPicker] = useState(false);
     const [chatBg, setChatBg] = useState('');
     const [profilePopupUser, setProfilePopupUser] = useState(null);
