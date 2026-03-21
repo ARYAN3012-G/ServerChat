@@ -6,10 +6,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiArrowLeft, FiUsers, FiShield, FiSearch, FiBarChart2, FiAlertTriangle, FiTrendingUp, FiActivity, FiFileText, FiPlay, FiMenu } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
+import { useSelector } from 'react-redux';
+
+const ADMIN_EMAIL = 'aryanrajeshgadam.3012@gmail.com';
 
 export default function AdminPage() {
     const router = useRouter();
     const { isAuthenticated, loading } = useAuth();
+    const { user } = useSelector(state => state.auth);
     const [tab, setTab] = useState('overview');
     const [stats, setStats] = useState(null);
     const [users, setUsers] = useState([]);
@@ -20,6 +24,7 @@ export default function AdminPage() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
+    useEffect(() => { if (!loading && isAuthenticated && user?.email !== ADMIN_EMAIL) router.push('/channels'); }, [isAuthenticated, loading, user]);
     useEffect(() => { if (isAuthenticated) { fetchStats(); fetchUsers(); } }, [isAuthenticated]);
 
     const fetchStats = async () => { try { const { data } = await api.get('/admin/dashboard'); setStats(data.stats || data); } catch (e) { console.error(e); } };

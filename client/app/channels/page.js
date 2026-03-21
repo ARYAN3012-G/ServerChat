@@ -518,10 +518,12 @@ export default function ChannelsPage() {
                     <IoGameControllerOutline className="w-6 h-6" />
                 </motion.div>
 
+                {user?.email === 'aryanrajeshgadam.3012@gmail.com' && (
                 <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/admin')}
                     className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-amber-500 cursor-pointer transition-all duration-200" title="Admin">
                     <FiShield className="w-5 h-5" />
                 </motion.div>
+                )}
             </div>
 
             {/* ─── CHANNEL SIDEBAR ─── */}
