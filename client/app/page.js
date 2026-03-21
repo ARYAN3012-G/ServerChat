@@ -349,7 +349,7 @@ export default function HomePage() {
                         </motion.div>
 
                         <motion.h1 variants={itemVariants}
-                            className="text-3xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-extrabold text-white mb-6 leading-tight break-words"
+                            className="text-2xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-extrabold text-white mb-6 leading-tight break-words"
                         >
                             Where Teams
                             <br />

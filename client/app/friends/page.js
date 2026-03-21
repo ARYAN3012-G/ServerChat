@@ -191,11 +191,11 @@ export default function FriendsPage() {
                     </button>
                     <FiUsers className="w-5 h-5 text-white/30 hidden sm:block" />
                     <span className="font-bold">Friends</span>
-                    <div className="flex items-center gap-1 ml-2 sm:ml-4 overflow-x-auto scrollbar-none">
+                    <div className="flex items-center gap-1 ml-2 sm:ml-4 overflow-x-auto scrollbar-none flex-shrink min-w-0">
                         {tabs.map(t => (
                             <button key={t.id} onClick={() => setTab(t.id)}
-                                className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${tab === t.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
-                                <t.icon className="w-4 h-4" /> {t.label}
+                                className={`flex items-center gap-1.5 px-2.5 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${tab === t.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
+                                <t.icon className="w-4 h-4" /> <span className="hidden sm:inline">{t.label}</span><span className="sm:hidden">{t.label.split(' ').pop()}</span>
                                 {t.count > 0 && <span className="ml-1 w-5 h-5 bg-red-500 rounded-full text-[10px] flex items-center justify-center font-bold">{t.count}</span>}
                             </button>
                         ))}

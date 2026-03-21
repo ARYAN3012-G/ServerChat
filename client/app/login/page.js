@@ -292,18 +292,19 @@ export default function LoginPage() {
                                 {[
                                     { id: 'email', icon: FiMail, label: 'Email' },
                                     { id: 'phone', icon: FiSmartphone, label: 'Phone' },
-                                    { id: 'face', icon: FiCamera, label: 'Face ID' },
+                                    { id: 'face', icon: FiCamera, label: 'Face ID', shortLabel: 'Face' },
                                 ].map((method) => (
                                     <button
                                         key={method.id}
                                         onClick={() => setLoginMethod(method.id)}
-                                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all ${loginMethod === method.id
+                                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs sm:text-sm font-medium transition-all ${loginMethod === method.id
                                             ? 'bg-white text-dark-900'
                                             : 'text-dark-400 hover:text-white'
                                             }`}
                                     >
                                         <method.icon className="w-4 h-4" />
-                                        {method.label}
+                                        <span className="hidden sm:inline">{method.label}</span>
+                                        <span className="sm:hidden">{method.shortLabel || method.label}</span>
                                     </button>
                                 ))}
                             </div>
