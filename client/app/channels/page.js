@@ -589,12 +589,8 @@ export default function ChannelsPage() {
                                                 <div onClick={() => {
                                                     if (connectedVoice === ch._id) {
                                                         leaveVoice(ch._id); leaveVoiceChannel(ch._id); setConnectedVoice(null);
-                                                        if (localVideoStream) { localVideoStream.getTracks().forEach(t => t.stop()); setLocalVideoStream(null); setIsVideoOn(false); }
-                                                        if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); setScreenStream(null); setIsScreenSharing(false); }
                                                     } else {
                                                         if (connectedVoice) { leaveVoice(connectedVoice); leaveVoiceChannel(connectedVoice); }
-                                                        if (localVideoStream) { localVideoStream.getTracks().forEach(t => t.stop()); setLocalVideoStream(null); setIsVideoOn(false); }
-                                                        if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); setScreenStream(null); setIsScreenSharing(false); }
                                                         joinVoice(ch._id); joinVoiceChannel(ch._id); setConnectedVoice(ch._id);
                                                     }
                                                 }}
