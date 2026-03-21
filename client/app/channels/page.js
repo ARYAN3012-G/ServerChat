@@ -833,14 +833,14 @@ export default function ChannelsPage() {
                                 {currentChannel.description && <span className="text-sm text-white/30 ml-2 border-l border-white/10 pl-2">{currentChannel.description}</span>}
                             </div>
                             <div className="flex items-center gap-2 sm:gap-3">
-                                <FiPhone className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-white/20 cursor-pointer hover:text-emerald-400 transition-colors" title="Voice Call"
+                                <FiPhone className="hidden sm:block w-4 h-4 sm:w-[18px] sm:h-[18px] text-white/20 cursor-pointer hover:text-emerald-400 transition-colors" title="Voice Call"
                                     onClick={() => setShowCallPicker('voice')} />
-                                <FiVideo className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-white/20 cursor-pointer hover:text-indigo-400 transition-colors" title="Video Call"
+                                <FiVideo className="hidden sm:block w-4 h-4 sm:w-[18px] sm:h-[18px] text-white/20 cursor-pointer hover:text-indigo-400 transition-colors" title="Video Call"
                                     onClick={() => setShowCallPicker('video')} />
                                 <FiBookmark className={`w-4 h-4 sm:w-[18px] sm:h-[18px] cursor-pointer transition-colors ${showPinned ? 'text-amber-400' : 'text-white/20 hover:text-amber-400'}`} title="Pinned Messages"
                                     onClick={() => { setShowPinned(!showPinned); if (!showPinned) fetchPinnedMessages(currentChannel._id); }} />
                                 <FiSearch className={`w-4 h-4 sm:w-5 sm:h-5 cursor-pointer transition-colors ${showSearch ? 'text-indigo-400' : 'text-white/20 hover:text-white'}`} onClick={() => { setShowSearch(!showSearch); setSearchResults([]); setSearchQuery(''); }} />
-                                <FiUsers className={`w-4 h-4 sm:w-5 sm:h-5 cursor-pointer transition-colors ${showMembers ? 'text-white' : 'text-white/20 hover:text-white'}`} onClick={() => setShowMembers(!showMembers)} />
+                                <FiUsers className={`hidden sm:block w-4 h-4 sm:w-5 sm:h-5 cursor-pointer transition-colors ${showMembers ? 'text-white' : 'text-white/20 hover:text-white'}`} onClick={() => setShowMembers(!showMembers)} />
                             </div>
                         </div>
 

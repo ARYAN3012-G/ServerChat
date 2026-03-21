@@ -394,22 +394,22 @@ export default function DMsPage() {
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 sm:gap-2">
                                 <button onClick={() => initiateCall && initiateCall(getOtherUser(selectedConvo)._id, selectedConvo?._id, 'voice')}
-                                    className="p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-emerald-400 transition-colors" title="Voice Call">
-                                    <FiPhone className="w-4 h-4" />
+                                    className="p-1.5 sm:p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-emerald-400 transition-colors" title="Voice Call">
+                                    <FiPhone className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                                 </button>
                                 <button onClick={() => initiateCall && initiateCall(getOtherUser(selectedConvo)._id, selectedConvo?._id, 'video')}
-                                    className="p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-indigo-400 transition-colors" title="Video Call">
-                                    <FiVideo className="w-4 h-4" />
+                                    className="hidden sm:block p-1.5 sm:p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-indigo-400 transition-colors" title="Video Call">
+                                    <FiVideo className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                                 </button>
                                 <button onClick={() => setShowSearch(true)}
-                                    className="p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-indigo-400 transition-colors" title="Search Messages">
-                                    <FiSearch className="w-4 h-4" />
+                                    className="p-1.5 sm:p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-indigo-400 transition-colors" title="Search Messages">
+                                    <FiSearch className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                                 </button>
                                 <button onClick={() => setShowBgPicker(true)}
-                                    className="p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-pink-400 transition-colors" title="Change Background">
-                                    <FiImage className="w-4 h-4" />
+                                    className="hidden sm:block p-1.5 sm:p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-pink-400 transition-colors" title="Change Background">
+                                    <FiImage className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                                 </button>
                             </div>
                         </div>
