@@ -26,6 +26,7 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
     const [chatInput, setChatInput] = useState('');
     const progressRef = useRef(null);
     const audioRef = useRef(null);
+    const playPromiseRef = useRef(null);
 
     useEffect(() => {
         if (serverId) joinMusicRoom(serverId);
@@ -68,19 +69,43 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
         }
     }, [musicRoom?.track, musicRoom?.isPlaying, musicRoom?.currentTime]);
 
-    // Audio Playback Control
+    // Audio Playback Control — handles play/pause with AbortError prevention
     useEffect(() => {
-        if (!audioRef.current) return;
-        if (isPlaying && currentTrack) {
-            // Need to set src if it changed
-            if (audioRef.current.src !== currentTrack.url) {
-                audioRef.current.src = currentTrack.url;
-                audioRef.current.load();
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        const doPlayback = async () => {
+            if (isPlaying && currentTrack) {
+                // Set src if it changed
+                if (!audio.src || !audio.src.includes(currentTrack.url.split('/').pop())) {
+                    audio.src = currentTrack.url;
+                    audio.load();
+                }
+                try {
+                    // Cancel any pending play promise before starting a new one
+                    if (playPromiseRef.current) {
+                        try { await playPromiseRef.current; } catch (e) { /* ignore */ }
+                    }
+                    playPromiseRef.current = audio.play();
+                    await playPromiseRef.current;
+                } catch (e) {
+                    if (e.name !== 'AbortError') {
+                        console.error('Audio play failed:', e);
+                    }
+                } finally {
+                    playPromiseRef.current = null;
+                }
+            } else {
+                // Pause safely — wait for any pending play promise first
+                if (playPromiseRef.current) {
+                    try { await playPromiseRef.current; } catch (e) { /* ignore */ }
+                    playPromiseRef.current = null;
+                }
+                audio.pause();
             }
-            audioRef.current.play().catch(e => console.error('Audio play failed:', e));
-        } else {
-            audioRef.current.pause();
-        }
+        };
+
+        doPlayback();
     }, [isPlaying, currentTrack?.id]);
 
     const handleTimeUpdate = () => {

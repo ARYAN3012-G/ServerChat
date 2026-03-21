@@ -1,6 +1,7 @@
 const Server = require('../models/Server');
 const Channel = require('../models/Channel');
 const { logger } = require('../config/logger');
+const { getIO } = require('../sockets');
 
 // Create a new server
 exports.createServer = async (req, res, next) => {
@@ -151,6 +152,27 @@ exports.joinServer = async (req, res, next) => {
             .populate('owner', 'username avatar')
             .populate('channels')
             .populate('members.user', 'username avatar status');
+
+        // Notify all existing members in real-time
+        try {
+            const io = getIO();
+            if (io) {
+                // Broadcast to all channels in this server so existing members get updated
+                const channelIds = populated.channels.map(ch => ch._id.toString());
+                channelIds.forEach(chId => {
+                    io.to(`channel:${chId}`).emit('server:member-joined', {
+                        serverId: server._id.toString(),
+                        member: {
+                            user: { _id: req.user._id, username: req.user.username, avatar: req.user.avatar, status: req.user.status || 'online' },
+                            role: 'member',
+                            joinedAt: new Date(),
+                        },
+                    });
+                });
+            }
+        } catch (socketErr) {
+            logger.error('Failed to emit server:member-joined:', socketErr);
+        }
 
         res.json(populated);
     } catch (error) {

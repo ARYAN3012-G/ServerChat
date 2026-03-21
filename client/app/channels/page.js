@@ -107,6 +107,23 @@ export default function ChannelsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Listen for new members joining the server in real-time
+    useEffect(() => {
+        const socket = getSocket();
+        if (!socket || !currentServer) return;
+        const handleMemberJoined = async ({ serverId }) => {
+            if (serverId === currentServer._id) {
+                // Re-fetch server to update member list
+                try {
+                    const { data } = await api.get(`/servers/${currentServer._id}`);
+                    dispatch(setCurrentServer(data));
+                } catch (e) { console.error(e); }
+            }
+        };
+        socket.on('server:member-joined', handleMemberJoined);
+        return () => socket.off('server:member-joined', handleMemberJoined);
+    }, [currentServer?._id]);
+
     // Auto-show game launcher if a game starts in our channel
     useEffect(() => {
         if (gameSession && gameSession.status !== 'finished' && gameSession.channel === currentChannel?._id) {
