@@ -524,6 +524,51 @@ export default function ChannelsPage() {
                     <FiShield className="w-5 h-5" />
                 </motion.div>
                 )}
+
+                {/* Spacer to push bottom items down */}
+                <div className="flex-1" />
+
+                <div className="w-8 h-0.5 bg-white/10 rounded-full" />
+
+                {/* Status Picker */}
+                <div className="relative">
+                    <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => setShowStatusPicker(!showStatusPicker)}
+                        className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-white/10" title={`Status: ${user?.status || 'offline'}`}>
+                        <div className={`w-4 h-4 rounded-full border-2 border-dark-950 ${user?.status === 'online' ? 'bg-emerald-400' : user?.status === 'idle' ? 'bg-amber-400' : user?.status === 'dnd' ? 'bg-red-500' : 'bg-gray-400'}`} />
+                    </motion.div>
+                    <AnimatePresence>
+                        {showStatusPicker && (
+                            <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}
+                                className="absolute left-16 bottom-0 w-52 bg-dark-800 border border-white/10 rounded-xl shadow-2xl z-[60] p-2 space-y-1">
+                                {statusOptions.map(opt => (
+                                    <button key={opt.value} onClick={() => { handleStatusChange(opt.value); setShowStatusPicker(false); }}
+                                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${user?.status === opt.value ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5 hover:text-white'}`}>
+                                        <div className={`w-3 h-3 rounded-full ${opt.color}`} />
+                                        <span>{opt.label}</span>
+                                    </button>
+                                ))}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Settings */}
+                <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/settings')}
+                    className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-white/10 cursor-pointer transition-all duration-200" title="Settings">
+                    <FiSettings className="w-5 h-5" />
+                </motion.div>
+
+                {/* Profile */}
+                <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/settings')}
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold cursor-pointer transition-all duration-200 hover:opacity-80 mb-2" 
+                    style={{ backgroundColor: user?.accentColor || '#6366f1' }}
+                    title={user?.username || 'Profile'}>
+                    {user?.avatar?.url ? (
+                        <img src={user.avatar.url} alt="" className="w-full h-full rounded-full object-cover" />
+                    ) : user?.avatar?.prebuilt ? (
+                        <div className="w-full h-full rounded-full flex items-center justify-center text-lg" style={{ background: user.avatar.bg }}>{user.avatar.emoji}</div>
+                    ) : (user?.username?.[0] || 'U').toUpperCase()}
+                </motion.div>
             </div>
 
             {/* ─── CHANNEL SIDEBAR ─── */}
