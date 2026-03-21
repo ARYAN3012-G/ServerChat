@@ -85,6 +85,8 @@ app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/calls', require('./routes/callRoutes'));
 app.use('/api/gifs', require('./routes/gifRoutes'));
+app.use('/api/contact', require('./routes/contactRoutes'));
+
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { FiArrowLeft, FiMessageSquare, FiMail, FiPhone, FiSend, FiCheck } from 'react-icons/fi';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FiArrowLeft, FiMessageSquare, FiMail, FiPhone, FiSend, FiCheck, FiAlertCircle, FiLoader } from 'react-icons/fi';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export default function Contact() {
     const router = useRouter();
@@ -11,15 +13,26 @@ export default function Contact() {
     const [email, setEmail] = useState('');
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
-    const [sent, setSent] = useState(false);
+    const [status, setStatus] = useState('idle'); // idle | loading | success | error
+    const [errorMsg, setErrorMsg] = useState('');
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // Open default mail client with pre-filled values
-        const mailto = `mailto:aryanrajeshgadam.3012@gmail.com?subject=${encodeURIComponent(subject || 'ServerChat Support')}&body=${encodeURIComponent(`Name: ${name}\nEmail: ${email}\n\n${message}`)}`;
-        window.open(mailto, '_blank');
-        setSent(true);
-        setTimeout(() => setSent(false), 3000);
+        setStatus('loading');
+        setErrorMsg('');
+        try {
+            const res = await fetch(`${API_URL}/api/contact`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, subject, message }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to send message');
+            setStatus('success');
+        } catch (err) {
+            setStatus('error');
+            setErrorMsg(err.message || 'Something went wrong. Please try again.');
+        }
     };
 
     return (
@@ -122,13 +135,58 @@ export default function Contact() {
                                     className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all resize-none placeholder-white/20"
                                 />
                             </div>
-                            <button type="submit" className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-sm font-semibold transition-colors shadow-lg shadow-indigo-500/20">
-                                {sent ? <><FiCheck className="w-4 h-4" /> Opening Email Client...</> : <><FiSend className="w-4 h-4" /> Send Message</>}
+
+                            {/* Error message */}
+                            {status === 'error' && (
+                                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                                    <FiAlertCircle className="w-4 h-4 flex-shrink-0" />
+                                    {errorMsg}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={status === 'loading' || status === 'success'}
+                                className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold transition-colors shadow-lg shadow-indigo-500/20"
+                            >
+                                {status === 'loading' ? (
+                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending...</>
+                                ) : status === 'success' ? (
+                                    <><FiCheck className="w-4 h-4" /> Message Sent!</>
+                                ) : (
+                                    <><FiSend className="w-4 h-4" /> Send Message</>
+                                )}
                             </button>
-                            <p className="text-xs text-white/20 text-center">This will open your email client. We typically respond within 24 hours.</p>
+                            <p className="text-xs text-white/20 text-center">We typically respond within 24 hours.</p>
                         </form>
                     </motion.div>
                 </div>
+
+                {/* Success overlay card */}
+                <AnimatePresence>
+                    {status === 'success' && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        >
+                            <div className="bg-[#111427] border border-white/10 rounded-2xl p-8 text-center max-w-sm w-full shadow-2xl">
+                                <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+                                    <FiCheck className="w-8 h-8 text-emerald-400" />
+                                </div>
+                                <h2 className="text-xl font-bold mb-2">Message Sent! 🎉</h2>
+                                <p className="text-white/50 text-sm mb-6">Your message has been delivered to our team. We'll get back to you within 24 hours at <span className="text-indigo-300">{email}</span>.</p>
+                                <button
+                                    onClick={() => { setStatus('idle'); setName(''); setEmail(''); setSubject(''); setMessage(''); }}
+                                    className="w-full py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold transition-colors"
+                                >
+                                    Send Another Message
+                                </button>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
 
                 <div className="mt-12 text-center space-x-6 text-sm text-white/30">
                     <button onClick={() => router.push('/terms')} className="hover:text-white transition-colors">Terms of Service</button>
