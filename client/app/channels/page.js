@@ -924,7 +924,12 @@ export default function ChannelsPage() {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-baseline gap-2">
-                                                <span className="font-medium text-white cursor-pointer hover:underline" onClick={() => setProfileUser(msg.sender?._id || msg.sender)}>{msg.sender?.username || 'User'}</span>
+                                                <span className="font-medium text-white cursor-pointer hover:underline flex items-center" onClick={() => setProfileUser(msg.sender?._id || msg.sender)}>
+                                                    {msg.sender?.username || 'User'}
+                                                    {msg.sender?.subscription?.tier === 'pro' && (
+                                                        <span className="ml-1.5 text-[12px] bg-gradient-to-r from-amber-400 to-orange-500 text-transparent bg-clip-text drop-shadow-[0_0_2px_rgba(251,191,36,0.5)]" title="ServerChat Pro">✦</span>
+                                                    )}
+                                                </span>
                                                 <span className="text-xs text-white/20 flex items-center gap-1">
                                                     {new Date(msg.createdAt || Date.now()).toLocaleString()}
                                                     {msg.sender?._id === user?._id && msg.readBy?.length > 0 && (
@@ -1061,7 +1066,12 @@ export default function ChannelsPage() {
                                         {/* Parent Message */}
                                         <div className="px-4 py-3 border-b border-white/5 bg-white/[0.02]">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-sm font-medium text-white">{threadView.sender?.username || 'User'}</span>
+                                                <span className="text-sm font-medium text-white flex items-center">
+                                                    {threadView.sender?.username || 'User'}
+                                                    {threadView.sender?.subscription?.tier === 'pro' && (
+                                                        <span className="ml-1 text-[10px] bg-gradient-to-r from-amber-400 to-orange-500 text-transparent bg-clip-text drop-shadow-[0_0_2px_rgba(251,191,36,0.5)]" title="ServerChat Pro">✦</span>
+                                                    )}
+                                                </span>
                                                 <span className="text-xs text-white/20">{new Date(threadView.createdAt || Date.now()).toLocaleString()}</span>
                                             </div>
                                             <p className="text-sm text-white/60">{threadView.content}</p>
@@ -1075,7 +1085,12 @@ export default function ChannelsPage() {
                                                     </div>
                                                     <div>
                                                         <div className="flex items-baseline gap-1.5">
-                                                            <span className="text-xs font-medium text-white">{tm.sender?.username || 'User'}</span>
+                                                            <span className="text-xs font-medium text-white flex items-center">
+                                                                {tm.sender?.username || 'User'}
+                                                                {tm.sender?.subscription?.tier === 'pro' && (
+                                                                    <span className="ml-1 text-[10px] bg-gradient-to-r from-amber-400 to-orange-500 text-transparent bg-clip-text drop-shadow-[0_0_2px_rgba(251,191,36,0.5)]" title="ServerChat Pro">✦</span>
+                                                                )}
+                                                            </span>
                                                             <span className="text-[10px] text-white/20">{new Date(tm.createdAt || Date.now()).toLocaleTimeString()}</span>
                                                         </div>
                                                         <p className="text-xs text-white/60 mt-0.5">{tm.content}</p>

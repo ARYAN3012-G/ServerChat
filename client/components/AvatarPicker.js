@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiCamera, FiUpload, FiX, FiLock, FiStar, FiCheck } from 'react-icons/fi';
 import api from '../services/api';
@@ -34,6 +35,9 @@ const PREMIUM_AVATARS = [
 ];
 
 export default function AvatarPicker({ isOpen, onClose, currentAvatar, onAvatarChange, username }) {
+    const { user } = useSelector(state => state.auth);
+    const isPro = user?.subscription?.tier === 'pro';
+
     const [activeTab, setActiveTab] = useState('gallery');
     const [uploading, setUploading] = useState(false);
     const [cameraStream, setCameraStream] = useState(null);
@@ -113,6 +117,13 @@ export default function AvatarPicker({ isOpen, onClose, currentAvatar, onAvatarC
     const handleFileUpload = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        if (file.type === 'image/gif' && !isPro) {
+            toast('Animated GIF avatars require ServerChat Pro!', { icon: '🔒', duration: 4000 });
+            e.target.value = ''; // reset input
+            return;
+        }
+
         if (file.size > 5 * 1024 * 1024) {
             toast.error('File too large (max 5MB)');
             return;

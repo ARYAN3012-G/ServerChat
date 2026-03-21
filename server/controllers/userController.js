@@ -22,12 +22,14 @@ exports.getProfile = async (req, res, next) => {
 // Update profile
 exports.updateProfile = async (req, res, next) => {
     try {
-        const { username, bio, customStatus, preferences, prebuiltAvatar } = req.body;
+        const { username, bio, customStatus, preferences, prebuiltAvatar, banner, accentColor } = req.body;
         const updates = {};
 
         if (username) updates.username = username;
         if (bio !== undefined) updates.bio = bio;
-        if (customStatus) updates.customStatus = customStatus;
+        if (customStatus !== undefined) updates.customStatus = customStatus;
+        if (banner !== undefined) updates.banner = banner;
+        if (accentColor !== undefined) updates.accentColor = accentColor;
         if (preferences !== undefined) {
             updates.preferences = { ...req.user.preferences, ...preferences };
         }
@@ -60,6 +62,13 @@ exports.uploadAvatar = async (req, res, next) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        // Feature Gate: Animated Avatars (GIFs) are Pro only
+        if (req.file.mimetype === 'image/gif' && req.user?.subscription?.tier !== 'pro') {
+            const fs = require('fs');
+            fs.unlink(req.file.path, () => {});
+            return res.status(403).json({ message: 'Animated avatars require ServerChat Pro!' });
         }
 
         // Delete old avatar

@@ -14,6 +14,17 @@ router.post('/', auth, upload.single('file'), async (req, res, next) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
+        // Feature Gate: File Upload Limit (Free = 10MB, Pro = 100MB)
+        const isPro = req.user?.subscription?.tier === 'pro';
+        const maxFileSize = isPro ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+        
+        if (req.file.size > maxFileSize) {
+            fs.unlink(req.file.path, () => {});
+            return res.status(400).json({ 
+                message: `File exceeds limit of ${isPro ? '100MB' : '10MB'}. ${!isPro ? 'Upgrade to ServerChat Pro for 100MB uploads!' : ''}`
+            });
+        }
+
         console.log(`Receiving file upload: ${req.file.originalname} (${req.file.mimetype})`);
 
         // Determine the correct Cloudinary resource_type

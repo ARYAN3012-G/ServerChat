@@ -32,6 +32,56 @@ export default function BackgroundRenderer() {
         );
     }
 
+    // PREMIUM PRESETS
+    if (bg === 'aurora') {
+        return (
+            <div className="fixed inset-0 z-[-100] overflow-hidden bg-[#0A0A1A]">
+                <div className="absolute inset-0 opacity-40 mix-blend-screen"
+                    style={{
+                        background: 'radial-gradient(ellipse at top right, rgba(16, 185, 129, 0.4) 0%, transparent 50%), radial-gradient(ellipse at bottom left, rgba(139, 92, 246, 0.4) 0%, transparent 50%), radial-gradient(ellipse at center, rgba(59, 130, 246, 0.4) 0%, transparent 50%)',
+                        filter: 'blur(60px)',
+                    }}
+                />
+            </div>
+        );
+    }
+
+    if (bg === 'particles') {
+        return (
+            <div className="fixed inset-0 z-[-100] overflow-hidden bg-[#040407]">
+                <style>{`
+                    @keyframes floatUp { 0% { transform: translateY(100vh) scale(0); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(-10vh) scale(1.5); opacity: 0; } }
+                    .particle { position: absolute; background: rgba(255, 255, 255, 0.5); border-radius: 50%; animation: floatUp linear infinite; }
+                `}</style>
+                {[...Array(30)].map((_, i) => (
+                    <div key={i} className="particle"
+                        style={{
+                            left: `${Math.random() * 100}vw`,
+                            width: `${Math.random() * 4 + 1}px`,
+                            height: `${Math.random() * 4 + 1}px`,
+                            animationDuration: `${Math.random() * 10 + 10}s`,
+                            animationDelay: `${Math.random() * 10}s`,
+                        }}
+                    />
+                ))}
+            </div>
+        );
+    }
+
+    if (bg === 'waves') {
+        return (
+            <div className="fixed inset-0 z-[-100] overflow-hidden bg-[#0f1019]">
+                <style>{`
+                    @keyframes waveMove { 0% { background-position-x: 0; } 100% { background-position-x: -100vw; } }
+                    .wave-layer { position: absolute; bottom: 0; width: 200vw; height: 100%; background: repeating-radial-gradient(circle at 0 100%, rgba(99, 102, 241, 0.1) 0, rgba(99, 102, 241, 0.05) 50px, transparent 100px); animation: waveMove 20s linear infinite; }
+                `}</style>
+                <div className="wave-layer" style={{ height: '50vh', opacity: 0.8 }} />
+                <div className="wave-layer" style={{ height: '70vh', opacity: 0.5, animationDuration: '30s', animationDirection: 'reverse' }} />
+                <div className="wave-layer" style={{ height: '100vh', opacity: 0.3, animationDuration: '40s' }} />
+            </div>
+        );
+    }
+
     // Custom Image / GIF
     return (
         <div className="fixed inset-0 z-[-100]">

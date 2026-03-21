@@ -31,14 +31,21 @@ const userSchema = new mongoose.Schema({
     avatar: {
         url: { type: String, default: '' },
         publicId: { type: String, default: '' },
+        emoji: { type: String },
+        bg: { type: String },
+        prebuilt: { type: Boolean, default: false },
     },
     banner: {
-        url: { type: String, default: '' },
-        publicId: { type: String, default: '' },
+        type: String,
+        default: '',
+    },
+    accentColor: {
+        type: String,
+        default: '#6366f1', // default indigo-500
     },
     bio: {
         type: String,
-        maxlength: 200,
+        maxlength: 500, // Enforced tier limits in controller
         default: '',
     },
     role: {

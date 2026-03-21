@@ -114,7 +114,11 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
                     className="bg-[#111427] border border-white/10 rounded-2xl w-full max-w-[360px] mx-4 overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
 
                     {/* Banner */}
-                    <div className="h-24 bg-gradient-to-br from-indigo-600 via-purple-500 to-pink-500 relative">
+                    <div className="h-24 relative" style={{ 
+                        backgroundColor: profile?.accentColor || '#6366f1', 
+                        backgroundImage: profile?.banner ? `url(${profile.banner})` : undefined, 
+                        backgroundSize: 'cover', backgroundPosition: 'center' 
+                    }}>
                         <button onClick={onClose} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/30 flex items-center justify-center text-white/70 hover:text-white transition-colors">
                             <FiX className="w-4 h-4" />
                         </button>
@@ -132,10 +136,12 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
                         <div className="relative">
                             {/* Avatar */}
                             <div className="absolute -top-10 left-5">
-                                <div className="w-20 h-20 rounded-full bg-indigo-500 border-4 border-[#111427] flex items-center justify-center text-2xl font-bold">
-                                    {profile.avatar?.url ? (
+                                <div className="w-20 h-20 rounded-full border-[6px] border-[#111427] flex items-center justify-center text-3xl font-bold" style={{ backgroundColor: profile?.accentColor || '#6366f1' }}>
+                                    {profile?.avatar?.url ? (
                                         <img src={profile.avatar.url} alt="" className="w-full h-full rounded-full object-cover" />
-                                    ) : (profile.username?.[0] || 'U').toUpperCase()}
+                                    ) : profile?.avatar?.prebuilt ? (
+                                        <div className="w-full h-full rounded-full flex items-center justify-center text-3xl" style={{ background: profile.avatar.bg }}>{profile.avatar.emoji}</div>
+                                    ) : (profile?.username?.[0] || 'U').toUpperCase()}
                                 </div>
                                 <div className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-3 border-[#111427] ${profile.status === 'online' ? 'bg-emerald-400' : profile.status === 'idle' ? 'bg-amber-400' : profile.status === 'dnd' ? 'bg-red-400' : 'bg-white/20'}`} />
                             </div>
@@ -143,7 +149,12 @@ export default function UserProfileModal({ userId, onClose, onVoiceCall, onVideo
                             <div className="pt-12 px-5 pb-5">
                                 {/* Name & Role */}
                                 <div className="flex items-center gap-2 mb-1">
-                                    <h2 className="text-xl font-bold text-white">{profile.username || 'Unknown User'}</h2>
+                                    <h2 className="text-xl font-bold text-white flex items-center gap-1.5 drop-shadow-md">
+                                        {profile.username || 'Unknown User'}
+                                        {profile?.subscription?.tier === 'pro' && (
+                                            <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-transparent bg-clip-text text-sm" title="ServerChat Pro">✦</span>
+                                        )}
+                                    </h2>
                                     {profile.role && roleBadges[profile.role] && (
                                         <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${roleBadges[profile.role].color}`}>
                                             {roleBadges[profile.role].label}

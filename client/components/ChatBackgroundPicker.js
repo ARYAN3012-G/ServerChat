@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiLock, FiCheck, FiImage } from 'react-icons/fi';
 import toast from 'react-hot-toast';
@@ -18,17 +19,20 @@ const FREE_BACKGROUNDS = [
 ];
 
 const PREMIUM_BACKGROUNDS = [
-    { id: 'aurora-borealis', label: 'Aurora Borealis', preview: 'linear-gradient(180deg, #0f0c29 0%, #302b63 30%, #24243e 60%, #0f0c29 100%)' },
-    { id: 'galaxy', label: 'Galaxy', preview: 'radial-gradient(ellipse at 30% 20%, #1a0533 0%, #0d0221 40%, #000 70%), radial-gradient(circle at 70% 80%, #1b0a3c 0%, transparent 50%)' },
-    { id: 'neon-city', label: 'Neon City', preview: 'linear-gradient(180deg, #0a0015 0%, #1a0a3e 30%, #2d0a5e 50%, #0a0015 100%)' },
-    { id: 'sunset-gradient', label: 'Sunset', preview: 'linear-gradient(180deg, #1a0a2e 0%, #4a1942 30%, #801336 50%, #1a0a2e 100%)' },
-    { id: 'emerald-city', label: 'Emerald', preview: 'linear-gradient(135deg, #0a2f1a 0%, #1a5c3a 30%, #0a3d2e 60%, #0a1a14 100%)' },
-    { id: 'cyber-grid', label: 'Cyber Grid', preview: 'linear-gradient(#6366f108 1px, transparent 1px), linear-gradient(to right, #6366f108 1px, transparent 1px)' },
-    { id: 'nebula', label: 'Nebula', preview: 'radial-gradient(ellipse at 20% 50%, #240046 0%, transparent 50%), radial-gradient(ellipse at 80% 50%, #3c096c 0%, transparent 50%), #0a0a1a' },
-    { id: 'fire-glow', label: 'Fire Glow', preview: 'radial-gradient(ellipse at 50% 100%, #4a1500 0%, #1a0500 40%, #0a0000 70%)' },
+    { id: 'aurora-borealis', label: 'Aurora Borealis', preview: 'linear-gradient(180deg, #0f0c29 0%, #302b63 30%, #24243e 60%, #0f0c29 100%)', css: 'linear-gradient(180deg, #0f0c29 0%, #302b63 30%, #24243e 60%, #0f0c29 100%)' },
+    { id: 'galaxy', label: 'Galaxy', preview: 'radial-gradient(ellipse at 30% 20%, #1a0533 0%, #0d0221 40%, #000 70%), radial-gradient(circle at 70% 80%, #1b0a3c 0%, transparent 50%)', css: 'radial-gradient(ellipse at 30% 20%, #1a0533 0%, #0d0221 40%, #000 70%), radial-gradient(circle at 70% 80%, #1b0a3c 0%, transparent 50%)' },
+    { id: 'neon-city', label: 'Neon City', preview: 'linear-gradient(180deg, #0a0015 0%, #1a0a3e 30%, #2d0a5e 50%, #0a0015 100%)', css: 'linear-gradient(180deg, #0a0015 0%, #1a0a3e 30%, #2d0a5e 50%, #0a0015 100%)' },
+    { id: 'sunset-gradient', label: 'Sunset', preview: 'linear-gradient(180deg, #1a0a2e 0%, #4a1942 30%, #801336 50%, #1a0a2e 100%)', css: 'linear-gradient(180deg, #1a0a2e 0%, #4a1942 30%, #801336 50%, #1a0a2e 100%)' },
+    { id: 'emerald-city', label: 'Emerald', preview: 'linear-gradient(135deg, #0a2f1a 0%, #1a5c3a 30%, #0a3d2e 60%, #0a1a14 100%)', css: 'linear-gradient(135deg, #0a2f1a 0%, #1a5c3a 30%, #0a3d2e 60%, #0a1a14 100%)' },
+    { id: 'cyber-grid', label: 'Cyber Grid', preview: 'linear-gradient(#6366f108 1px, transparent 1px), linear-gradient(to right, #6366f108 1px, transparent 1px)', css: 'linear-gradient(#6366f108 1px, transparent 1px), linear-gradient(to right, #6366f108 1px, transparent 1px)' },
+    { id: 'nebula', label: 'Nebula', preview: 'radial-gradient(ellipse at 20% 50%, #240046 0%, transparent 50%), radial-gradient(ellipse at 80% 50%, #3c096c 0%, transparent 50%), #0a0a1a', css: 'radial-gradient(ellipse at 20% 50%, #240046 0%, transparent 50%), radial-gradient(ellipse at 80% 50%, #3c096c 0%, transparent 50%), #0a0a1a' },
+    { id: 'fire-glow', label: 'Fire Glow', preview: 'radial-gradient(ellipse at 50% 100%, #4a1500 0%, #1a0500 40%, #0a0000 70%)', css: 'radial-gradient(ellipse at 50% 100%, #4a1500 0%, #1a0500 40%, #0a0000 70%)' },
 ];
 
 export default function ChatBackgroundPicker({ isOpen, onClose, currentBg, onSelectBackground }) {
+    const { user } = useSelector(state => state.auth);
+    const isPro = user?.subscription?.tier === 'pro';
+
     if (!isOpen) return null;
 
     return (
@@ -91,14 +95,21 @@ export default function ChatBackgroundPicker({ isOpen, onClose, currentBg, onSel
                         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
                             {PREMIUM_BACKGROUNDS.map((bg) => (
                                 <motion.div key={bg.id} whileHover={{ scale: 1.02 }}
-                                    onClick={() => toast('Premium subscription required!', { icon: '🔒' })}
-                                    className="relative cursor-not-allowed rounded-xl overflow-hidden border-2 border-white/5">
-                                    <div className="w-full aspect-[4/3] opacity-50"
+                                    onClick={() => isPro ? onSelectBackground(bg) : toast('ServerChat Pro required!', { icon: '🔒' })}
+                                    className={`relative rounded-xl overflow-hidden border-2 transition-colors ${currentBg === bg.css ? 'border-amber-500' : 'border-white/5'} ${isPro ? 'cursor-pointer hover:border-amber-500/50' : 'cursor-not-allowed'}`}>
+                                    <div className={`w-full aspect-[4/3] ${!isPro ? 'opacity-50' : ''}`}
                                         style={{ background: bg.preview }}>
                                     </div>
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-xl">
-                                        <FiLock className="w-4 h-4 text-amber-400/50" />
-                                    </div>
+                                    {!isPro && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-xl">
+                                            <FiLock className="w-4 h-4 text-amber-400/50" />
+                                        </div>
+                                    )}
+                                    {currentBg === bg.css && isPro && (
+                                        <div className="absolute top-1 right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center">
+                                            <FiCheck className="w-2.5 h-2.5" />
+                                        </div>
+                                    )}
                                     <p className="text-[9px] text-white/30 text-center py-1 truncate px-1">{bg.label}</p>
                                 </motion.div>
                             ))}

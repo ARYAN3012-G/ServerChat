@@ -18,6 +18,8 @@ export default function SettingsPage() {
     const [username, setUsername] = useState('');
     const [bio, setBio] = useState('');
     const [customStatus, setCustomStatus] = useState('');
+    const [banner, setBanner] = useState('');
+    const [accentColor, setAccentColor] = useState('#6366f1');
     const [background, setBackground] = useState('');
     const [currentPw, setCurrentPw] = useState('');
     const [newPw, setNewPw] = useState('');
@@ -56,7 +58,7 @@ export default function SettingsPage() {
     }, [searchParams]);
 
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
-    useEffect(() => { if (user) { setUsername(user.username || ''); setBio(user.bio || ''); setCustomStatus(user.customStatus || ''); setBackground(user.preferences?.background || ''); setPhoneNumber(user.phone || ''); if (user.phone) setPhoneSaved(true); if (user.hasFaceId) setFaceRegistered(true); setAvatarData(user.avatar || null); } }, [user]);
+    useEffect(() => { if (user) { setUsername(user.username || ''); setBio(user.bio || ''); setCustomStatus(user.customStatus || ''); setBackground(user.preferences?.background || ''); setPhoneNumber(user.phone || ''); if (user.phone) setPhoneSaved(true); if (user.hasFaceId) setFaceRegistered(true); setAvatarData(user.avatar || null); setBanner(user.banner || ''); setAccentColor(user.accentColor || '#6366f1'); } }, [user]);
     useEffect(() => { if (isAuthenticated) fetchSubscription(); }, [isAuthenticated]);
 
     // Load face-api via npm dynamic import, forcing CPU backend to avoid WebGL hang
@@ -88,8 +90,15 @@ export default function SettingsPage() {
     const fetchSubscription = async () => { try { const { data } = await api.get('/payments/subscription'); setSubscription(data.subscription || { tier: 'free', status: 'inactive' }); } catch (e) { setSubscription({ tier: 'free', status: 'inactive' }); } };
 
     const handleSaveProfile = async () => {
+        const isPro = subscription?.tier === 'pro';
+        const maxBio = isPro ? 500 : 200;
+        if (bio.length > maxBio) {
+            setError(`Bio is too long (max ${maxBio} chars). ${!isPro ? 'Upgrade to Pro for 500 chars!' : ''}`);
+            return;
+        }
+
         setError(''); setSaved(false);
-        try { await api.put('/users/profile', { username, bio, customStatus, preferences: { background } }); setSaved(true); setTimeout(() => setSaved(false), 2000); }
+        try { await api.put('/users/profile', { username, bio, customStatus, banner, accentColor, preferences: { background } }); setSaved(true); setTimeout(() => setSaved(false), 2000); }
         catch (e) { setError(e.response?.data?.message || 'Failed'); }
     };
 
@@ -171,31 +180,58 @@ export default function SettingsPage() {
                             <>
                                 <motion.div key="account" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                                     <h3 className="text-2xl font-bold mb-8">My Account</h3>
-                                <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8">
-                                    <div className="flex items-center gap-5 mb-8 pb-8 border-b border-white/5">
-                                        <div className="relative group cursor-pointer" onClick={() => setShowAvatarPicker(true)}>
-                                            <div className="w-20 h-20 rounded-full bg-indigo-500/60 flex items-center justify-center text-3xl font-bold overflow-hidden border-2 border-white/10">
+                                <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8 relative overflow-hidden">
+                                    {/* Banner Preview */}
+                                    <div className={`absolute top-0 left-0 right-0 h-32 z-0 ${!banner ? 'bg-indigo-500/20' : ''}`} style={{ backgroundColor: !banner ? accentColor : undefined, backgroundImage: banner ? `url(${banner})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+
+                                    <div className="relative z-10 pt-12 flex items-end gap-5 mb-8 pb-8 border-b border-white/5">
+                                        <div className="relative group cursor-pointer shadow-xl shadow-black/50 rounded-full" onClick={() => setShowAvatarPicker(true)}>
+                                            <div className="w-24 h-24 rounded-full flex items-center justify-center text-4xl font-bold overflow-hidden border-4 border-dark-900" style={{ backgroundColor: accentColor }}>
                                                 {avatarData?.url ? (
                                                     <img src={avatarData.url} alt="" className="w-full h-full object-cover" />
                                                 ) : avatarData?.prebuilt ? (
-                                                    <div className="w-full h-full flex items-center justify-center text-3xl" style={{ background: avatarData.bg }}>{avatarData.emoji}</div>
+                                                    <div className="w-full h-full flex items-center justify-center text-4xl" style={{ background: avatarData.bg }}>{avatarData.emoji}</div>
                                                 ) : (
                                                     user?.username?.[0]?.toUpperCase() || '?'
                                                 )}
                                             </div>
-                                            <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><FiCamera className="w-5 h-5" /></div>
+                                            <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity border-4 border-transparent"><FiCamera className="w-6 h-6" /></div>
                                         </div>
-                                        <div>
-                                            <p className="text-xl font-bold">{user?.username}</p>
-                                            <p className="text-sm text-white/30">{user?.email}</p>
-                                            <button onClick={() => setShowAvatarPicker(true)} className="text-xs text-indigo-400 hover:text-indigo-300 mt-1 transition-colors">Change Avatar</button>
+                                        <div className="mb-2">
+                                            <p className="text-2xl font-bold flex items-center gap-2 drop-shadow-md">
+                                                {user?.username} 
+                                                {subscription?.tier === 'pro' && <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-transparent bg-clip-text text-sm ml-1" title="ServerChat Pro">✦</span>}
+                                            </p>
+                                            <p className="text-sm text-white/50">{user?.email}</p>
                                         </div>
                                     </div>
-                                    <div className="space-y-5">
+                                    <div className="space-y-5 relative z-10">
                                         <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Username</label>
                                             <input value={username} onChange={(e) => setUsername(e.target.value)} className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" /></div>
-                                        <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Bio</label>
-                                            <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} placeholder="Tell us about yourself" className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all resize-none placeholder-white/20" /></div>
+                                        <div>
+                                            <label className="text-[11px] font-bold text-white/40 uppercase tracking-wider flex items-center gap-2">
+                                                Bio <span className="text-[9px] lowercase font-normal">({bio.length}/{subscription?.tier === 'pro' ? 500 : 200})</span>
+                                                {subscription?.tier !== 'pro' && bio.length >= 200 && <span className="text-amber-400 capitalize text-[9px] ml-auto">Upgrade to Pro for 500 chars</span>}
+                                            </label>
+                                            <textarea value={bio} maxLength={subscription?.tier === 'pro' ? 500 : 200} onChange={(e) => setBio(e.target.value)} rows={3} placeholder="Tell us about yourself" className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all resize-none placeholder-white/20" />
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                            <div>
+                                                <label className="text-[11px] font-bold text-white/40 uppercase tracking-wider flex items-center gap-2">Custom Banner URL {!subscription || subscription?.tier !== 'pro' ? <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">PRO</span> : ''}</label>
+                                                <div className="relative mt-2">
+                                                    <input value={banner} onChange={(e) => setBanner(e.target.value)} disabled={subscription?.tier !== 'pro'} placeholder={subscription?.tier === 'pro' ? "https://example.com/banner.gif" : "Subscribe to Pro"} className={`w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all placeholder-white/20 ${subscription?.tier !== 'pro' ? 'opacity-50 cursor-not-allowed pr-10' : ''}`} />
+                                                    {subscription?.tier !== 'pro' && <FiLock className="absolute right-3 top-3.5 text-amber-400/50" />}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] font-bold text-white/40 uppercase tracking-wider flex items-center gap-2">Accent Color {!subscription || subscription?.tier !== 'pro' ? <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">PRO</span> : ''}</label>
+                                                <div className="flex items-center gap-3 mt-2 h-[46px]">
+                                                    <input type="color" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} disabled={subscription?.tier !== 'pro'} className={`w-12 h-10 rounded cursor-pointer ${subscription?.tier !== 'pro' ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                                                    <span className="text-sm font-mono text-white/60">{accentColor}</span>
+                                                    {subscription?.tier !== 'pro' && <FiLock className="text-amber-400/50 ml-2" />}
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Custom Status</label>
                                             <input value={customStatus} onChange={(e) => setCustomStatus(e.target.value)} placeholder="What are you up to?" className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all placeholder-white/20" /></div>
                                     </div>
@@ -426,22 +462,39 @@ export default function SettingsPage() {
                                     </div>
 
                                     <div className="mt-8 pt-8 border-t border-white/5">
-                                        <h4 className="text-lg font-semibold mb-2">Custom Background</h4>
+                                        <h4 className="text-lg font-semibold mb-2 flex items-center gap-2">Custom Background {!subscription || subscription?.tier !== 'pro' ? <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">PRO</span> : ''}</h4>
                                         <p className="text-sm text-white/40 mb-4">Paste an image or GIF URL to use as your app background.</p>
-                                        <input
-                                            value={background}
-                                            onChange={(e) => setBackground(e.target.value)}
-                                            placeholder="https://example.com/animated-bg.gif"
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all placeholder-white/20"
-                                        />
+                                        <div className="relative">
+                                            <input
+                                                value={background}
+                                                onChange={(e) => setBackground(e.target.value)}
+                                                disabled={subscription?.tier !== 'pro'}
+                                                placeholder={subscription?.tier === 'pro' ? "https://example.com/animated-bg.gif" : "Subscribe to Pro to use custom URLs"}
+                                                className={`w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all placeholder-white/20 ${subscription?.tier !== 'pro' ? 'opacity-50 cursor-not-allowed pr-10' : ''}`}
+                                            />
+                                            {subscription?.tier !== 'pro' && <FiLock className="absolute right-3 top-3.5 text-amber-400/50" />}
+                                        </div>
 
-                                        <div className="mt-6 flex flex-wrap gap-3">
-                                            {['none', 'stars', 'matrix', 'cyberpunk'].map(preset => (
-                                                <button key={preset} onClick={() => setBackground(preset === 'none' ? '' : preset)}
-                                                    className={`px-4 py-2 rounded-lg text-xs font-semibold capitalize border transition-all ${background === preset || (preset === 'none' && !background) ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300' : 'border-white/10 text-white/40 hover:bg-white/5'}`}>
-                                                    {preset}
-                                                </button>
-                                            ))}
+                                        <div className="mt-6">
+                                            <p className="text-[10px] font-bold text-white/40 mb-2 uppercase tracking-wider">Free Presets</p>
+                                            <div className="flex flex-wrap gap-3 mb-4">
+                                                {['none', 'stars', 'matrix', 'cyberpunk'].map(preset => (
+                                                    <button key={preset} onClick={() => setBackground(preset === 'none' ? '' : preset)}
+                                                        className={`px-4 py-2 rounded-lg text-xs font-semibold capitalize border transition-all ${background === preset || (preset === 'none' && !background) ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300' : 'border-white/10 text-white/40 hover:bg-white/5'}`}>
+                                                        {preset}
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            <p className="text-[10px] font-bold text-amber-400/60 mb-2 uppercase tracking-wider flex items-center gap-2">Premium Presets</p>
+                                            <div className="flex flex-wrap gap-3">
+                                                {['aurora', 'particles', 'waves'].map(preset => (
+                                                    <button key={preset} onClick={() => subscription?.tier === 'pro' ? setBackground(preset) : toast('ServerChat Pro required!', { icon: '🔒' })}
+                                                        className={`flex items-center gap-1 px-4 py-2 rounded-lg text-xs font-semibold capitalize border transition-all ${background === preset ? 'border-amber-500 bg-amber-500/20 text-amber-300' : 'border-white/5 text-white/40'} ${subscription?.tier === 'pro' ? 'hover:bg-amber-500/10 cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
+                                                        {preset} {subscription?.tier !== 'pro' && <FiLock className="w-3 h-3 text-amber-400/50" />}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
 
                                         {error && <p className="text-red-400 text-sm mt-3">{error}</p>}

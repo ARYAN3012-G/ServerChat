@@ -466,7 +466,12 @@ export default function DMsPage() {
                                         ); })()}
                                         <div className={`max-w-[70%] ${isMine ? 'text-right' : ''}`}>
                                             <div className={`flex items-baseline gap-2 ${isMine ? 'justify-end' : ''}`}>
-                                                <span className="font-medium text-sm cursor-pointer hover:underline" onClick={() => { const sid = msg.sender?._id || msg.sender; if (!isMine) setProfilePopupUser({ userId: sid, username: msg.sender?.username, status: msg.sender?.status, bio: msg.sender?.bio }); }}>{isMine ? (msg.sender?.username || 'You') : getDisplayName(msg.sender?._id || msg.sender, msg.sender?.username)}</span>
+                                                <span className="font-medium text-sm cursor-pointer hover:underline flex items-center" onClick={() => { const sid = msg.sender?._id || msg.sender; if (!isMine) setProfilePopupUser({ userId: sid, username: msg.sender?.username, status: msg.sender?.status, bio: msg.sender?.bio }); }}>
+                                                    {isMine ? (msg.sender?.username || 'You') : getDisplayName(msg.sender?._id || msg.sender, msg.sender?.username)}
+                                                    {msg.sender?.subscription?.tier === 'pro' && (
+                                                        <span className="ml-1.5 text-[12px] bg-gradient-to-r from-amber-400 to-orange-500 text-transparent bg-clip-text drop-shadow-[0_0_2px_rgba(251,191,36,0.5)]" title="ServerChat Pro">✦</span>
+                                                    )}
+                                                </span>
                                                 <span className="text-[10px] text-white/20 flex items-center gap-1">
                                                     {new Date(msg.createdAt || Date.now()).toLocaleTimeString()}
                                                     {isMine && msg.readBy?.length > 0 && (

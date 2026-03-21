@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiMic, FiSquare, FiSend, FiX } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 export default function VoiceRecorder({ onSend, onCancel }) {
     const [isRecording, setIsRecording] = useState(false);
@@ -12,6 +14,10 @@ export default function VoiceRecorder({ onSend, onCancel }) {
     const mediaRecorderRef = useRef(null);
     const chunksRef = useRef([]);
     const timerRef = useRef(null);
+
+    const { user } = useSelector(state => state.auth);
+    const isPro = user?.subscription?.tier === 'pro';
+    const MAX_SECONDS = isPro ? 300 : 60; // 5 mins for Pro, 60s for Free
 
     const startRecording = useCallback(async () => {
         try {
@@ -54,6 +60,13 @@ export default function VoiceRecorder({ onSend, onCancel }) {
         setIsRecording(false);
         clearInterval(timerRef.current);
     }, []);
+
+    useEffect(() => {
+        if (isRecording && recordingTime >= MAX_SECONDS) {
+            stopRecording();
+            toast(`Voice limit reached (${formatTime(MAX_SECONDS)}). ${!isPro ? 'Upgrade to Pro for 5-minute messages!' : ''}`, { icon: '⏱️' });
+        }
+    }, [recordingTime, isRecording, MAX_SECONDS, stopRecording, isPro]);
 
     const handleSend = useCallback(() => {
         if (audioBlob && onSend) {

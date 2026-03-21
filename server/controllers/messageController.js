@@ -11,7 +11,7 @@ exports.getMessages = async (req, res, next) => {
         if (before) query.createdAt = { $lt: new Date(before) };
 
         const messages = await Message.find(query)
-            .populate('sender', 'username avatar status')
+            .populate('sender', 'username avatar status subscription')
             .populate('replyTo', 'content sender')
             .sort({ createdAt: -1 })
             .limit(Number(limit))
@@ -35,10 +35,10 @@ exports.getThread = async (req, res, next) => {
         const { messageId } = req.params;
 
         const parent = await Message.findById(messageId)
-            .populate('sender', 'username avatar status');
+            .populate('sender', 'username avatar status subscription');
 
         const replies = await Message.find({ threadId: messageId, isDeleted: false })
-            .populate('sender', 'username avatar status')
+            .populate('sender', 'username avatar status subscription')
             .sort({ createdAt: 1 });
 
         res.json({ parent, replies });
@@ -56,7 +56,7 @@ exports.getPinnedMessages = async (req, res, next) => {
             isPinned: true,
             isDeleted: false,
         })
-            .populate('sender', 'username avatar status')
+            .populate('sender', 'username avatar status subscription')
             .sort({ createdAt: -1 });
 
         res.json({ messages });
@@ -75,7 +75,7 @@ exports.searchMessages = async (req, res, next) => {
         if (channelId) query.channel = channelId;
 
         const messages = await Message.find(query)
-            .populate('sender', 'username avatar status')
+            .populate('sender', 'username avatar status subscription')
             .populate('channel', 'name')
             .sort({ createdAt: -1 })
             .limit(Number(limit))
@@ -100,7 +100,7 @@ exports.sendMessage = async (req, res, next) => {
             channel: channelId,
         });
 
-        const populated = await message.populate('sender', 'username avatar status');
+        const populated = await message.populate('sender', 'username avatar status subscription');
         await Channel.findByIdAndUpdate(channelId, {
             lastMessage: message._id,
             lastActivity: new Date(),
@@ -129,7 +129,7 @@ exports.editMessage = async (req, res, next) => {
         message.editedAt = new Date();
         await message.save();
 
-        const populated = await message.populate('sender', 'username avatar status');
+        const populated = await message.populate('sender', 'username avatar status subscription');
         res.json({ message: populated });
     } catch (error) {
         next(error);
@@ -182,7 +182,7 @@ exports.toggleReaction = async (req, res, next) => {
         }
 
         await message.save();
-        const populated = await message.populate('sender', 'username avatar status');
+        const populated = await message.populate('sender', 'username avatar status subscription');
         res.json({ message: populated });
     } catch (error) {
         next(error);
