@@ -100,11 +100,19 @@ export default function SettingsPage() {
         catch (e) { setError(e.response?.data?.message || 'Failed'); }
     };
 
-    const tierConfig = {
-        free: { color: 'from-gray-500 to-gray-600', badge: 'text-white/40 bg-white/5', label: 'Free', features: ['10 MB uploads', 'Basic features'] },
-        basic: { color: 'from-blue-500 to-indigo-600', badge: 'text-blue-400 bg-blue-500/10', label: 'Basic', features: ['50 MB uploads', 'Custom Emojis', 'Screen Share'] },
-        premium: { color: 'from-amber-500 to-orange-600', badge: 'text-amber-400 bg-amber-500/10', label: 'Premium', features: ['100 MB uploads', 'Custom Emojis', 'Premium Badge', 'Animated Avatar', 'Screen Share'] },
-    };
+    const proFeatures = [
+        { icon: '🎨', label: 'Premium Backgrounds', desc: '8 exclusive DM + app backgrounds' },
+        { icon: '📁', label: '100 MB Uploads', desc: '10× larger file uploads' },
+        { icon: '⚡', label: 'Premium Badge', desc: 'Gold badge on profile & messages' },
+        { icon: '🎭', label: 'Animated Avatar', desc: 'Upload GIFs as profile picture' },
+        { icon: '🖼️', label: 'Profile Banner', desc: 'Custom banner image on profile' },
+        { icon: '📝', label: 'Extended Bio', desc: '500 characters (vs 200 free)' },
+        { icon: '🖥️', label: 'HD Screen Share', desc: '1080p / 30fps quality' },
+        { icon: '🎵', label: 'Music Room Priority', desc: 'DJ controls & queue priority' },
+        { icon: '💬', label: 'Custom Emoji', desc: 'Use custom emojis everywhere' },
+        { icon: '✅', label: 'Read Receipts', desc: 'See who read your messages' },
+        { icon: '🚀', label: 'Server Boost', desc: '500 member limit for owned servers' },
+    ];
 
     const tabs = [
         { id: 'account', label: 'My Account', icon: FiUser },
@@ -463,47 +471,125 @@ export default function SettingsPage() {
                             </motion.div>
                         )}
 
-                        {/* SUBSCRIPTION (Subscription + Payment collections) */}
+                        {/* SUBSCRIPTION (ServerChat Pro) */}
                         {tab === 'subscription' && (
                             <motion.div key="subscription" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                                 <h3 className="text-2xl font-bold mb-8">Subscription</h3>
-                                <p className="text-white/40 text-sm mb-6">Your plan and features — from <code className="text-indigo-400">subscriptions</code> & <code className="text-indigo-400">payments</code> collections</p>
 
                                 {/* Current Plan Card */}
-                                <div className={`bg-gradient-to-br ${tierConfig[subscription?.tier || 'free']?.color} rounded-2xl p-8 shadow-xl mb-6 relative overflow-hidden`}>
+                                <div className={`rounded-2xl p-8 shadow-xl mb-6 relative overflow-hidden ${subscription?.tier === 'pro' ? 'bg-gradient-to-br from-amber-500 to-orange-600' : 'bg-gradient-to-br from-gray-600 to-gray-700'}`}>
                                     <div className="absolute top-4 right-4 opacity-20"><FiZap className="w-16 h-16" /></div>
                                     <p className="text-white/70 text-sm font-medium uppercase tracking-wider">Current Plan</p>
-                                    <h4 className="text-4xl font-black mt-2 mb-1">{tierConfig[subscription?.tier || 'free']?.label}</h4>
-                                    <p className="text-white/60 text-sm mb-4">Status: <span className={`font-semibold ${subscription?.status === 'active' ? 'text-emerald-300' : 'text-white/50'}`}>{subscription?.status || 'inactive'}</span></p>
-                                    {subscription?.currentPeriodEnd && <p className="text-white/40 text-xs">Renews: {new Date(subscription.currentPeriodEnd).toLocaleDateString()}</p>}
+                                    <h4 className="text-4xl font-black mt-2 mb-1">{subscription?.tier === 'pro' ? 'ServerChat Pro ⚡' : 'Free'}</h4>
+                                    <p className="text-white/60 text-sm mb-2">
+                                        Status: <span className={`font-semibold ${subscription?.status === 'active' ? 'text-emerald-300' : 'text-white/50'}`}>{subscription?.status || 'inactive'}</span>
+                                    </p>
+                                    {subscription?.currentPeriodEnd && subscription?.tier === 'pro' && (
+                                        <p className="text-white/40 text-xs">
+                                            {subscription.cancelAtPeriodEnd ? 'Cancels' : 'Renews'}: {new Date(subscription.currentPeriodEnd).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                        </p>
+                                    )}
                                 </div>
 
-                                {/* Features */}
+                                {/* Upgrade Card (show only for free users) */}
+                                {subscription?.tier !== 'pro' && (
+                                    <div className="bg-gradient-to-br from-amber-500/5 to-orange-500/5 rounded-2xl border border-amber-500/20 p-8 mb-6">
+                                        <div className="flex items-center justify-between mb-6">
+                                            <div>
+                                                <h4 className="text-2xl font-bold text-amber-400">Upgrade to ServerChat Pro</h4>
+                                                <p className="text-white/40 text-sm mt-1">Unlock all premium features</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-3xl font-black text-white">₹50<span className="text-sm font-normal text-white/40">/month</span></p>
+                                                <p className="text-xs text-amber-400/60">UPI • Cards • Net Banking</p>
+                                            </div>
+                                        </div>
+
+                                        <button onClick={async () => {
+                                            try {
+                                                const { data } = await api.post('/payments/checkout');
+                                                const options = {
+                                                    key: data.razorpayKeyId,
+                                                    subscription_id: data.subscriptionId,
+                                                    name: 'ServerChat Pro',
+                                                    description: '₹50/month — Premium Subscription',
+                                                    handler: async (response) => {
+                                                        try {
+                                                            const verifyRes = await api.post('/payments/verify', {
+                                                                razorpay_payment_id: response.razorpay_payment_id,
+                                                                razorpay_subscription_id: response.razorpay_subscription_id,
+                                                                razorpay_signature: response.razorpay_signature,
+                                                            });
+                                                            toast.success(verifyRes.data.message || 'Welcome to Pro! 🎉');
+                                                            fetchSubscription();
+                                                        } catch (e) {
+                                                            toast.error('Payment verification failed');
+                                                        }
+                                                    },
+                                                    prefill: {
+                                                        name: user?.username || '',
+                                                        email: user?.email || '',
+                                                    },
+                                                    theme: { color: '#f59e0b' },
+                                                    modal: {
+                                                        ondismiss: () => toast('Payment cancelled', { icon: '❌' }),
+                                                    },
+                                                };
+                                                const rzp = new window.Razorpay(options);
+                                                rzp.open();
+                                            } catch (e) {
+                                                toast.error(e.response?.data?.message || 'Failed to start checkout');
+                                            }
+                                        }}
+                                            className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-lg font-bold rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg shadow-amber-500/20 active:scale-[0.98]">
+                                            ⚡ Subscribe Now — ₹50/month
+                                        </button>
+                                        <p className="text-xs text-white/20 text-center mt-3">Supports UPI, PhonePe, Google Pay, Paytm, Cards, Net Banking</p>
+                                    </div>
+                                )}
+
+                                {/* Cancel Button (for Pro users) */}
+                                {subscription?.tier === 'pro' && subscription?.status === 'active' && !subscription?.cancelAtPeriodEnd && (
+                                    <div className="mb-6">
+                                        <button onClick={async () => {
+                                            if (!confirm('Are you sure you want to cancel? You\'ll keep Pro features until the end of your billing period.')) return;
+                                            try {
+                                                const { data } = await api.post('/payments/cancel');
+                                                toast.success(data.message);
+                                                fetchSubscription();
+                                            } catch (e) {
+                                                toast.error(e.response?.data?.message || 'Cancel failed');
+                                            }
+                                        }}
+                                            className="px-6 py-3 rounded-xl text-sm text-red-400 border border-red-500/20 hover:bg-red-500/10 transition-colors">
+                                            Cancel Subscription
+                                        </button>
+                                    </div>
+                                )}
+
+                                {subscription?.cancelAtPeriodEnd && (
+                                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-5 py-3 mb-6">
+                                        <p className="text-sm text-red-400">⚠️ Your subscription will cancel at the end of your billing period. You will keep Pro features until then.</p>
+                                    </div>
+                                )}
+
+                                {/* Pro Features List */}
                                 <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8">
-                                    <h4 className="text-lg font-semibold mb-5">Your Features</h4>
-                                    <div className="space-y-3">
-                                        {(tierConfig[subscription?.tier || 'free']?.features || []).map((f, i) => (
-                                            <div key={i} className="flex items-center gap-3">
-                                                <FiCheck className="w-4 h-4 text-emerald-400" />
-                                                <span className="text-sm text-white/70">{f}</span>
+                                    <h4 className="text-lg font-semibold mb-5 flex items-center gap-2">
+                                        <FiZap className="w-5 h-5 text-amber-400" /> Pro Features
+                                    </h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {proFeatures.map((f, i) => (
+                                            <div key={i} className="flex items-start gap-3 py-2">
+                                                <span className="text-lg">{f.icon}</span>
+                                                <div>
+                                                    <p className={`text-sm font-semibold ${subscription?.tier === 'pro' ? 'text-amber-400' : 'text-white/70'}`}>{f.label}</p>
+                                                    <p className="text-xs text-white/30">{f.desc}</p>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
-
-                                {/* Upgrade Tiers */}
-                                <div className="grid grid-cols-3 gap-4 mt-6">
-                                    {Object.entries(tierConfig).map(([key, cfg]) => (
-                                        <div key={key} className={`rounded-2xl border p-6 text-center transition-all ${subscription?.tier === key ? 'border-indigo-500 bg-indigo-500/10' : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04]'}`}>
-                                            <h5 className="font-bold text-lg mb-1">{cfg.label}</h5>
-                                            <p className="text-xs text-white/30 mb-3">{key === 'free' ? 'Free forever' : key === 'basic' ? '$4.99/mo' : '$9.99/mo'}</p>
-                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${subscription?.tier === key ? 'bg-indigo-500 text-white' : cfg.badge}`}>
-                                                {subscription?.tier === key ? 'Current' : 'Select'}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                                <p className="text-white/20 text-xs mt-4 text-center">Payment processing requires Stripe configuration</p>
                             </motion.div>
                         )}
 

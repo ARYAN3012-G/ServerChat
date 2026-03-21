@@ -53,6 +53,9 @@ export default function RootLayout({ children }) {
                 <meta name="twitter:card" content="summary_large_image" />
                 <meta name="twitter:title" content="ServerChat - Real-Time Communication Platform" />
                 <meta name="twitter:description" content="Chat, voice & video calls, built-in games, watch parties, and more. Connect with your team instantly." />
+
+                {/* Razorpay Checkout */}
+                <script src="https://checkout.razorpay.com/v1/checkout.js" async />
             </head>
             <body className="bg-transparent text-[var(--text-primary)] antialiased">
                 <Provider store={store}>

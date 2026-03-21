@@ -94,11 +94,11 @@ const userSchema = new mongoose.Schema({
     subscription: {
         tier: {
             type: String,
-            enum: ['free', 'basic', 'premium'],
+            enum: ['free', 'pro'],
             default: 'free',
         },
-        stripeCustomerId: String,
-        stripeSubscriptionId: String,
+        razorpayCustomerId: String,
+        razorpaySubscriptionId: String,
         expiresAt: Date,
     },
 

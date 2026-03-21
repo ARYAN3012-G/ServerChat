@@ -6,25 +6,31 @@ const paymentSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
-    stripePaymentIntentId: String,
-    stripeInvoiceId: String,
+    razorpayPaymentId: String,
+    razorpayOrderId: String,
+    razorpaySubscriptionId: String,
+    razorpaySignature: String,
     amount: {
         type: Number,
         required: true,
     },
     currency: {
         type: String,
-        default: 'usd',
+        default: 'INR',
     },
     status: {
         type: String,
         enum: ['pending', 'succeeded', 'failed', 'refunded'],
         default: 'pending',
     },
+    method: {
+        type: String, // upi, card, netbanking, wallet
+    },
     description: String,
     tier: {
         type: String,
-        enum: ['basic', 'premium'],
+        enum: ['pro'],
+        default: 'pro',
     },
 }, { timestamps: true });
 
