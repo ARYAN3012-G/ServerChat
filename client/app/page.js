@@ -588,19 +588,20 @@ export default function HomePage() {
                 </motion.div>
             </section>
 
-            {/* Footer */}
             <footer className="relative z-10 border-t border-white/[0.05] py-6 sm:py-8">
-                <div className="max-w-7xl mx-auto px-4 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-white to-silver-400 flex items-center justify-center">
-                            <FiMessageSquare className="w-3 h-3 text-dark-900" />
+                <div className="max-w-7xl mx-auto px-4 sm:px-8">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-white to-silver-400 flex items-center justify-center">
+                                <FiMessageSquare className="w-3 h-3 text-dark-900" />
+                            </div>
+                            <span className="text-sm text-silver-600">© 2026 ServerChat. All rights reserved.</span>
                         </div>
-                        <span className="text-sm text-silver-600">© 2026 ServerChat</span>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-silver-700">
-                        <span className="flex items-center gap-1"><FiShield className="w-3 h-3 text-green-500" /> Secure</span>
-                        <span className="flex items-center gap-1"><FiZap className="w-3 h-3 text-yellow-500" /> Fast</span>
-                        <span className="flex items-center gap-1"><FiGlobe className="w-3 h-3 text-blue-500" /> Global</span>
+                        <div className="flex items-center gap-5 text-xs text-silver-600">
+                            <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+                            <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+                            <Link href="/contact" className="hover:text-white transition-colors">Contact Us</Link>
+                        </div>
                     </div>
                 </div>
             </footer>
