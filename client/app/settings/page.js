@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUser, FiLock, FiMoon, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap, FiMenu, FiSmartphone, FiShield, FiSlash } from 'react-icons/fi';
+import { FiArrowLeft, FiUser, FiLock, FiMoon, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap, FiMenu, FiSmartphone, FiShield, FiSlash, FiLogOut } from 'react-icons/fi';
 import dynamic from 'next/dynamic';
 const AvatarPicker = dynamic(() => import('../../components/AvatarPicker'), { ssr: false });
 import { useAuth } from '../../hooks/useAuth';
@@ -13,7 +13,7 @@ import BlockedUsersTab from '../../components/BlockedUsersTab';
 
 export default function SettingsPage() {
     const router = useRouter();
-    const { user, isAuthenticated, loading } = useAuth();
+    const { user, isAuthenticated, loading, logout } = useAuth();
     const [tab, setTab] = useState('account');
     const [username, setUsername] = useState('');
     const [bio, setBio] = useState('');
@@ -60,6 +60,11 @@ export default function SettingsPage() {
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
     useEffect(() => { if (user) { setUsername(user.username || ''); setBio(user.bio || ''); setCustomStatus(user.customStatus || ''); setBackground(user.preferences?.background || ''); setPhoneNumber(user.phone || ''); if (user.phone) setPhoneSaved(true); if (user.hasFaceId) setFaceRegistered(true); setAvatarData(user.avatar || null); setBanner(user.banner || ''); setAccentColor(user.accentColor || '#6366f1'); } }, [user]);
     useEffect(() => { if (isAuthenticated) fetchSubscription(); }, [isAuthenticated]);
+
+    const handleLogout = () => {
+        logout();
+        setTimeout(() => router.push('/login'), 100);
+    };
 
     // Load face-api — let it use its default backend (WebGL if available, WASM fallback)
     // Do NOT override the backend: face-api bundles its own TF.js with WebGL kernels already
@@ -248,6 +253,9 @@ export default function SettingsPage() {
                                     {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
                                     <button onClick={handleSaveProfile} className="mt-6 flex items-center gap-2 px-6 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/20">
                                         {saved ? <><FiCheck className="w-4 h-4" /> Saved!</> : <><FiSave className="w-4 h-4" /> Save Changes</>}
+                                    </button>
+                                    <button onClick={handleLogout} className="mt-6 ml-4 flex items-center gap-2 px-6 py-2.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-sm font-semibold hover:bg-red-500 hover:text-white transition-colors">
+                                        <FiLogOut className="w-4 h-4" /> Log Out
                                     </button>
                                 </div>
                             </motion.div>

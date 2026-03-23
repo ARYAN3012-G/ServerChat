@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiSend, FiSearch, FiMessageSquare, FiPlus, FiX, FiPaperclip, FiPhone, FiVideo, FiSmile, FiMenu, FiCheck, FiImage } from 'react-icons/fi';
+import { FiArrowLeft, FiSend, FiSearch, FiMessageSquare, FiPlus, FiX, FiPaperclip, FiPhone, FiVideo, FiSmile, FiMenu, FiCheck, FiImage, FiSettings, FiLogOut } from 'react-icons/fi';
 import { useSelector, useDispatch } from 'react-redux';
 import { setMessages, addMessage } from '../../redux/chatSlice';
 import { useAuth } from '../../hooks/useAuth';
@@ -29,7 +29,7 @@ import toast from 'react-hot-toast';
 export default function DMsPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { user, isAuthenticated, loading } = useAuth();
+    const { user, isAuthenticated, loading, logout } = useAuth();
     const { sendMessage, reactToMessage } = useSocket();
     const { initiateCall } = useCall() || {};
 
@@ -58,6 +58,11 @@ export default function DMsPage() {
     useEffect(() => {
         if (!loading && !isAuthenticated) router.push('/login');
     }, [isAuthenticated, loading]);
+
+    const handleLogout = () => {
+        logout();
+        setTimeout(() => router.push('/login'), 100);
+    };
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -352,6 +357,29 @@ export default function DMsPage() {
                             );
                         })
                     }
+                </div>
+
+                {/* User Panel (Bottom of Sidebar) */}
+                <div className="relative bg-dark-950/50 px-2.5 py-2 border-t border-white/5 shrink-0">
+                    <div className="flex items-center gap-2">
+                        <div className="relative cursor-pointer" onClick={() => router.push('/settings')}>
+                            <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-sm font-bold">{user?.username?.[0]?.toUpperCase() || '?'}</div>
+                            <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-dark-950 ${user?.status === 'dnd' ? 'bg-red-500' : user?.status === 'idle' ? 'bg-amber-400' : user?.status === 'invisible' ? 'bg-gray-400' : 'bg-emerald-400'
+                                }`} title={user?.status || 'Online'} />
+                        </div>
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push('/settings')}>
+                            <p className="text-sm font-medium truncate">{user?.username || 'User'}</p>
+                            <p className={`text-[10px] ${user?.status === 'dnd' ? 'text-red-400' : user?.status === 'idle' ? 'text-amber-400' : user?.status === 'invisible' ? 'text-gray-400' : 'text-emerald-400'}`}>
+                                {user?.customStatus?.text || (user?.status === 'dnd' ? 'Do Not Disturb' : user?.status === 'idle' ? 'Idle' : user?.status === 'invisible' ? 'Invisible' : 'Online')}
+                            </p>
+                        </div>
+                        <button onClick={() => router.push('/settings')} className="p-1.5 rounded hover:bg-white/10 text-white/30 hover:text-white transition-colors" title="Settings">
+                            <FiSettings className="w-4 h-4" />
+                        </button>
+                        <button onClick={handleLogout} className="p-1.5 rounded hover:bg-white/10 text-white/30 hover:text-red-400 transition-colors" title="Log Out">
+                            <FiLogOut className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
