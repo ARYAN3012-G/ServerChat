@@ -199,9 +199,9 @@ export default function SettingsPage() {
                                     {/* Banner Preview */}
                                     <div className={`absolute top-0 left-0 right-0 h-32 z-0 ${!banner ? 'bg-indigo-500/20' : ''}`} style={{ backgroundColor: !banner ? accentColor : undefined, backgroundImage: banner ? `url(${banner})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }} />
 
-                                    <div className="relative z-10 pt-12 flex items-end gap-5 mb-8 pb-8 border-b border-white/5">
-                                        <div className="relative group cursor-pointer shadow-xl shadow-black/50 rounded-full" onClick={() => setShowAvatarPicker(true)}>
-                                            <div className="w-24 h-24 rounded-full flex items-center justify-center text-4xl font-bold overflow-hidden border-4 border-dark-900" style={{ backgroundColor: accentColor }}>
+                                    <div className="relative z-10 pt-16 sm:pt-12 flex flex-col sm:flex-row items-center sm:items-end text-center sm:text-left gap-3 sm:gap-5 mb-8 pb-8 border-b border-white/5">
+                                        <div className="relative group cursor-pointer shadow-xl shadow-black/50 rounded-full shrink-0" onClick={() => setShowAvatarPicker(true)}>
+                                            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center text-3xl sm:text-4xl font-bold overflow-hidden border-4 border-dark-900" style={{ backgroundColor: accentColor }}>
                                                 {avatarData?.url ? (
                                                     <img src={avatarData.url} alt="" className="w-full h-full object-cover" />
                                                 ) : avatarData?.prebuilt ? (
@@ -212,12 +212,12 @@ export default function SettingsPage() {
                                             </div>
                                             <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity border-4 border-transparent"><FiCamera className="w-6 h-6" /></div>
                                         </div>
-                                        <div className="mb-2">
-                                            <p className="text-2xl font-bold flex items-center gap-2 drop-shadow-md">
+                                        <div className="mb-2 min-w-0 w-full sm:w-auto flex-1">
+                                            <p className="text-xl sm:text-2xl font-bold flex flex-wrap justify-center sm:justify-start items-center gap-2 drop-shadow-md break-all">
                                                 {user?.username} 
                                                 {subscription?.tier === 'pro' && <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-transparent bg-clip-text text-sm ml-1" title="ServerChat Pro">✦</span>}
                                             </p>
-                                            <p className="text-sm text-white/50">{user?.email}</p>
+                                            <p className="text-xs sm:text-sm text-white/50 break-all">{user?.email}</p>
                                         </div>
                                     </div>
                                     <div className="space-y-5 relative z-10">

@@ -472,16 +472,16 @@ export default function LoginPage() {
                                     Would you like to set up your profile? You can add a <span className="text-white/60">password</span>, <span className="text-white/60">phone number</span>, and <span className="text-white/60">Face ID</span> for easier login next time.
                                 </p>
                             </div>
-                            <div className="px-8 pb-8 flex gap-3">
+                            <div className="px-6 sm:px-8 pb-8 flex flex-col sm:flex-row gap-3">
                                 <motion.button whileTap={{ scale: 0.97 }}
                                     onClick={() => { setShowWelcome(false); hydrateAndRedirect('/channels'); }}
-                                    className="flex-1 py-3 rounded-xl text-sm text-white/40 hover:text-white border border-white/10 hover:border-white/20 transition-all font-medium">
+                                    className="w-full sm:flex-1 py-3 sm:py-3.5 rounded-xl text-sm text-white/40 hover:text-white border border-white/10 hover:border-white/20 transition-all font-medium order-2 sm:order-1">
                                     Skip for now
                                 </motion.button>
                                 <motion.button whileTap={{ scale: 0.97 }}
                                     onClick={() => { setShowWelcome(false); hydrateAndRedirect('/settings?tab=security'); }}
-                                    className="flex-1 py-3 rounded-xl text-sm bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition-all flex items-center justify-center gap-2">
-                                    <FiSettings className="w-4 h-4" /> Update Details
+                                    className="w-full sm:flex-1 py-3 sm:py-3.5 rounded-xl text-sm bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 order-1 sm:order-2 shadow-lg shadow-indigo-500/20">
+                                    <FiSettings className="w-4 h-4 shrink-0" /> <span className="truncate">Update Details</span>
                                 </motion.button>
                             </div>
                         </motion.div>
