@@ -192,6 +192,32 @@ exports.refreshToken = async (req, res, next) => {
     }
 };
 
+// Change Password (for users who already have a password)
+exports.changePassword = async (req, res, next) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ message: 'New password must be at least 6 characters' });
+        }
+
+        const user = await User.findById(req.user._id).select('+password');
+
+        if (!user.password) {
+            return res.status(400).json({ message: 'No password set. Use Set Password instead.' });
+        }
+
+        if (!(await user.comparePassword(currentPassword))) {
+            return res.status(401).json({ message: 'Current password is incorrect' });
+        }
+
+        user.password = newPassword;
+        await user.save(); // pre-save hook will hash it
+        res.json({ message: 'Password changed successfully' });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Forgot Password
 exports.forgotPassword = async (req, res, next) => {
     try {
@@ -251,7 +277,7 @@ exports.resetPassword = async (req, res, next) => {
 
 // Get current user
 exports.getMe = async (req, res) => {
-    const user = await User.findById(req.user._id).select('+faceDescriptor');
+    const user = await User.findById(req.user._id).select('+faceDescriptor +password');
     res.json({ user });
 };
 

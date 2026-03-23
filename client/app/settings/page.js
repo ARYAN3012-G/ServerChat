@@ -104,9 +104,19 @@ export default function SettingsPage() {
 
     const handleChangePassword = async () => {
         if (newPw !== confirmPw) { setError('Passwords do not match'); return; }
+        if (newPw.length < 6) { setError('Password must be at least 6 characters'); return; }
         setError(''); setSaved(false);
-        try { await api.put('/auth/password', { currentPassword: currentPw, newPassword: newPw }); setCurrentPw(''); setNewPw(''); setConfirmPw(''); setSaved(true); setTimeout(() => setSaved(false), 2000); }
-        catch (e) { setError(e.response?.data?.message || 'Failed'); }
+        try {
+            if (user?.hasPassword) {
+                // User already has a password — change it
+                await api.put('/auth/password', { currentPassword: currentPw, newPassword: newPw });
+            } else {
+                // OAuth user setting password for the first time
+                await api.post('/auth/set-password', { password: newPw });
+            }
+            setCurrentPw(''); setNewPw(''); setConfirmPw(''); setSaved(true); setTimeout(() => setSaved(false), 2000);
+            toast.success(user?.hasPassword ? 'Password changed!' : 'Password set! You can now login with email + password.');
+        } catch (e) { setError(e.response?.data?.message || 'Failed'); }
     };
 
     const proFeatures = [
@@ -258,12 +268,20 @@ export default function SettingsPage() {
                             <motion.div key="security" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                                 <h3 className="text-2xl font-bold mb-8">Security</h3>
 
-                                {/* Change Password */}
+                                {/* Set / Change Password */}
                                 <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8 mb-6">
-                                    <h4 className="text-lg font-semibold mb-5 flex items-center gap-2"><FiLock className="w-5 h-5 text-indigo-400" /> Change Password</h4>
+                                    <h4 className="text-lg font-semibold mb-3 flex items-center gap-2"><FiLock className="w-5 h-5 text-indigo-400" /> {user?.hasPassword ? 'Change Password' : 'Set Password'}</h4>
+                                    {!user?.hasPassword && (
+                                        <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 mb-5">
+                                            <FiZap className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                                            <p className="text-sm text-amber-300/80">You signed in with {user?.googleId ? 'Google' : 'GitHub'}. Set a password to also login with email.</p>
+                                        </div>
+                                    )}
                                     <div className="space-y-4">
-                                        <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Current Password</label>
-                                            <input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" /></div>
+                                        {user?.hasPassword && (
+                                            <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Current Password</label>
+                                                <input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" /></div>
+                                        )}
                                         <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">New Password</label>
                                             <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" /></div>
                                         <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Confirm Password</label>
@@ -271,7 +289,7 @@ export default function SettingsPage() {
                                     </div>
                                     {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
                                     <button onClick={handleChangePassword} className="mt-6 flex items-center gap-2 px-6 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/20">
-                                        {saved ? <><FiCheck className="w-4 h-4" /> Updated!</> : <><FiLock className="w-4 h-4" /> Change Password</>}
+                                        {saved ? <><FiCheck className="w-4 h-4" /> Updated!</> : <><FiLock className="w-4 h-4" /> {user?.hasPassword ? 'Change Password' : 'Set Password'}</>}
                                     </button>
                                 </div>
 
@@ -397,10 +415,13 @@ export default function SettingsPage() {
                                                     setFaceScanning(true);
                                                     try {
                                                         const faceapi = faceApiRef.current;
-                                                        const detection = await faceapi
-                                                            .detectSingleFace(faceVideoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 }))
-                                                            .withFaceLandmarks()
-                                                            .withFaceDescriptor();
+                                                        const detection = await Promise.race([
+                                                            faceapi
+                                                                .detectSingleFace(faceVideoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 }))
+                                                                .withFaceLandmarks()
+                                                                .withFaceDescriptor(),
+                                                            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000))
+                                                        ]);
                                                         if (!detection) { toast.error('No face detected. Look directly at the camera.'); setFaceScanning(false); return; }
                                                         const descriptor = Array.from(detection.descriptor);
                                                         await api.post('/auth/face-descriptor', { descriptor });
@@ -408,7 +429,13 @@ export default function SettingsPage() {
                                                         toast.success('Face ID registered successfully!');
                                                         if (faceStreamRef.current) faceStreamRef.current.getTracks().forEach(t => t.stop());
                                                         setCameraActive(false);
-                                                    } catch (e) { toast.error('Failed to register face'); }
+                                                    } catch (e) {
+                                                        if (e.message === 'timeout') {
+                                                            toast.error('Detection timed out. Try better lighting or move closer to the camera.');
+                                                        } else {
+                                                            toast.error('Failed to register face');
+                                                        }
+                                                    }
                                                     setFaceScanning(false);
                                                 }} disabled={faceScanning || !faceApiLoaded}
                                                     className="flex items-center gap-2 px-6 py-2.5 bg-violet-500 text-white rounded-xl text-sm font-semibold hover:bg-violet-600 transition-colors disabled:opacity-50">

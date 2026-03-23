@@ -16,6 +16,7 @@ router.post('/forgot-password', authLimiter, authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
 router.get('/me', auth, authController.getMe);
 router.post('/set-password', auth, authController.setPassword);
+router.put('/password', auth, authController.changePassword);
 router.post('/face-descriptor', auth, authController.storeFaceDescriptor);
 router.delete('/face-descriptor', auth, authController.deleteFaceDescriptor);
 router.post('/face-login', authLimiter, authController.faceLogin);

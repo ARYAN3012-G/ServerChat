@@ -165,6 +165,7 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 // Remove sensitive fields from JSON
 userSchema.methods.toJSON = function () {
     const obj = this.toObject();
+    obj.hasPassword = !!obj.password;
     delete obj.password;
     delete obj.twoFactorSecret;
     obj.hasFaceId = !!(obj.faceDescriptor && obj.faceDescriptor.length > 0);

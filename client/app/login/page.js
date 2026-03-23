@@ -232,10 +232,13 @@ export default function LoginPage() {
         setScanning(true);
         try {
             const faceapi = faceApiRef.current;
-            const detection = await faceapi
-                .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 }))
-                .withFaceLandmarks()
-                .withFaceDescriptor();
+            const detection = await Promise.race([
+                faceapi
+                    .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 }))
+                    .withFaceLandmarks()
+                    .withFaceDescriptor(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000))
+            ]);
 
             if (!detection) {
                 toast.error('No face detected. Please look at the camera.');
@@ -252,7 +255,11 @@ export default function LoginPage() {
             toast.success('Welcome back!');
             router.push('/channels');
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Face recognition failed');
+            if (error.message === 'timeout') {
+                toast.error('Detection timed out. Try better lighting or move closer.');
+            } else {
+                toast.error(error.response?.data?.message || 'Face recognition failed');
+            }
         } finally {
             setScanning(false);
         }
