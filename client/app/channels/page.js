@@ -525,10 +525,8 @@ export default function ChannelsPage() {
                 </motion.div>
                 )}
 
-                {/* Spacer to push bottom items down */}
-                <div className="flex-1" />
-
-                <div className="w-8 h-0.5 bg-white/10 rounded-full" />
+                {/* Separator before bottom utilities */}
+                <div className="w-8 h-0.5 bg-white/10 rounded-full mt-1" />
 
                 {/* Status Picker */}
                 <div className="relative">
@@ -1160,7 +1158,7 @@ export default function ChannelsPage() {
                             <TypingIndicator users={Object.values(typingUsers[currentChannel._id]).map(u => ({ username: u }))} />
                         )}
 
-                        <div className="px-4 pb-4 pt-2 relative shrink-0 bg-dark-900">
+                        <div className="px-2 sm:px-4 pb-4 pt-2 relative shrink-0 bg-dark-900">
                             {/* @Mention Autocomplete */}
                             <AnimatePresence>
                                 {showMentions && (
@@ -1178,13 +1176,13 @@ export default function ChannelsPage() {
                                 )}
                             </AnimatePresence>
                             <div className="bg-white/5 border border-white/10 rounded-xl flex items-center px-4 relative">
-                                <button onClick={() => { setShowInputEmojiPicker(!showInputEmojiPicker); setShowGifPicker(false); }} className="text-white/20 hover:text-amber-400 transition-colors mr-2 cursor-pointer" title="Emoji">
+                                <button onClick={() => { setShowInputEmojiPicker(!showInputEmojiPicker); setShowGifPicker(false); }} className="text-white/20 hover:text-amber-400 transition-colors mr-1 sm:mr-2 cursor-pointer flex-shrink-0" title="Emoji">
                                     <FiSmile className="w-5 h-5" />
                                 </button>
-                                <button onClick={() => { setShowGifPicker(!showGifPicker); setShowInputEmojiPicker(false); }} className="text-white/20 hover:text-emerald-400 transition-colors mr-2 cursor-pointer" title="GIFs">
+                                <button onClick={() => { setShowGifPicker(!showGifPicker); setShowInputEmojiPicker(false); }} className="hidden sm:flex text-white/20 hover:text-emerald-400 transition-colors mr-1 sm:mr-2 cursor-pointer flex-shrink-0" title="GIFs">
                                     <MdGif className="w-7 h-7" />
                                 </button>
-                                <FiPaperclip className="w-5 h-5 text-white/20 cursor-pointer hover:text-white transition-colors" onClick={() => fileInputRef.current?.click()} title="Attach file" />
+                                <FiPaperclip className="hidden sm:block w-5 h-5 text-white/20 cursor-pointer hover:text-white transition-colors flex-shrink-0" onClick={() => fileInputRef.current?.click()} title="Attach file" />
                                 <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
                                 <input type="text" value={messageInput} onChange={handleTyping}
                                     onKeyDown={(e) => {
@@ -1192,7 +1190,7 @@ export default function ChannelsPage() {
                                         if (e.key === 'Escape') { setShowMentions(false); setShowInputEmojiPicker(false); setShowGifPicker(false); }
                                     }}
                                     placeholder={`Message #${currentChannel.name}`} className="flex-1 bg-transparent py-3 px-3 text-sm outline-none text-white placeholder-white/30" />
-                                <button onClick={handleSendMessage} className="text-white/20 hover:text-indigo-400 transition-colors"><FiSend className="w-5 h-5" /></button>
+                                <button onClick={handleSendMessage} className="text-white/20 hover:text-indigo-400 transition-colors flex-shrink-0 ml-1"><FiSend className="w-5 h-5" /></button>
                                 <VoiceRecorder onSend={async (blob) => {
                                     try {
                                         const formData = new FormData();
