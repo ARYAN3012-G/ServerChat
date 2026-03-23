@@ -61,16 +61,16 @@ export default function SettingsPage() {
     useEffect(() => { if (user) { setUsername(user.username || ''); setBio(user.bio || ''); setCustomStatus(user.customStatus || ''); setBackground(user.preferences?.background || ''); setPhoneNumber(user.phone || ''); if (user.phone) setPhoneSaved(true); if (user.hasFaceId) setFaceRegistered(true); setAvatarData(user.avatar || null); setBanner(user.banner || ''); setAccentColor(user.accentColor || '#6366f1'); } }, [user]);
     useEffect(() => { if (isAuthenticated) fetchSubscription(); }, [isAuthenticated]);
 
-    // Load face-api via npm dynamic import, forcing CPU backend to avoid WebGL hang
+    // Load face-api — let it use its default backend (WebGL if available, WASM fallback)
+    // Do NOT override the backend: face-api bundles its own TF.js with WebGL kernels already
+    // registered. Calling tf.setBackend('cpu') after that causes "kernel already registered"
+    // conflicts and makes detection hang indefinitely.
     const loadFaceApi = async () => {
         if (faceApiRef.current) { setFaceApiLoaded(true); return; }
         try {
-            // Import the full TF.js and force CPU backend — WebGL hangs on many systems
-            const tf = await import('@tensorflow/tfjs');
-            await tf.setBackend('cpu');
-            await tf.ready();
-
             const faceapi = await import('@vladmandic/face-api');
+            // Ensure TF backend is fully ready before loading models
+            await faceapi.tf.ready();
             await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
             await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
             await faceapi.nets.faceRecognitionNet.loadFromUri('/models');

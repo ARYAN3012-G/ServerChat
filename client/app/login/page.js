@@ -121,12 +121,11 @@ export default function LoginPage() {
         const loadFaceApi = async () => {
             if (faceApiRef.current) { setFaceApiLoaded(true); return; }
             try {
-                // Import full TF.js and force CPU backend — WebGL hangs on many systems
-                const tf = await import('@tensorflow/tfjs');
-                await tf.setBackend('cpu');
-                await tf.ready();
-
+                // Do NOT import TF.js separately or call setBackend('cpu'):
+                // face-api bundles its own TF.js with WebGL already registered.
+                // Overriding the backend causes "kernel already registered" conflicts and hangs.
                 const faceapi = await import('@vladmandic/face-api');
+                await faceapi.tf.ready(); // wait for whatever backend TF chose (WebGL / WASM)
                 await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
                 await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
                 await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
