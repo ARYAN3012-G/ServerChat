@@ -165,13 +165,19 @@ export default function SettingsPage() {
                     <button onClick={() => router.push('/channels')} className="flex items-center gap-2 text-white/40 hover:text-white text-sm transition-colors mb-4"><FiArrowLeft className="w-4 h-4" /> Back to Chat</button>
                     <h2 className="text-lg font-bold">Settings</h2>
                 </div>
-                <div className="flex-1 p-2 space-y-1">
+                <div className="flex-1 p-2 space-y-1 overflow-y-auto">
                     {tabs.map(t => (
-                        <button key={t.id} onClick={() => { setTab(t.id); setError(''); setSaved(false); }}
+                        <button key={t.id} onClick={() => { setTab(t.id); setError(''); setSaved(false); setSidebarOpen(false); }}
                             className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === t.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
                             <t.icon className="w-4 h-4" /> {t.label}
                         </button>
                     ))}
+                </div>
+                <div className="p-2 border-t border-white/5">
+                    <button onClick={handleLogout}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:text-white hover:bg-red-500/20 transition-all">
+                        <FiLogOut className="w-4 h-4" /> Log Out
+                    </button>
                 </div>
             </div>
 
