@@ -216,6 +216,25 @@ export default function VoiceProvider({ children }) {
         });
     }, []);
 
+    // Renegotiate with all peers (needed after adding tracks)
+    const renegotiateAll = useCallback(async () => {
+        const socket = getSocket();
+        if (!socket) return;
+        for (const [userId, { pc, socketId }] of Object.entries(peersRef.current)) {
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                socket.emit('voice:offer', {
+                    targetSocketId: socketId,
+                    offer,
+                    channelId: channelIdRef.current,
+                });
+            } catch (err) {
+                console.error(`[VoiceProvider] Renegotiation error for ${userId}:`, err);
+            }
+        }
+    }, []);
+
     // Start video (camera)
     const startVideo = useCallback(async (facing = 'user') => {
         try {
@@ -361,24 +380,7 @@ export default function VoiceProvider({ children }) {
         if (socket) socket.emit('voice:user-state', { channelId: channelIdRef.current, isScreenSharing: false });
     }, []);
 
-    // Renegotiate with all peers (needed after adding tracks)
-    const renegotiateAll = useCallback(async () => {
-        const socket = getSocket();
-        if (!socket) return;
-        for (const [userId, { pc, socketId }] of Object.entries(peersRef.current)) {
-            try {
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                socket.emit('voice:offer', {
-                    targetSocketId: socketId,
-                    offer,
-                    channelId: channelIdRef.current,
-                });
-            } catch (err) {
-                console.error(`[VoiceProvider] Renegotiation error for ${userId}:`, err);
-            }
-        }
-    }, []);
+
 
     // Socket event handlers
     useEffect(() => {

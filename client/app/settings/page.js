@@ -58,7 +58,7 @@ export default function SettingsPage() {
     }, [searchParams]);
 
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
-    useEffect(() => { if (user) { setUsername(user.username || ''); setBio(user.bio || ''); setCustomStatus(user.customStatus || ''); setBackground(user.preferences?.background || ''); setPhoneNumber(user.phone || ''); if (user.phone) setPhoneSaved(true); if (user.hasFaceId) setFaceRegistered(true); setAvatarData(user.avatar || null); setBanner(user.banner || ''); setAccentColor(user.accentColor || '#6366f1'); } }, [user]);
+    useEffect(() => { if (user) { setUsername(user.username || ''); setBio(user.bio || ''); setCustomStatus(typeof user.customStatus === 'string' ? user.customStatus : (user.customStatus?.text || '')); setBackground(user.preferences?.background || ''); setPhoneNumber(user.phone || ''); if (user.phone) setPhoneSaved(true); if (user.hasFaceId) setFaceRegistered(true); setAvatarData(user.avatar || null); setBanner(user.banner || ''); setAccentColor(user.accentColor || '#6366f1'); } }, [user]);
     useEffect(() => { if (isAuthenticated) fetchSubscription(); }, [isAuthenticated]);
 
     const handleLogout = () => {
@@ -103,7 +103,7 @@ export default function SettingsPage() {
         }
 
         setError(''); setSaved(false);
-        try { await api.put('/users/profile', { username, bio, customStatus, banner, accentColor, preferences: { background } }); setSaved(true); setTimeout(() => setSaved(false), 2000); }
+        try { await api.put('/users/profile', { username, bio, customStatus: { text: customStatus }, banner, accentColor, preferences: { background } }); setSaved(true); setTimeout(() => setSaved(false), 2000); }
         catch (e) { setError(e.response?.data?.message || 'Failed'); }
     };
 
@@ -165,15 +165,14 @@ export default function SettingsPage() {
                     <button onClick={() => router.push('/channels')} className="flex items-center gap-2 text-white/40 hover:text-white text-sm transition-colors mb-4"><FiArrowLeft className="w-4 h-4" /> Back to Chat</button>
                     <h2 className="text-lg font-bold">Settings</h2>
                 </div>
-                <div className="flex-1 p-2 space-y-1 overflow-y-auto">
+                <div className="p-2 space-y-1 overflow-y-auto flex-none">
                     {tabs.map(t => (
                         <button key={t.id} onClick={() => { setTab(t.id); setError(''); setSaved(false); setSidebarOpen(false); }}
                             className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === t.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
                             <t.icon className="w-4 h-4" /> {t.label}
                         </button>
                     ))}
-                </div>
-                <div className="p-2 border-t border-white/5">
+                    <div className="my-2 border-t border-white/5" />
                     <button onClick={handleLogout}
                         className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:text-white hover:bg-red-500/20 transition-all">
                         <FiLogOut className="w-4 h-4" /> Log Out
@@ -257,12 +256,14 @@ export default function SettingsPage() {
                                             <input value={customStatus} onChange={(e) => setCustomStatus(e.target.value)} placeholder="What are you up to?" className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all placeholder-white/20" /></div>
                                     </div>
                                     {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
-                                    <button onClick={handleSaveProfile} className="mt-6 flex items-center gap-2 px-6 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/20">
-                                        {saved ? <><FiCheck className="w-4 h-4" /> Saved!</> : <><FiSave className="w-4 h-4" /> Save Changes</>}
-                                    </button>
-                                    <button onClick={handleLogout} className="mt-6 ml-4 flex items-center gap-2 px-6 py-2.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-sm font-semibold hover:bg-red-500 hover:text-white transition-colors">
-                                        <FiLogOut className="w-4 h-4" /> Log Out
-                                    </button>
+                                    <div className="mt-8 flex flex-col sm:flex-row items-center gap-4">
+                                        <button onClick={handleSaveProfile} className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/20">
+                                            {saved ? <><FiCheck className="w-4 h-4" /> Saved!</> : <><FiSave className="w-4 h-4" /> Save Changes</>}
+                                        </button>
+                                        <button onClick={handleLogout} className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl text-sm font-semibold hover:bg-red-500 hover:text-white transition-colors">
+                                            <FiLogOut className="w-4 h-4" /> Log Out
+                                        </button>
+                                    </div>
                                 </div>
                             </motion.div>
 
