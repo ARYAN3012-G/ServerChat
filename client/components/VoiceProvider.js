@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
 import { getSocket } from '../services/socket';
+import toast from 'react-hot-toast';
 
 const VoiceContext = createContext(null);
 
@@ -247,8 +248,15 @@ export default function VoiceProvider({ children }) {
             await renegotiateAll();
         } catch (err) {
             console.error('[VoiceProvider] Video error:', err);
+            if (err.name === 'NotAllowedError') {
+                toast.error('Camera access denied. Please check permissions.');
+            } else if (err.name === 'NotFoundError') {
+                toast.error('No camera found on this device.');
+            } else {
+                toast.error('Failed to start camera.');
+            }
         }
-    }, []);
+    }, [renegotiateAll]);
 
     // Stop video
     const stopVideo = useCallback(() => {
@@ -292,6 +300,7 @@ export default function VoiceProvider({ children }) {
                 });
             } catch (err) {
                 console.error('[VoiceProvider] Camera switch error:', err);
+                toast.error('Failed to switch camera.');
             }
         }
         setFacingMode(newFacing);
@@ -300,6 +309,10 @@ export default function VoiceProvider({ children }) {
     // Start screen sharing
     const startScreenShare = useCallback(async () => {
         try {
+            if (!navigator.mediaDevices?.getDisplayMedia) {
+                toast.error('Screen sharing is not supported on this browser/device.');
+                return;
+            }
             const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
             const screenTrack = stream.getVideoTracks()[0];
             screenTrackRef.current = screenTrack;
@@ -323,8 +336,13 @@ export default function VoiceProvider({ children }) {
             await renegotiateAll();
         } catch (err) {
             console.error('[VoiceProvider] Screen share error:', err);
+            if (err.name === 'NotAllowedError') {
+                toast.error('Screen share permission denied.');
+            } else {
+                toast.error('Failed to start screen share.');
+            }
         }
-    }, []);
+    }, [renegotiateAll]);
 
     // Stop screen sharing
     const stopScreenShare = useCallback(() => {
