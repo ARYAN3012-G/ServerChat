@@ -502,17 +502,20 @@ export default function ChannelsPage() {
                     <div className="w-8 h-0.5 bg-white/10 rounded-full" />
                 </div>
 
-                {/* Scrollable Middle: Server Icons + Create/Join */}
-                <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center gap-2 py-1" style={{ scrollbarWidth: 'none' }}>
+                {/* Scrollable Middle: Server Icons ONLY (max ~3 visible) */}
+                <div className="overflow-y-auto flex flex-col items-center gap-2 py-1" style={{ scrollbarWidth: 'none', maxHeight: '192px' }}>
                     {servers.map((server) => (
                         <motion.div key={server._id} whileHover={{ borderRadius: '35%' }} onClick={() => handleSelectServer(server)}
-                            className={`w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer transition-all duration-200 text-sm font-bold ${currentServer?._id === server._id ? 'bg-indigo-500 text-white rounded-[35%] shadow-lg shadow-indigo-500/30' : 'bg-white/5 text-white/40 hover:text-white hover:bg-indigo-500/80'}`}
+                            className={`w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer transition-all duration-200 text-[11px] font-bold tracking-tight ${currentServer?._id === server._id ? 'bg-indigo-500 text-white rounded-[35%] shadow-lg shadow-indigo-500/30' : 'bg-white/5 text-white/40 hover:text-white hover:bg-indigo-500/80'}`}
                             title={server.name}>
-                            {server.icon?.url ? <img src={server.icon.url} alt="" className="w-full h-full rounded-full object-cover" /> : server.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()}
+                            {server.icon?.url ? <img src={server.icon.url} alt="" className="w-full h-full rounded-full object-cover" /> : server.name.substring(0, 2).toUpperCase()}
                         </motion.div>
                     ))}
+                </div>
 
-                    <div className="w-8 h-0.5 bg-white/10 rounded-full flex-shrink-0" />
+                {/* Fixed: Create & Join Server */}
+                <div className="flex flex-col items-center gap-2 py-1 flex-shrink-0">
+                    <div className="w-8 h-0.5 bg-white/10 rounded-full" />
 
                     <motion.div whileHover={{ borderRadius: '35%' }}
                         onClick={() => { setShowCreateServer(true); setServerError(''); }}
@@ -527,8 +530,11 @@ export default function ChannelsPage() {
                     </motion.div>
                 </div>
 
-                {/* Fixed Bottom: Utilities */}
-                <div className="flex flex-col items-center gap-2 pt-1 pb-3 flex-shrink-0">
+                {/* Spacer pushes bottom up */}
+                <div className="flex-1" />
+
+                {/* Fixed Bottom: Utilities (pushed up) */}
+                <div className="flex flex-col items-center gap-2 pt-2 pb-4 flex-shrink-0">
                     <div className="w-8 h-0.5 bg-white/10 rounded-full" />
 
                     <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/games')}
