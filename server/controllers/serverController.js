@@ -341,6 +341,34 @@ exports.updateMemberRole = async (req, res, next) => {
     }
 };
 
+// Update member nickname
+exports.updateMemberNickname = async (req, res, next) => {
+    try {
+        const server = await Server.findById(req.params.id);
+        if (!server) {
+            return res.status(404).json({ message: 'Server not found' });
+        }
+
+        const requester = server.members.find(m => m.user.toString() === req.user._id.toString());
+        if (!requester || !['owner', 'admin'].includes(requester.role)) {
+            return res.status(403).json({ message: 'Insufficient permissions' });
+        }
+
+        const { userId, nickname } = req.body;
+        const target = server.members.find(m => m.user.toString() === userId);
+        if (!target) {
+            return res.status(404).json({ message: 'User not found in server' });
+        }
+
+        target.nickname = nickname || '';
+        await server.save();
+
+        res.json({ message: 'Nickname updated', nickname: target.nickname });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Kick member
 exports.kickMember = async (req, res, next) => {
     try {

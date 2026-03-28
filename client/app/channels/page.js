@@ -30,6 +30,7 @@ const GifPicker = dynamic(() => import('../../components/GifPicker'), { ssr: fal
 import AudioPlayer from '../../components/AudioPlayer';
 import MessageSearch from '../../components/MessageSearch';
 import VoiceVideoPopup from '../../components/VoiceVideoPopup';
+import ServerSettingsModal from '../../components/ServerSettingsModal';
 import { MdGif } from 'react-icons/md';
 
 export default function ChannelsPage() {
@@ -599,6 +600,9 @@ export default function ChannelsPage() {
                         <div className="flex items-center gap-1">
                             <button onClick={handleCopyInvite} className="p-1 rounded hover:bg-white/10 text-white/30 hover:text-white transition-colors" title="Copy Invite Code">
                                 {copied ? <FiCheck className="w-4 h-4 text-emerald-400" /> : <FiCopy className="w-4 h-4" />}
+                            </button>
+                            <button onClick={() => setShowServerSettings(true)} className="p-1 rounded hover:bg-white/10 text-white/30 hover:text-white transition-colors" title="Server Settings">
+                                <FiSettings className="w-4 h-4" />
                             </button>
                             <FiChevronDown className="w-4 h-4 text-white/30" />
                         </div>
@@ -1431,6 +1435,29 @@ export default function ChannelsPage() {
                     onVideoCall={(userId) => { setProfileUser(null); initiateCall?.(userId, currentChannel?._id, 'video'); }}
                 />
             )}
+
+            {/* Server Settings Modal */}
+            <AnimatePresence>
+                {showServerSettings && currentServer && (
+                    <ServerSettingsModal
+                        server={currentServer}
+                        user={user}
+                        onClose={() => setShowServerSettings(false)}
+                        onServerUpdate={(updated) => {
+                            dispatch(setCurrentServer({ ...currentServer, ...updated }));
+                            dispatch(setServers(servers.map(s => s._id === updated._id ? { ...s, ...updated } : s)));
+                        }}
+                        onServerDelete={() => {
+                            dispatch(setServers(servers.filter(s => s._id !== currentServer._id)));
+                            dispatch(setCurrentServer(null));
+                        }}
+                        onLeaveServer={() => {
+                            dispatch(setServers(servers.filter(s => s._id !== currentServer._id)));
+                            dispatch(setCurrentServer(null));
+                        }}
+                    />
+                )}
+            </AnimatePresence>
         </div >
     );
 }

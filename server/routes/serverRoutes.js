@@ -21,6 +21,7 @@ router.post('/:id/invite', auth, serverController.createInvite);
 
 // Member management
 router.put('/:id/members/role', auth, serverController.updateMemberRole);
+router.put('/:id/members/nickname', auth, serverController.updateMemberNickname);
 router.delete('/:id/members/:userId', auth, serverController.kickMember);
 
 module.exports = router;
