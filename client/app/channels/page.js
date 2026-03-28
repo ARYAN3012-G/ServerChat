@@ -478,95 +478,101 @@ export default function ChannelsPage() {
             )}
 
             {/* ─── SERVER SIDEBAR ─── */}
-            <div className={`fixed mt-12 md:mt-0 md:relative z-50 w-[72px] h-full bg-dark-950 flex flex-col items-center py-3 gap-2 border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} ${!sidebarOpen ? 'max-md:invisible' : ''}`} style={{ scrollbarWidth: 'none', overflowY: 'auto' }}>
-                <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/friends')}
-                    className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-emerald-400 hover:text-white hover:bg-emerald-500 cursor-pointer transition-all duration-200" title="Friends">
-                    <FiUsers className="w-6 h-6" />
-                </motion.div>
-                <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/dms')}
-                    className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-indigo-400 hover:text-white hover:bg-indigo-500 cursor-pointer transition-all duration-200" title="Direct Messages">
-                    <FiMessageSquare className="w-6 h-6" />
-                </motion.div>
-                <div className="w-8 h-0.5 bg-white/10 rounded-full" />
-
-                {servers.map((server) => (
-                    <motion.div key={server._id} whileHover={{ borderRadius: '35%' }} onClick={() => handleSelectServer(server)}
-                        className={`w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 text-sm font-bold ${currentServer?._id === server._id ? 'bg-indigo-500 text-white rounded-[35%] shadow-lg shadow-indigo-500/30' : 'bg-white/5 text-white/40 hover:text-white hover:bg-indigo-500/80'}`}
-                        title={server.name}>
-                        {server.icon?.url ? <img src={server.icon.url} alt="" className="w-full h-full rounded-full object-cover" /> : server.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()}
+            <div className={`fixed mt-12 md:mt-0 md:relative z-50 w-[72px] h-full bg-dark-950 flex flex-col items-center border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} ${!sidebarOpen ? 'max-md:invisible' : ''}`}>
+                {/* Fixed Top: Friends & DMs */}
+                <div className="flex flex-col items-center gap-2 pt-3 pb-1 flex-shrink-0">
+                    <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/friends')}
+                        className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-emerald-400 hover:text-white hover:bg-emerald-500 cursor-pointer transition-all duration-200" title="Friends">
+                        <FiUsers className="w-6 h-6" />
                     </motion.div>
-                ))}
-
-                <div className="w-8 h-0.5 bg-white/10 rounded-full" />
-
-                <motion.div whileHover={{ borderRadius: '35%' }}
-                    onClick={() => { setShowCreateServer(true); setServerError(''); }}
-                    className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-emerald-400 hover:text-white hover:bg-emerald-500 cursor-pointer transition-all duration-200" title="Create Server">
-                    <FiPlus className="w-6 h-6" />
-                </motion.div>
-
-                <motion.div whileHover={{ borderRadius: '35%' }}
-                    onClick={() => { setShowJoinServer(true); setServerError(''); }}
-                    className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-emerald-500 cursor-pointer transition-all duration-200" title="Join Server">
-                    <FiCompass className="w-5 h-5" />
-                </motion.div>
-
-                <div className="w-8 h-0.5 bg-white/10 rounded-full" />
-
-                <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/games')}
-                    className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-indigo-500 cursor-pointer transition-all duration-200" title="Games">
-                    <IoGameControllerOutline className="w-6 h-6" />
-                </motion.div>
-
-                {user?.email === 'aryanrajeshgadam.3012@gmail.com' && (
-                <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/admin')}
-                    className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-amber-500 cursor-pointer transition-all duration-200" title="Admin">
-                    <FiShield className="w-5 h-5" />
-                </motion.div>
-                )}
-
-                {/* Separator before bottom utilities */}
-                <div className="w-8 h-0.5 bg-white/10 rounded-full mt-1" />
-
-                {/* Status Picker */}
-                <div className="relative">
-                    <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => setShowStatusPicker(!showStatusPicker)}
-                        className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-white/10" title={`Status: ${user?.status || 'offline'}`}>
-                        <div className={`w-4 h-4 rounded-full border-2 border-dark-950 ${user?.status === 'online' ? 'bg-emerald-400' : user?.status === 'idle' ? 'bg-amber-400' : user?.status === 'dnd' ? 'bg-red-500' : 'bg-gray-400'}`} />
+                    <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/dms')}
+                        className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-indigo-400 hover:text-white hover:bg-indigo-500 cursor-pointer transition-all duration-200" title="Direct Messages">
+                        <FiMessageSquare className="w-6 h-6" />
                     </motion.div>
-                    <AnimatePresence>
-                        {showStatusPicker && (
-                            <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}
-                                className="absolute left-16 bottom-0 w-52 bg-dark-800 border border-white/10 rounded-xl shadow-2xl z-[60] p-2 space-y-1">
-                                {statusOptions.map(opt => (
-                                    <button key={opt.value} onClick={() => { handleStatusChange(opt.value); setShowStatusPicker(false); }}
-                                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${user?.status === opt.value ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5 hover:text-white'}`}>
-                                        <div className={`w-3 h-3 rounded-full ${opt.color}`} />
-                                        <span>{opt.label}</span>
-                                    </button>
-                                ))}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                    <div className="w-8 h-0.5 bg-white/10 rounded-full" />
                 </div>
 
-                {/* Settings */}
-                <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/settings')}
-                    className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-white/10 cursor-pointer transition-all duration-200" title="Settings">
-                    <FiSettings className="w-5 h-5" />
-                </motion.div>
+                {/* Scrollable Middle: Server Icons + Create/Join */}
+                <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center gap-2 py-1" style={{ scrollbarWidth: 'none' }}>
+                    {servers.map((server) => (
+                        <motion.div key={server._id} whileHover={{ borderRadius: '35%' }} onClick={() => handleSelectServer(server)}
+                            className={`w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer transition-all duration-200 text-sm font-bold ${currentServer?._id === server._id ? 'bg-indigo-500 text-white rounded-[35%] shadow-lg shadow-indigo-500/30' : 'bg-white/5 text-white/40 hover:text-white hover:bg-indigo-500/80'}`}
+                            title={server.name}>
+                            {server.icon?.url ? <img src={server.icon.url} alt="" className="w-full h-full rounded-full object-cover" /> : server.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()}
+                        </motion.div>
+                    ))}
 
-                {/* Profile */}
-                <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/settings')}
-                    className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold cursor-pointer transition-all duration-200 hover:opacity-80 mb-2" 
-                    style={{ backgroundColor: user?.accentColor || '#6366f1' }}
-                    title={user?.username || 'Profile'}>
-                    {user?.avatar?.url ? (
-                        <img src={user.avatar.url} alt="" className="w-full h-full rounded-full object-cover" />
-                    ) : user?.avatar?.prebuilt ? (
-                        <div className="w-full h-full rounded-full flex items-center justify-center text-lg" style={{ background: user.avatar.bg }}>{user.avatar.emoji}</div>
-                    ) : (user?.username?.[0] || 'U').toUpperCase()}
-                </motion.div>
+                    <div className="w-8 h-0.5 bg-white/10 rounded-full flex-shrink-0" />
+
+                    <motion.div whileHover={{ borderRadius: '35%' }}
+                        onClick={() => { setShowCreateServer(true); setServerError(''); }}
+                        className="w-12 h-12 rounded-full flex-shrink-0 bg-white/5 flex items-center justify-center text-emerald-400 hover:text-white hover:bg-emerald-500 cursor-pointer transition-all duration-200" title="Create Server">
+                        <FiPlus className="w-6 h-6" />
+                    </motion.div>
+
+                    <motion.div whileHover={{ borderRadius: '35%' }}
+                        onClick={() => { setShowJoinServer(true); setServerError(''); }}
+                        className="w-12 h-12 rounded-full flex-shrink-0 bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-emerald-500 cursor-pointer transition-all duration-200" title="Join Server">
+                        <FiCompass className="w-5 h-5" />
+                    </motion.div>
+                </div>
+
+                {/* Fixed Bottom: Utilities */}
+                <div className="flex flex-col items-center gap-2 pt-1 pb-3 flex-shrink-0">
+                    <div className="w-8 h-0.5 bg-white/10 rounded-full" />
+
+                    <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/games')}
+                        className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-indigo-500 cursor-pointer transition-all duration-200" title="Games">
+                        <IoGameControllerOutline className="w-6 h-6" />
+                    </motion.div>
+
+                    {user?.email === 'aryanrajeshgadam.3012@gmail.com' && (
+                    <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/admin')}
+                        className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-amber-500 cursor-pointer transition-all duration-200" title="Admin">
+                        <FiShield className="w-5 h-5" />
+                    </motion.div>
+                    )}
+
+                    {/* Status Picker */}
+                    <div className="relative">
+                        <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => setShowStatusPicker(!showStatusPicker)}
+                            className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-white/10" title={`Status: ${user?.status || 'offline'}`}>
+                            <div className={`w-4 h-4 rounded-full border-2 border-dark-950 ${user?.status === 'online' ? 'bg-emerald-400' : user?.status === 'idle' ? 'bg-amber-400' : user?.status === 'dnd' ? 'bg-red-500' : 'bg-gray-400'}`} />
+                        </motion.div>
+                        <AnimatePresence>
+                            {showStatusPicker && (
+                                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}
+                                    className="absolute left-16 bottom-0 w-52 bg-dark-800 border border-white/10 rounded-xl shadow-2xl z-[60] p-2 space-y-1">
+                                    {statusOptions.map(opt => (
+                                        <button key={opt.value} onClick={() => { handleStatusChange(opt.value); setShowStatusPicker(false); }}
+                                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${user?.status === opt.value ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5 hover:text-white'}`}>
+                                            <div className={`w-3 h-3 rounded-full ${opt.color}`} />
+                                            <span>{opt.label}</span>
+                                        </button>
+                                    ))}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    {/* Settings */}
+                    <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/settings')}
+                        className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-white/10 cursor-pointer transition-all duration-200" title="Settings">
+                        <FiSettings className="w-5 h-5" />
+                    </motion.div>
+
+                    {/* Profile */}
+                    <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/settings')}
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold cursor-pointer transition-all duration-200 hover:opacity-80" 
+                        style={{ backgroundColor: user?.accentColor || '#6366f1' }}
+                        title={user?.username || 'Profile'}>
+                        {user?.avatar?.url ? (
+                            <img src={user.avatar.url} alt="" className="w-full h-full rounded-full object-cover" />
+                        ) : user?.avatar?.prebuilt ? (
+                            <div className="w-full h-full rounded-full flex items-center justify-center text-lg" style={{ background: user.avatar.bg }}>{user.avatar.emoji}</div>
+                        ) : (user?.username?.[0] || 'U').toUpperCase()}
+                    </motion.div>
+                </div>
             </div>
 
             {/* ─── CHANNEL SIDEBAR ─── */}
