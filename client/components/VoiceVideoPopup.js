@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMic, FiMicOff, FiVideo, FiVideoOff, FiMonitor, FiX, FiMinimize2, FiMaximize2, FiPhoneOff } from 'react-icons/fi';
+import { FiMic, FiMicOff, FiVideo, FiVideoOff, FiMonitor, FiX, FiMinimize2, FiMaximize2, FiPhoneOff, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
 /**
  * Google Meet-style floating popup for voice channel video/screen share.
@@ -32,6 +32,20 @@ export default function VoiceVideoPopup({
     onClose,
 }) {
     const [isMinimized, setIsMinimized] = useState(false);
+    const [currentPage, setCurrentPage] = useState(0);
+
+    // Pagination config: tiles per page (mobile: 4 = 2x2, desktop: 6 = 3x2)
+    const TILES_PER_PAGE_MOBILE = 4;
+    const TILES_PER_PAGE_DESKTOP = 6;
+    const [tilesPerPage, setTilesPerPage] = useState(TILES_PER_PAGE_DESKTOP);
+
+    // Detect viewport for tile count
+    useEffect(() => {
+        const updateTiles = () => setTilesPerPage(window.innerWidth < 640 ? TILES_PER_PAGE_MOBILE : TILES_PER_PAGE_DESKTOP);
+        updateTiles();
+        window.addEventListener('resize', updateTiles);
+        return () => window.removeEventListener('resize', updateTiles);
+    }, []);
 
     // Build participants list
     const localParticipant = {
@@ -60,12 +74,24 @@ export default function VoiceVideoPopup({
     const allParticipants = [localParticipant, ...remoteParticipants];
     const totalWithVideo = allParticipants.length;
 
-    // Grid layout calculation
+    // Pagination
+    const totalPages = Math.max(1, Math.ceil(totalWithVideo / tilesPerPage));
+    const paginatedParticipants = allParticipants.slice(
+        currentPage * tilesPerPage,
+        (currentPage + 1) * tilesPerPage
+    );
+    const currentTileCount = paginatedParticipants.length;
+
+    // Reset page when participants change
+    useEffect(() => {
+        if (currentPage >= totalPages) setCurrentPage(Math.max(0, totalPages - 1));
+    }, [totalPages, currentPage]);
+
+    // Grid layout for current page
     const getGridCols = (count) => {
         if (count <= 1) return 1;
         if (count <= 4) return 2;
-        if (count <= 9) return 3;
-        return 4;
+        return 3;
     };
 
     // ── Minimized floating bubble ──
@@ -124,7 +150,7 @@ export default function VoiceVideoPopup({
     }
 
     // ── Full popup ──
-    const cols = getGridCols(totalWithVideo);
+    const cols = getGridCols(currentTileCount);
 
     return (
         <AnimatePresence>
@@ -164,20 +190,70 @@ export default function VoiceVideoPopup({
                         </div>
                     </div>
 
-                    {/* Video Grid */}
-                    <div className="flex-1 min-h-0 p-2 sm:p-3 overflow-y-auto">
-                        <div
-                            className="grid gap-2 sm:gap-3 h-full"
-                            style={{
-                                gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                                gridAutoRows: totalWithVideo <= 2 ? '1fr' : 'minmax(120px, 1fr)',
-                            }}
-                        >
-                            {allParticipants.map((p) => (
-                                <ParticipantTile key={p.id} participant={p} />
-                            ))}
+                    {/* Video Grid with Pagination */}
+                    <div className="flex-1 min-h-0 relative flex items-stretch">
+                        {/* Left Arrow */}
+                        {totalPages > 1 && (
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                                disabled={currentPage === 0}
+                                className={`absolute left-1 sm:left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${currentPage === 0 ? 'bg-white/5 text-white/10 cursor-not-allowed' : 'bg-white/10 text-white hover:bg-white/20 shadow-lg'}`}
+                            >
+                                <FiChevronLeft className="w-4 sm:w-5 h-4 sm:h-5" />
+                            </button>
+                        )}
+
+                        {/* Grid */}
+                        <div className={`flex-1 p-2 sm:p-3 ${totalPages > 1 ? 'px-10 sm:px-14' : ''}`}>
+                            <AnimatePresence mode="wait">
+                                <motion.div
+                                    key={currentPage}
+                                    initial={{ opacity: 0, x: 30 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -30 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="grid gap-2 sm:gap-3 h-full"
+                                    style={{
+                                        gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                                        gridAutoRows: currentTileCount <= 2 ? '1fr' : 'minmax(120px, 1fr)',
+                                    }}
+                                >
+                                    {paginatedParticipants.map((p) => (
+                                        <ParticipantTile key={p.id} participant={p} />
+                                    ))}
+                                </motion.div>
+                            </AnimatePresence>
                         </div>
+
+                        {/* Right Arrow */}
+                        {totalPages > 1 && (
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                                disabled={currentPage === totalPages - 1}
+                                className={`absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${currentPage === totalPages - 1 ? 'bg-white/5 text-white/10 cursor-not-allowed' : 'bg-white/10 text-white hover:bg-white/20 shadow-lg'}`}
+                            >
+                                <FiChevronRight className="w-4 sm:w-5 h-4 sm:h-5" />
+                            </button>
+                        )}
                     </div>
+
+                    {/* Page Indicators */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-center gap-2 py-2 shrink-0 border-t border-white/5">
+                            <div className="flex gap-1.5">
+                                {Array.from({ length: totalPages }).map((_, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => setCurrentPage(i)}
+                                        className={`w-2 h-2 rounded-full transition-all ${i === currentPage ? 'bg-indigo-400 w-5' : 'bg-white/20 hover:bg-white/40'}`}
+                                    />
+                                ))}
+                            </div>
+                            <span className="text-[10px] text-white/30 ml-2">
+                                {currentPage + 1} / {totalPages}
+                            </span>
+                        </div>
+                    )}
 
                     {/* Controls Bar */}
                     <div className="px-3 sm:px-5 py-3 flex items-center justify-center gap-2 sm:gap-3 border-t border-white/5 bg-dark-950/30 shrink-0 flex-wrap">
