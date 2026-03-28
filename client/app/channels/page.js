@@ -29,6 +29,7 @@ const MusicRoom = dynamic(() => import('../../components/MusicRoom'), { ssr: fal
 const GifPicker = dynamic(() => import('../../components/GifPicker'), { ssr: false });
 import AudioPlayer from '../../components/AudioPlayer';
 import MessageSearch from '../../components/MessageSearch';
+import VoiceVideoPopup from '../../components/VoiceVideoPopup';
 import { MdGif } from 'react-icons/md';
 
 export default function ChannelsPage() {
@@ -94,6 +95,8 @@ export default function ChannelsPage() {
     const [showGameLauncher, setShowGameLauncher] = useState(false);
     const [showMusicRoom, setShowMusicRoom] = useState(false);
     const [showCallPicker, setShowCallPicker] = useState(null); // 'voice' | 'video' | null
+    const [showVideoPopup, setShowVideoPopup] = useState(false);
+    const [selectedCallMembers, setSelectedCallMembers] = useState([]);
 
     // Listen for friend status changes globally
     useEffect(() => {
@@ -130,6 +133,13 @@ export default function ChannelsPage() {
             setShowGameLauncher(true);
         }
     }, [gameSession, currentChannel?._id]);
+
+    // Auto-open video popup when video/screen share starts
+    useEffect(() => {
+        if ((isVideoOn || isScreenSharing) && connectedVoice) {
+            setShowVideoPopup(true);
+        }
+    }, [isVideoOn, isScreenSharing, connectedVoice]);
 
     // Callback refs to bind VoiceProvider video/screen streams to video elements
     const localVideoCallbackRef = useCallback((el) => {
@@ -876,85 +886,19 @@ export default function ChannelsPage() {
                             )}
                         </AnimatePresence>
 
-                        {/* VIDEO / SCREEN SHARE PANEL */}
-                        <AnimatePresence>
-                            {(isVideoOn || isScreenSharing) && connectedVoice && (
-                                <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: 'auto', opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    className="border-b border-white/5 overflow-hidden"
-                                >
-                                    <div className="relative bg-dark-950">
-                                        {/* Screen Share - Main View */}
-                                        {isScreenSharing && (
-                                            <div className="relative w-full" style={{ maxHeight: '45vh' }}>
-                                                <video
-                                                    ref={screenVideoCallbackRef}
-                                                    autoPlay
-                                                    playsInline
-                                                    muted
-                                                    className="w-full object-contain bg-black"
-                                                    style={{ maxHeight: '45vh' }}
-                                                />
-                                                <div className="absolute top-3 left-3 flex items-center gap-2 bg-dark-900/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/10">
-                                                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                                    <span className="text-xs text-white font-medium">Screen Sharing</span>
-                                                </div>
-                                                <button
-                                                    onClick={() => stopScreenShare && stopScreenShare()}
-                                                    className="absolute top-3 right-3 bg-red-500/80 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                                                >
-                                                    <FiX className="w-3 h-3" /> Stop Sharing
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* Camera Preview - PiP or Main */}
-                                        {isVideoOn && (
-                                            <motion.div
-                                                drag={isScreenSharing}
-                                                dragConstraints={{ top: 0, bottom: 200, left: -400, right: 0 }}
-                                                className={isScreenSharing
-                                                    ? "absolute bottom-3 right-3 w-40 aspect-video rounded-xl overflow-hidden border-2 border-white/10 shadow-xl bg-dark-800 cursor-move z-10"
-                                                    : "relative w-full flex items-center justify-center bg-dark-950"
-                                                }
-                                                style={!isScreenSharing ? { maxHeight: '35vh' } : {}}
-                                            >
-                                                <video
-                                                    ref={localVideoCallbackRef}
-                                                    autoPlay
-                                                    playsInline
-                                                    muted
-                                                    className={isScreenSharing
-                                                        ? "w-full h-full object-cover"
-                                                        : "w-full object-contain bg-black"
-                                                    }
-                                                    style={!isScreenSharing ? { maxHeight: '35vh' } : {}}
-                                                />
-                                                <div className={`absolute bottom-2 left-2 flex items-center gap-1 bg-dark-900/70 backdrop-blur-sm px-2 py-1 rounded text-[10px] text-white font-medium ${isScreenSharing ? '' : 'text-xs'}`}>
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                                    {user?.username || 'You'} • Camera
-                                                </div>
-                                                <button
-                                                    onClick={() => stopVideo && stopVideo()}
-                                                    className="absolute top-2 right-2 bg-dark-900/70 hover:bg-red-500/80 text-white/60 hover:text-white p-1 rounded-lg text-xs transition-colors"
-                                                >
-                                                    <FiX className="w-3 h-3" />
-                                                </button>
-                                            </motion.div>
-                                        )}
-
-                                        {/* No video/screen active but panel shown (shouldn't happen, but safe) */}
-                                        {!isVideoOn && !isScreenSharing && (
-                                            <div className="h-32 flex items-center justify-center text-white/20 text-sm">
-                                                No active video or screen share
-                                            </div>
-                                        )}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                        {/* VIDEO / SCREEN SHARE — now triggers the popup instead of inline */}
+                        {(isVideoOn || isScreenSharing) && connectedVoice && !showVideoPopup && (
+                            <div className="border-b border-white/5 bg-dark-950/50 px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-dark-950/80 transition-colors"
+                                onClick={() => setShowVideoPopup(true)}>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                    <span className="text-xs text-white/70 font-medium">
+                                        {isScreenSharing ? '📺 Screen Sharing' : '📹 Camera Active'} — Click to open video window
+                                    </span>
+                                </div>
+                                <span className="text-[10px] text-white/30">Open ↗</span>
+                            </div>
+                        )}
 
                         <div className="flex-1 flex min-h-0">
                             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 min-h-0">
@@ -1348,51 +1292,95 @@ export default function ChannelsPage() {
 
             {/* Call is now handled globally by CallProvider */}
 
-            {/* Call Member Picker Modal */}
+            {/* Voice Video Popup */}
+            {showVideoPopup && connectedVoice && (
+                <VoiceVideoPopup
+                    user={user}
+                    isVideoOn={isVideoOn}
+                    isScreenSharing={isScreenSharing}
+                    localVideoStream={localVideoStream}
+                    localScreenStream={localScreenStream}
+                    peerVideoStreams={peerVideoStreams || {}}
+                    peerScreenStreams={voice.peerScreenStreams || {}}
+                    voiceUsers={vcUsers?.[connectedVoice] || []}
+                    isMuted={isMuted}
+                    isDeafened={isDeafened}
+                    onToggleMute={voiceToggleMute}
+                    onToggleDeafen={voiceToggleDeafen}
+                    onStartVideo={() => startVideo && startVideo()}
+                    onStopVideo={() => stopVideo && stopVideo()}
+                    onStartScreenShare={() => startScreenShare && startScreenShare()}
+                    onStopScreenShare={() => stopScreenShare && stopScreenShare()}
+                    onSwitchCamera={() => switchCamera && switchCamera()}
+                    facingMode={facingMode}
+                    onDisconnect={() => { leaveVoice(connectedVoice); leaveVoiceChannel(connectedVoice); setConnectedVoice(null); setShowVideoPopup(false); }}
+                    onClose={() => setShowVideoPopup(false)}
+                />
+            )}
+
+            {/* Call Member Picker Modal (Multi-Select) */}
             <AnimatePresence>
                 {showCallPicker && currentServer && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowCallPicker(null)}>
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => { setShowCallPicker(null); setSelectedCallMembers([]); }}>
                         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
                             className="bg-dark-800 border border-white/10 rounded-2xl w-full max-w-[400px] mx-4 overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
                             <div className="p-6 text-center border-b border-white/5">
-                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-silver-400 flex items-center justify-center mx-auto mb-3">
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-400 flex items-center justify-center mx-auto mb-3">
                                     {showCallPicker === 'video' ? <FiVideo className="w-6 h-6 text-white" /> : <FiPhone className="w-6 h-6 text-white" />}
                                 </div>
                                 <h2 className="text-xl font-bold">Start {showCallPicker === 'video' ? 'Video' : 'Voice'} Call</h2>
-                                <p className="text-white/40 text-sm mt-1">Select a member to call</p>
+                                <p className="text-white/40 text-sm mt-1">Select member{selectedCallMembers.length > 1 ? 's' : ''} to call</p>
                             </div>
                             <div className="max-h-64 overflow-y-auto p-2">
-                                {(currentServer.members || []).filter(m => m.user?._id !== user?._id).map((m, i) => (
-                                    <motion.div key={m.user?._id || i}
-                                        whileHover={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
-                                        onClick={() => {
-                                            initiateCall?.(m.user?._id, currentChannel?._id, showCallPicker);
-                                            setShowCallPicker(null);
-                                        }}
-                                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors">
-                                        <div className="relative">
-                                            <div className="w-10 h-10 rounded-full bg-indigo-500/60 flex items-center justify-center text-sm font-bold">
-                                                {(m.user?.username || 'U')[0].toUpperCase()}
+                                {(currentServer.members || []).filter(m => m.user?._id !== user?._id).map((m, i) => {
+                                    const isSelected = selectedCallMembers.includes(m.user?._id);
+                                    return (
+                                        <motion.div key={m.user?._id || i}
+                                            whileHover={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
+                                            onClick={() => {
+                                                setSelectedCallMembers(prev =>
+                                                    isSelected ? prev.filter(id => id !== m.user?._id) : [...prev, m.user?._id]
+                                                );
+                                            }}
+                                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${isSelected ? 'bg-indigo-500/10 border border-indigo-500/30' : 'border border-transparent'}`}>
+                                            {/* Checkbox */}
+                                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-white/20'}`}>
+                                                {isSelected && <FiCheck className="w-3 h-3 text-white" />}
                                             </div>
-                                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-dark-800 ${onlineUsers.includes(m.user?._id) ? 'bg-emerald-400' : 'bg-white/20'}`} />
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="text-sm font-medium text-white">{m.user?.username || 'User'}</p>
-                                            <p className="text-xs text-white/30">{onlineUsers.includes(m.user?._id) ? 'Online' : 'Offline'}</p>
-                                        </div>
-                                        <div className="p-2 rounded-lg bg-white/5 text-white/30 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors">
-                                            {showCallPicker === 'video' ? <FiVideo className="w-4 h-4" /> : <FiPhone className="w-4 h-4" />}
-                                        </div>
-                                    </motion.div>
-                                ))}
+                                            <div className="relative">
+                                                <div className="w-10 h-10 rounded-full bg-indigo-500/60 flex items-center justify-center text-sm font-bold">
+                                                    {(m.user?.username || 'U')[0].toUpperCase()}
+                                                </div>
+                                                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-dark-800 ${onlineUsers.includes(m.user?._id) ? 'bg-emerald-400' : 'bg-white/20'}`} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-white truncate">{m.user?.username || 'User'}</p>
+                                                <p className="text-xs text-white/30">{onlineUsers.includes(m.user?._id) ? 'Online' : 'Offline'}</p>
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })}
                                 {(currentServer.members || []).filter(m => m.user?._id !== user?._id).length === 0 && (
                                     <p className="text-center text-white/30 text-sm py-6">No other members in this server</p>
                                 )}
                             </div>
-                            <div className="p-4 border-t border-white/5">
-                                <button onClick={() => setShowCallPicker(null)}
-                                    className="w-full py-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-sm text-white/50 hover:text-white transition-colors">Cancel</button>
+                            <div className="p-4 border-t border-white/5 flex gap-2">
+                                <button onClick={() => { setShowCallPicker(null); setSelectedCallMembers([]); }}
+                                    className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-sm text-white/50 hover:text-white transition-colors">Cancel</button>
+                                <button
+                                    disabled={selectedCallMembers.length === 0}
+                                    onClick={() => {
+                                        selectedCallMembers.forEach(memberId => {
+                                            initiateCall?.(memberId, currentChannel?._id, showCallPicker);
+                                        });
+                                        setShowCallPicker(null);
+                                        setSelectedCallMembers([]);
+                                    }}
+                                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 ${selectedCallMembers.length > 0 ? 'bg-indigo-500 hover:bg-indigo-600 text-white' : 'bg-white/5 text-white/20 cursor-not-allowed'}`}>
+                                    {showCallPicker === 'video' ? <FiVideo className="w-4 h-4" /> : <FiPhone className="w-4 h-4" />}
+                                    Call{selectedCallMembers.length > 0 ? ` (${selectedCallMembers.length})` : ''}
+                                </button>
                             </div>
                         </motion.div>
                     </motion.div>
