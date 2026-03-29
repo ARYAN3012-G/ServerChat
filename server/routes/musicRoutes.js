@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 
 // Proxy JioSaavn API to avoid CORS issues
 router.get('/search', auth, async (req, res) => {
