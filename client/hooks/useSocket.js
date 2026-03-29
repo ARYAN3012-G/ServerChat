@@ -35,7 +35,7 @@ export function useSocket() {
         const handleVoiceJoined = ({ channelId, userId, username }) => setVoiceUsers(prev => ({ ...prev, [channelId]: [...(prev[channelId] || []).filter(u => u.userId !== userId), { userId, username }] }));
         const handleVoiceLeft = ({ channelId, userId }) => setVoiceUsers(prev => ({ ...prev, [channelId]: (prev[channelId] || []).filter(u => u.userId !== userId) }));
         const handleMusicSync = (data) => setMusicRoom(prev => ({ ...prev, ...data }));
-        const handleStreamJoined = ({ userId, username }) => setMusicRoom(prev => prev ? { ...prev, users: [...(prev.users || []), { userId, username }] } : prev);
+        const handleStreamJoined = ({ userId, username, users, hostUserId, ownerUserId }) => setMusicRoom(prev => prev ? { ...prev, users: users || [...(prev.users || []), { userId, username }], hostUserId: hostUserId || prev.hostUserId, ownerUserId: ownerUserId || prev.ownerUserId } : prev);
         const handleStreamLeft = ({ userId }) => setMusicRoom(prev => prev ? { ...prev, users: (prev.users || []).filter(u => u.userId !== userId) } : prev);
         const handleStatusChanged = ({ userId, status }) => {
             // Keep user in online list (they're still connected), status change is cosmetic
@@ -158,11 +158,11 @@ export function useSocket() {
     }, []);
 
     // Music/Stream functions
-    const joinMusicRoom = useCallback((roomId) => {
+    const joinMusicRoom = useCallback((roomId, isServerOwner = false) => {
         const socket = getSocket();
         if (socket) {
-            socket.emit('stream:join', { roomId });
-            setMusicRoom({ roomId, users: [], track: null, isPlaying: false, currentTime: 0 });
+            socket.emit('stream:join', { roomId, isServerOwner });
+            setMusicRoom({ roomId, users: [], track: null, isPlaying: false, currentTime: 0, hostUserId: null, ownerUserId: null });
         }
     }, []);
 

@@ -1477,6 +1477,8 @@ export default function ChannelsPage() {
                         syncMusic={syncMusic}
                         leaveMusicRoom={leaveMusicRoom}
                         musicRoom={musicRoom}
+                        userId={user?._id}
+                        isServerOwner={currentServer?.owner?._id === user?._id || currentServer?.owner === user?._id}
                     />
                 )
             }
