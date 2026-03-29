@@ -544,13 +544,7 @@ export default function ChannelsPage() {
                         className="w-12 h-12 rounded-full flex-shrink-0 bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-emerald-500 cursor-pointer transition-all duration-200" title="Join Server">
                         <FiCompass className="w-5 h-5" />
                     </motion.div>
-                </div>
 
-                {/* Small spacer */}
-                <div className="mt-auto" />
-
-                {/* Fixed Bottom: Utilities */}
-                <div className="flex flex-col items-center gap-1.5 pt-1 pb-2 flex-shrink-0">
                     <div className="w-8 h-0.5 bg-white/10 rounded-full" />
 
                     <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/games')}
@@ -591,18 +585,6 @@ export default function ChannelsPage() {
                     <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/settings')}
                         className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-white/10 cursor-pointer transition-all duration-200" title="Settings">
                         <FiSettings className="w-4 h-4" />
-                    </motion.div>
-
-                    {/* Profile */}
-                    <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/settings')}
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer transition-all duration-200 hover:opacity-80" 
-                        style={{ backgroundColor: user?.accentColor || '#6366f1' }}
-                        title={user?.username || 'Profile'}>
-                        {user?.avatar?.url ? (
-                            <img src={user.avatar.url} alt="" className="w-full h-full rounded-full object-cover" />
-                        ) : user?.avatar?.prebuilt ? (
-                            <div className="w-full h-full rounded-full flex items-center justify-center text-base" style={{ background: user.avatar.bg }}>{user.avatar.emoji}</div>
-                        ) : (user?.username?.[0] || 'U').toUpperCase()}
                     </motion.div>
                 </div>
             </div>
