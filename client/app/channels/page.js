@@ -76,6 +76,24 @@ export default function ChannelsPage() {
     const [threadView, setThreadView] = useState(null);
     const [threadMessages, setThreadMessages] = useState([]);
     const [threadInput, setThreadInput] = useState('');
+    const [showGameChallenge, setShowGameChallenge] = useState(false);
+    const CHALLENGE_GAMES = [
+        { id: 'ttt', name: 'Tic-Tac-Toe', icon: '🎯' },
+        { id: 'connect4', name: 'Connect 4', icon: '🔴' },
+        { id: 'chess', name: 'Chess', icon: '♟️' },
+        { id: 'checkers', name: 'Checkers', icon: '🏁' },
+        { id: 'rps', name: 'Rock Paper Scissors', icon: '⚔️' },
+        { id: 'pong', name: 'Ping Pong', icon: '🏓' },
+        { id: 'battleship', name: 'Battleship', icon: '🚢' },
+        { id: '2048', name: '2048', icon: '🔢' },
+        { id: 'wordle', name: 'Wordle', icon: '📝' },
+        { id: 'snake', name: 'Snake', icon: '🐍' },
+    ];
+    const sendGameChallenge = (game) => {
+        if (!currentChannel) return;
+        sendMessage(currentChannel._id, `🎮 **Game Challenge!** I want to play **${game.name}** ${game.icon}! Join me → /games`, 'text');
+        setShowGameChallenge(false);
+    };
     // Video refs use callback pattern to bind VoiceProvider streams
 
     const { sendMessage, joinChannel, leaveChannel, startTyping, stopTyping, reactToMessage,
@@ -1197,8 +1215,32 @@ export default function ChannelsPage() {
                                 <button onClick={() => { setShowGifPicker(!showGifPicker); setShowInputEmojiPicker(false); }} className="hidden sm:flex text-white/20 hover:text-emerald-400 transition-colors mr-1 sm:mr-2 cursor-pointer flex-shrink-0" title="GIFs">
                                     <MdGif className="w-7 h-7" />
                                 </button>
+                                <button onClick={() => { setShowGameChallenge(!showGameChallenge); setShowInputEmojiPicker(false); setShowGifPicker(false); }} className="hidden sm:flex text-white/20 hover:text-indigo-400 transition-colors mr-1 sm:mr-2 cursor-pointer flex-shrink-0" title="Game Challenge">
+                                    <IoGameControllerOutline className="w-5 h-5" />
+                                </button>
                                 <FiPaperclip className="hidden sm:block w-5 h-5 text-white/20 cursor-pointer hover:text-white transition-colors flex-shrink-0" onClick={() => fileInputRef.current?.click()} title="Attach file" />
                                 <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
+                                {/* Game Challenge Popup */}
+                                <AnimatePresence>
+                                    {showGameChallenge && (
+                                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+                                            className="absolute bottom-full left-0 mb-2 w-64 bg-[#1a1d2e] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
+                                            <div className="px-3 py-2 border-b border-white/5 flex items-center justify-between">
+                                                <span className="text-xs font-bold text-indigo-400">🎮 Challenge to a Game</span>
+                                                <button onClick={() => setShowGameChallenge(false)} className="text-white/30 hover:text-white"><FiX className="w-3 h-3" /></button>
+                                            </div>
+                                            <div className="max-h-48 overflow-y-auto p-1">
+                                                {CHALLENGE_GAMES.map(g => (
+                                                    <button key={g.id} onClick={() => sendGameChallenge(g)}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors text-left">
+                                                        <span className="text-lg">{g.icon}</span>
+                                                        <span className="text-xs font-medium text-white/70">{g.name}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                                 <input type="text" value={messageInput} onChange={handleTyping}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); setShowMentions(false); setShowInputEmojiPicker(false); setShowGifPicker(false); }
