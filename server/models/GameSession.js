@@ -3,8 +3,12 @@ const mongoose = require('mongoose');
 const gameSessionSchema = new mongoose.Schema({
     game: {
         type: String,
-        enum: ['tic-tac-toe', 'rock-paper-scissors', 'quiz', 'word-guess', 'snake'],
+        enum: ['tic-tac-toe', 'rock-paper-scissors', 'quiz', 'word-guess', 'snake', 'connect4', 'chess', 'checkers', 'battleship', 'ludo', '2048', 'minesweeper', 'wordle', 'flappy', 'tetris', 'pong'],
         required: true,
+    },
+    server: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Server',
     },
     channel: {
         type: mongoose.Schema.Types.ObjectId,

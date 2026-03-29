@@ -189,6 +189,14 @@ function getInitialState(game) {
             return { board: Array(9).fill(null), xIsNext: true };
         case 'rock-paper-scissors':
             return { choices: {}, round: 1 };
+        case 'connect4':
+            return { board: Array(6).fill(null).map(() => Array(7).fill(null)), isRedNext: true };
+        case 'chess':
+            return { fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', moves: [] };
+        case 'checkers':
+            return { board: getInitialCheckersBoard(), isRedNext: true };
+        case 'battleship':
+            return { boards: {}, shots: {}, phase: 'setup' };
         case 'quiz':
             return { currentQuestion: 0, answers: {}, scores: {} };
         case 'word-guess':
@@ -202,6 +210,12 @@ function getMinPlayers(game) {
     switch (game) {
         case 'tic-tac-toe': return 2;
         case 'rock-paper-scissors': return 2;
+        case 'connect4': return 2;
+        case 'chess': return 2;
+        case 'checkers': return 2;
+        case 'battleship': return 2;
+        case 'pong': return 2;
+        case 'ludo': return 2;
         case 'quiz': return 2;
         case 'word-guess': return 2;
         default: return 2;
@@ -214,6 +228,8 @@ function processMove(session, userId, move) {
             return processTicTacToe(session, userId, move);
         case 'rock-paper-scissors':
             return processRPS(session, userId, move);
+        case 'connect4':
+            return processConnect4(session, userId, move);
         default:
             return { state: session.state };
     }
@@ -259,15 +275,12 @@ function processRPS(session, userId, move) {
     const state = { ...session.state };
     state.choices[userId] = move.choice;
 
-    // Check if both players have chosen
     if (Object.keys(state.choices).length === session.players.length) {
         const players = session.players.map(p => p.user.toString());
         const [p1, p2] = players;
         const c1 = state.choices[p1];
         const c2 = state.choices[p2];
-
         const wins = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
-
         if (c1 === c2) {
             return { state: { ...state, result: 'draw', choices: {} }, draw: false };
         } else if (wins[c1] === c2) {
@@ -276,6 +289,62 @@ function processRPS(session, userId, move) {
             return { state: { ...state, result: p2 }, winner: p2 };
         }
     }
-
     return { state };
+}
+
+function processConnect4(session, userId, move) {
+    const state = JSON.parse(JSON.stringify(session.state));
+    const board = state.board;
+    const col = move.column;
+    const playerIndex = session.players.findIndex(p => p.user.toString() === userId);
+    const color = playerIndex === 0 ? 'R' : 'Y';
+
+    // Find lowest empty row in column
+    let row = -1;
+    for (let r = 5; r >= 0; r--) {
+        if (!board[r][col]) { row = r; break; }
+    }
+    if (row === -1) return { state }; // Column full
+
+    board[row][col] = color;
+    state.board = board;
+    state.isRedNext = !state.isRedNext;
+
+    // Check win (4 in a row)
+    const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+    for (const [dr, dc] of dirs) {
+        let count = 1;
+        for (let i = 1; i < 4; i++) {
+            const nr = row + dr * i, nc = col + dc * i;
+            if (nr >= 0 && nr < 6 && nc >= 0 && nc < 7 && board[nr][nc] === color) count++;
+            else break;
+        }
+        for (let i = 1; i < 4; i++) {
+            const nr = row - dr * i, nc = col - dc * i;
+            if (nr >= 0 && nr < 6 && nc >= 0 && nc < 7 && board[nr][nc] === color) count++;
+            else break;
+        }
+        if (count >= 4) return { state, winner: userId };
+    }
+
+    // Check draw
+    if (board[0].every(cell => cell !== null)) return { state, draw: true };
+
+    const nextPlayerIndex = state.isRedNext ? 0 : 1;
+    return { state, nextTurn: session.players[nextPlayerIndex]?.user };
+}
+
+function getInitialCheckersBoard() {
+    const board = Array(8).fill(null).map(() => Array(8).fill(null));
+    for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 8; c++) {
+            if ((r + c) % 2 === 1) board[r][c] = 'b';
+        }
+    }
+    for (let r = 5; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            if ((r + c) % 2 === 1) board[r][c] = 'r';
+        }
+    }
+    return board;
 }

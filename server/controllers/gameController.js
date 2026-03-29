@@ -4,7 +4,7 @@ const ActivityLog = require('../models/ActivityLog');
 // Save a game score
 exports.saveScore = async (req, res, next) => {
     try {
-        const { game, score, won } = req.body;
+        const { game, score, won, serverId } = req.body;
 
         const session = await GameSession.create({
             game,
@@ -12,6 +12,7 @@ exports.saveScore = async (req, res, next) => {
             state: {},
             status: 'finished',
             winner: won ? req.user._id : null,
+            ...(serverId && { server: serverId }),
             round: 1,
             maxRounds: 1,
             startedAt: new Date(Date.now() - 60000),
@@ -66,10 +67,13 @@ exports.getGameSession = async (req, res, next) => {
 // Get game leaderboard
 exports.getLeaderboard = async (req, res, next) => {
     try {
-        const { game } = req.query;
+        const { game, serverId } = req.query;
+        const matchFilter = { status: 'finished' };
+        if (game) matchFilter.game = game;
+        if (serverId) matchFilter.server = new (require('mongoose').Types.ObjectId)(serverId);
 
         const pipeline = [
-            { $match: { status: 'finished', ...(game && { game }) } },
+            { $match: matchFilter },
             { $unwind: '$players' },
             {
                 $group: {
