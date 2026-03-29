@@ -1,13 +1,18 @@
 const { Resend } = require('resend');
 const { logger } = require('../config/logger');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 /**
  * Send password reset email via Resend (HTTP API — works on Render free tier)
  */
 exports.sendPasswordResetEmail = async (to, resetToken) => {
     const resetUrl = `${(process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/+$/, '')}/reset-password/${resetToken}`;
+
+    if (!resend) {
+        logger.warn('Mock password reset email sent. RESEND_API_KEY missing.');
+        return true;
+    }
 
     try {
         const { data, error } = await resend.emails.send({
@@ -111,6 +116,11 @@ exports.sendContactEmail = async ({ name, email, subject, message }) => {
         dateStyle: 'medium',
         timeStyle: 'short',
     });
+
+    if (!resend) {
+        logger.warn('Mock contact email sent. RESEND_API_KEY missing.');
+        return true;
+    }
 
     try {
         const { data, error } = await resend.emails.send({
