@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiSettings, FiUsers, FiEdit2, FiLink, FiAlertTriangle, FiX, FiCopy, FiCheck, FiChevronDown, FiTrash2, FiShield, FiStar } from 'react-icons/fi';
+import { FiSettings, FiUsers, FiEdit2, FiLink, FiAlertTriangle, FiX, FiCopy, FiCheck, FiChevronDown, FiTrash2, FiShield, FiStar, FiLogOut, FiArrowRight } from 'react-icons/fi';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -50,6 +50,9 @@ export default function ServerSettingsModal({ server, user, onClose, onServerUpd
 
     // Danger state
     const [deleteConfirm, setDeleteConfirm] = useState('');
+    const [transferTarget, setTransferTarget] = useState('');
+    const [leaveAfterTransfer, setLeaveAfterTransfer] = useState(false);
+    const [transferring, setTransferring] = useState(false);
 
     const myMember = server?.members?.find(m => m.user?._id === user?._id);
     const myRole = myMember?.role || 'member';
@@ -146,6 +149,28 @@ export default function ServerSettingsModal({ server, user, onClose, onServerUpd
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to leave');
         }
+    };
+
+    // ── Transfer Ownership ──
+    const handleTransfer = async () => {
+        if (!transferTarget) return;
+        setTransferring(true);
+        try {
+            const res = await api.put(`/servers/${server._id}/transfer-ownership`, {
+                newOwnerId: transferTarget,
+                leaveAfterTransfer,
+            });
+            toast.success('Ownership transferred!');
+            if (leaveAfterTransfer) {
+                onLeaveServer?.();
+                onClose();
+            } else {
+                onServerUpdate?.(res.data);
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to transfer');
+        }
+        setTransferring(false);
     };
 
     const renderTabContent = () => {
@@ -304,20 +329,54 @@ export default function ServerSettingsModal({ server, user, onClose, onServerUpd
 
             case 'danger': return (
                 <div className="space-y-4">
+                    {/* Transfer Ownership (owner only) */}
+                    {isOwner && server?.members?.filter(m => m.user?._id !== user?._id).length > 0 && (
+                        <div className="bg-dark-950 border border-indigo-500/20 rounded-xl p-4">
+                            <h3 className="text-sm font-semibold text-indigo-400 mb-1 flex items-center gap-2"><FiArrowRight className="w-4 h-4" /> Transfer Ownership</h3>
+                            <p className="text-xs text-white/30 mb-3">Make another member the owner of this server.</p>
+                            <div className="space-y-3">
+                                <select value={transferTarget} onChange={e => setTransferTarget(e.target.value)}
+                                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-indigo-500/50 focus:outline-none appearance-none">
+                                    <option value="">Select new owner...</option>
+                                    {server.members.filter(m => m.user?._id !== user?._id).map(m => (
+                                        <option key={m.user?._id} value={m.user?._id}>{m.user?.username} ({m.role})</option>
+                                    ))}
+                                </select>
+                                <div className="flex items-center justify-between bg-dark-900 border border-white/10 rounded-lg px-3 py-2.5">
+                                    <div>
+                                        <p className="text-xs text-white">Leave after transfer</p>
+                                        <p className="text-[10px] text-white/25">If off, you stay as a member</p>
+                                    </div>
+                                    <button onClick={() => setLeaveAfterTransfer(!leaveAfterTransfer)}
+                                        className={`w-9 h-5 rounded-full transition-colors relative ${leaveAfterTransfer ? 'bg-amber-500' : 'bg-white/10'}`}>
+                                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${leaveAfterTransfer ? 'left-[18px]' : 'left-0.5'}`} />
+                                    </button>
+                                </div>
+                                <button onClick={handleTransfer} disabled={!transferTarget || transferring}
+                                    className="w-full py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-xs font-medium text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                                    {transferring ? 'Transferring...' : leaveAfterTransfer ? 'Transfer & Leave' : 'Transfer & Stay as Member'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Leave Server (non-owners) */}
                     {!isOwner && (
                         <div className="bg-dark-950 border border-amber-500/20 rounded-xl p-4">
-                            <h3 className="text-sm font-semibold text-amber-400 mb-1">Leave Server</h3>
-                            <p className="text-xs text-white/30 mb-3">You will lose access to all channels.</p>
+                            <h3 className="text-sm font-semibold text-amber-400 mb-1 flex items-center gap-2"><FiLogOut className="w-4 h-4" /> Leave Server</h3>
+                            <p className="text-xs text-white/30 mb-3">You will lose access to all channels and messages.</p>
                             <button onClick={handleLeave}
                                 className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-xs font-medium transition-colors">
                                 Leave Server
                             </button>
                         </div>
                     )}
+
+                    {/* Delete Server (owner only) */}
                     {isOwner && (
                         <div className="bg-dark-950 border border-red-500/20 rounded-xl p-4">
-                            <h3 className="text-sm font-semibold text-red-400 mb-1">Delete Server</h3>
-                            <p className="text-xs text-white/30 mb-3">This action is permanent and cannot be undone. All channels and messages will be deleted.</p>
+                            <h3 className="text-sm font-semibold text-red-400 mb-1 flex items-center gap-2"><FiTrash2 className="w-4 h-4" /> Delete Server</h3>
+                            <p className="text-xs text-white/30 mb-3">This action is <strong className="text-red-400">permanent</strong> and cannot be undone. All channels and messages will be deleted.</p>
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                 <input value={deleteConfirm} onChange={e => setDeleteConfirm(e.target.value)}
                                     placeholder={`Type "${server?.name}" to confirm`}
@@ -358,7 +417,6 @@ export default function ServerSettingsModal({ server, user, onClose, onServerUpd
                     </div>
                     <div className="flex-1 p-2 space-y-0.5 overflow-y-auto">
                         {TABS.map(tab => {
-                            if (tab.id === 'danger' && !isAdmin && !isOwner) return null;
                             if (tab.id === 'nicknames' && !isAdmin) return null;
                             const Icon = tab.icon;
                             return (

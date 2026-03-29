@@ -369,6 +369,54 @@ exports.updateMemberNickname = async (req, res, next) => {
     }
 };
 
+// Transfer ownership
+exports.transferOwnership = async (req, res, next) => {
+    try {
+        const server = await Server.findById(req.params.id);
+        if (!server) {
+            return res.status(404).json({ message: 'Server not found' });
+        }
+
+        if (server.owner.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Only the owner can transfer ownership' });
+        }
+
+        const { newOwnerId, leaveAfterTransfer } = req.body;
+        if (!newOwnerId) {
+            return res.status(400).json({ message: 'New owner ID is required' });
+        }
+
+        const newOwnerMember = server.members.find(m => m.user.toString() === newOwnerId);
+        if (!newOwnerMember) {
+            return res.status(404).json({ message: 'User not found in server' });
+        }
+
+        // Transfer ownership
+        server.owner = newOwnerId;
+        newOwnerMember.role = 'owner';
+
+        // Demote old owner to member or remove
+        const oldOwnerMember = server.members.find(m => m.user.toString() === req.user._id.toString());
+        if (leaveAfterTransfer) {
+            server.members = server.members.filter(m => m.user.toString() !== req.user._id.toString());
+            server.memberCount = Math.max(0, server.memberCount - 1);
+        } else {
+            if (oldOwnerMember) oldOwnerMember.role = 'member';
+        }
+
+        await server.save();
+
+        const populated = await Server.findById(server._id)
+            .populate('owner', 'username avatar status')
+            .populate('channels')
+            .populate('members.user', 'username avatar status');
+
+        res.json(populated);
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Kick member
 exports.kickMember = async (req, res, next) => {
     try {
