@@ -45,6 +45,7 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
     const [mobileTab, setMobileTab] = useState('tracks'); // 'tracks' | 'chat' | 'users'
     const [showEmojis, setShowEmojis] = useState(false);
     const [minimized, setMinimized] = useState(false);
+    const [needsInteraction, setNeedsInteraction] = useState(false);
     const audioRef = useRef(null);
     const playPromiseRef = useRef(null);
     const searchTimeoutRef = useRef(null);
@@ -143,8 +144,14 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                     if (playPromiseRef.current) { try { await playPromiseRef.current; } catch (e) {} }
                     playPromiseRef.current = audio.play();
                     await playPromiseRef.current;
+                    setNeedsInteraction(false); // play succeeded
                 } catch (e) {
-                    if (e.name !== 'AbortError') console.error('Audio play failed:', e);
+                    if (e.name === 'NotAllowedError') {
+                        // Browser blocked autoplay — need user interaction
+                        setNeedsInteraction(true);
+                    } else if (e.name !== 'AbortError') {
+                        console.error('Audio play failed:', e);
+                    }
                 } finally { playPromiseRef.current = null; }
             } else {
                 if (playPromiseRef.current) { try { await playPromiseRef.current; } catch (e) {} playPromiseRef.current = null; }
@@ -153,6 +160,28 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
         };
         doPlayback();
     }, [isPlaying, currentTrack?.id]);
+
+    // Unlock audio with user gesture
+    const unlockAudio = async () => {
+        const audio = audioRef.current;
+        if (!audio || !currentTrack) return;
+        try {
+            if (!audio.src || !audio.src.includes(currentTrack.url?.split('/').pop())) {
+                audio.src = currentTrack.url;
+                audio.load();
+            }
+            // Seek to correct position
+            if (audioRef.current.duration && progress > 0) {
+                audioRef.current.currentTime = (progress / 100) * audioRef.current.duration;
+            }
+            await audio.play();
+            setNeedsInteraction(false);
+            setIsPlaying(true);
+        } catch (e) {
+            console.error('Manual play failed:', e);
+            toast.error('Could not play audio. Try again.');
+        }
+    };
 
     const handleTimeUpdate = () => {
         if (audioRef.current) {
@@ -213,6 +242,13 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                                 <button onClick={onClose} className="p-1.5 text-white/30 hover:text-red-400 transition-colors" title="Close"><FiX className="w-3 h-3" /></button>
                             </div>
                         </div>
+                        {needsInteraction && (
+                            <div className="px-3 pb-1.5">
+                                <button onClick={unlockAudio} className="w-full py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-[10px] font-semibold transition-colors flex items-center justify-center gap-1">
+                                    <FiVolume2 className="w-3 h-3" /> Tap to Listen
+                                </button>
+                            </div>
+                        )}
                         <div className="px-3 pb-2 flex items-center gap-1.5 text-[9px] text-white/20">
                             <FiUsers className="w-2.5 h-2.5" />
                             <span>{roomUsers.length || 1} listening</span>
@@ -309,6 +345,14 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                                         </div>
                                     </div>
                                     {!amHost && <p className="text-center text-[9px] text-amber-400/40 mt-1 flex items-center justify-center gap-1"><FiLock className="w-2 h-2" /> Only the host can control playback</p>}
+                    {needsInteraction && (
+                        <motion.button
+                            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                            onClick={unlockAudio}
+                            className="mt-2 w-full py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20">
+                            <FiVolume2 className="w-3.5 h-3.5" /> Click to Start Listening 🎧
+                        </motion.button>
+                    )}
                                 </div>
                             )}
 
