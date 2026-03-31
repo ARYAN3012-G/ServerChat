@@ -3,24 +3,25 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { setHighScore, getHighScore } from './gameData';
 
-// ═══ GAME HEADER — Full-width with themed background ═══
+// ═══ GAME HEADER — Premium full-width with animated background ═══
 export function GameHeader({ title, gradient, goBack, onReset, children }) {
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="relative w-full min-h-[calc(100vh-0px)] flex flex-col">
-            {/* Themed background */}
+            {/* Multi-layer themed background */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <div className={`absolute top-[-300px] left-1/2 -translate-x-1/2 w-[900px] h-[900px] bg-gradient-to-br ${gradient} opacity-[0.07] rounded-full blur-[120px]`} />
-                <div className={`absolute bottom-[-200px] right-[-100px] w-[500px] h-[500px] bg-gradient-to-br ${gradient} opacity-[0.05] rounded-full blur-[100px]`} />
-                <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+                <div className={`absolute top-[-400px] left-1/2 -translate-x-1/2 w-[1000px] h-[1000px] bg-gradient-to-br ${gradient} opacity-[0.06] rounded-full blur-[160px]`} />
+                <div className={`absolute bottom-[-300px] right-[-150px] w-[600px] h-[600px] bg-gradient-to-br ${gradient} opacity-[0.04] rounded-full blur-[120px]`} />
+                <div className={`absolute top-[40%] left-[-200px] w-[400px] h-[400px] bg-gradient-to-br ${gradient} opacity-[0.03] rounded-full blur-[100px]`} />
+                <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.015) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
             </div>
-            {/* Top bar */}
-            <div className="relative flex items-center justify-between px-4 sm:px-8 py-4 border-b border-white/5 backdrop-blur-sm bg-white/[0.02]">
-                <button onClick={goBack} className="flex items-center gap-1.5 text-white/30 hover:text-white text-sm transition-colors font-medium">
-                    <span className="text-lg">←</span> Lobby
+            {/* Top bar — glass effect */}
+            <div className="relative flex items-center justify-between px-4 sm:px-8 py-3.5 border-b border-white/[0.04] backdrop-blur-md bg-white/[0.015]">
+                <button onClick={goBack} className="flex items-center gap-1.5 text-white/25 hover:text-white text-sm transition-all font-medium hover:gap-2.5 group">
+                    <span className="text-lg group-hover:-translate-x-0.5 transition-transform">←</span> Lobby
                 </button>
-                <h2 className={`text-xl sm:text-2xl font-black bg-gradient-to-r ${gradient} bg-clip-text text-transparent`}>{title}</h2>
-                <button onClick={onReset} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/30 hover:text-white transition-all" title="Reset">🔄</button>
+                <h2 className={`text-xl sm:text-2xl font-black bg-gradient-to-r ${gradient} bg-clip-text text-transparent drop-shadow-sm`}>{title}</h2>
+                <button onClick={onReset} className="w-9 h-9 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.04] hover:border-white/[0.08] flex items-center justify-center text-white/25 hover:text-white transition-all hover:rotate-90 duration-300" title="Reset">🔄</button>
             </div>
             {/* Game content — centered and spacious */}
             <div className="relative flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-6 sm:py-10 overflow-y-auto">
@@ -30,14 +31,15 @@ export function GameHeader({ title, gradient, goBack, onReset, children }) {
     );
 }
 
-// ═══ SCORE PANEL ═══
+// ═══ SCORE PANEL — Glassmorphism ═══
 export function ScorePanel({ items }) {
     return (
-        <div className="flex justify-center gap-2 sm:gap-4 mb-6">
+        <div className="flex justify-center gap-3 sm:gap-4 mb-6">
             {items.map((item, i) => (
-                <div key={i} className={`rounded-xl px-4 sm:px-6 py-2.5 backdrop-blur-sm border ${item.border || 'border-white/10'} ${item.bg || 'bg-white/5'}`}>
-                    <p className="text-[9px] uppercase tracking-wider font-semibold text-white/40">{item.label}</p>
-                    <p className={`text-xl sm:text-2xl font-black ${item.color || 'text-white'}`}>{item.value}</p>
+                <div key={i} className={`rounded-2xl px-5 sm:px-7 py-3 backdrop-blur-md border transition-all hover:scale-105 ${item.border || 'border-white/[0.06]'} ${item.bg || 'bg-white/[0.03]'}`}
+                    style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.03)' }}>
+                    <p className="text-[9px] uppercase tracking-[0.15em] font-semibold text-white/30 mb-0.5">{item.label}</p>
+                    <p className={`text-2xl sm:text-3xl font-black ${item.color || 'text-white'}`}>{item.value}</p>
                 </div>
             ))}
         </div>

@@ -185,22 +185,39 @@ export function ChessGame({ goBack, saveScoreToDb }) {
     const isValidTarget = (r, c) => validMoves.some(([vr, vc]) => vr === r && vc === c);
 
     return (
-        <GameHeader title="Chess" gradient="from-amber-300 to-yellow-500" goBack={goBack} onReset={reset}>
-            {status && <div className="mb-4 p-4 rounded-xl font-bold text-center bg-amber-500/20 text-amber-400 text-lg">{status}<button onClick={reset} className="block mx-auto mt-2 px-6 py-2 bg-white/10 rounded-lg text-sm text-white">New Game</button></div>}
-            <div className="flex justify-center gap-6 mb-3 text-sm">
-                <span className="text-white/50">⬜ Captured: {captured.w.map(p => pieceSymbols[p]).join(' ')}</span>
-                <span className="text-white/50">⬛ Captured: {captured.b.map(p => pieceSymbols[p]).join(' ')}</span>
+        <GameHeader title="Chess" gradient="from-violet-400 to-indigo-500" goBack={goBack} onReset={reset}>
+            {status && <div className={`mb-5 py-4 px-8 rounded-2xl font-bold text-center text-lg backdrop-blur-sm border ${status.includes('White') ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : status.includes('Black') ? 'bg-rose-500/15 text-rose-400 border-rose-500/20' : 'bg-white/10 text-white/60 border-white/10'}`}>{status}<button onClick={reset} className="block mx-auto mt-3 px-6 py-2 bg-white/10 hover:bg-white/15 rounded-lg text-sm text-white transition-colors">New Game</button></div>}
+            {/* Capture panels */}
+            <div className="flex justify-center gap-4 mb-4">
+                <div className="flex items-center gap-2 bg-white/[0.04] backdrop-blur-sm rounded-xl px-4 py-2 border border-white/5">
+                    <span className="text-xs text-white/30 font-medium">YOU</span>
+                    <div className="flex gap-0.5 text-lg">{captured.w.map((p,i) => <span key={i} className="opacity-70">{pieceSymbols[p]}</span>)}</div>
+                    {!captured.w.length && <span className="text-white/10 text-xs">—</span>}
+                </div>
+                <div className="flex items-center gap-2 bg-white/[0.04] backdrop-blur-sm rounded-xl px-4 py-2 border border-white/5">
+                    <span className="text-xs text-white/30 font-medium">CPU</span>
+                    <div className="flex gap-0.5 text-lg">{captured.b.map((p,i) => <span key={i} className="opacity-70">{pieceSymbols[p]}</span>)}</div>
+                    {!captured.b.length && <span className="text-white/10 text-xs">—</span>}
+                </div>
             </div>
-            <p className="text-white/30 text-sm mb-3 font-medium">{turn === 'w' ? '⬜ Your turn' : '⬛ CPU thinking...'}</p>
-            <div className="inline-grid grid-cols-8 gap-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-2xl shadow-amber-500/10">
-                {board.flat().map((cell, i) => { const r = Math.floor(i / 8), c = i % 8; const isDark = (r + c) % 2 === 1;
-                    const isValid = isValidTarget(r, c); const isSel = selected?.[0]===r&&selected?.[1]===c;
-                    return (<button key={i} onClick={() => handleClick(r, c)}
-                        className={`w-12 h-12 sm:w-[60px] sm:h-[60px] flex items-center justify-center text-3xl sm:text-4xl transition-all relative ${isDark ? 'bg-[#779952]' : 'bg-[#edeed1]'} ${isSel ? 'ring-2 ring-inset ring-yellow-400 brightness-125' : ''} hover:brightness-110`}>
-                        {isValid && <div className="absolute inset-0 flex items-center justify-center z-10"><div className={`rounded-full ${cell ? 'w-full h-full ring-4 ring-inset ring-red-400/60' : 'w-4 h-4 bg-black/25'}`}/></div>}
-                        {cell && <span className="relative z-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" style={{ color: side(cell) === 'w' ? '#ffffff' : '#1a1a2e', WebkitTextStroke: side(cell) === 'w' ? '0.5px #888' : '0.5px #555', filter: side(cell) === 'b' ? 'drop-shadow(0 0 1px rgba(255,255,255,0.4))' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.6))' }}>{pieceSymbols[cell]}</span>}
-                    </button>);
-                })}
+            <div className={`mb-4 text-sm font-semibold px-5 py-2 rounded-full ${turn === 'w' ? 'bg-violet-500/15 text-violet-300 border border-violet-500/20' : 'bg-amber-500/15 text-amber-300 border border-amber-500/20'}`}>{turn === 'w' ? '♔ Your turn' : '♚ CPU thinking...'}</div>
+            {/* Board with coordinate labels */}
+            <div className="relative">
+                <div className="inline-grid grid-cols-8 gap-0 rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl shadow-violet-500/10" style={{ boxShadow: '0 0 60px rgba(124,58,237,0.08), 0 25px 50px rgba(0,0,0,0.4)' }}>
+                    {board.flat().map((cell, i) => { const r = Math.floor(i / 8), c = i % 8; const isDark = (r + c) % 2 === 1;
+                        const isValid = isValidTarget(r, c); const isSel = selected?.[0]===r&&selected?.[1]===c;
+                        return (<button key={i} onClick={() => handleClick(r, c)}
+                            className={`w-[52px] h-[52px] sm:w-[62px] sm:h-[62px] flex items-center justify-center text-3xl sm:text-[2.2rem] transition-all duration-150 relative ${isDark ? 'bg-[#2d3250]' : 'bg-[#424769]'} ${isSel ? 'brightness-150 ring-1 ring-inset ring-violet-400/60' : ''} hover:brightness-125`}
+                            style={isSel ? { boxShadow: 'inset 0 0 20px rgba(139,92,246,0.3)' } : {}}>
+                            {isValid && <div className="absolute inset-0 flex items-center justify-center z-10"><div className={`rounded-full transition-all ${cell ? 'w-[90%] h-[90%] ring-[3px] ring-inset ring-cyan-400/50' : 'w-4 h-4 bg-cyan-400/30 shadow-[0_0_8px_rgba(34,211,238,0.3)]'}`}/></div>}
+                            {cell && <span className="relative z-0 select-none" style={{
+                                color: side(cell) === 'w' ? '#e8e8f0' : '#f5c542',
+                                textShadow: side(cell) === 'w' ? '0 0 12px rgba(200,200,255,0.4), 0 2px 4px rgba(0,0,0,0.5)' : '0 0 10px rgba(245,197,66,0.3), 0 2px 4px rgba(0,0,0,0.5)',
+                                filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.4))',
+                            }}>{pieceSymbols[cell]}</span>}
+                        </button>);
+                    })}
+                </div>
             </div>
         </GameHeader>
     );
@@ -275,17 +292,17 @@ export function CheckersGame({ goBack, saveScoreToDb }) {
     const isValidTarget = (r, c) => validMoves.some(m => m.tr === r && m.tc === c);
 
     return (
-        <GameHeader title="Checkers" gradient="from-orange-400 to-amber-400" goBack={goBack} onReset={reset}>
-            {status && <div className="mb-4 p-4 rounded-xl font-bold text-center bg-amber-500/20 text-amber-400 text-lg">{status}<button onClick={reset} className="block mx-auto mt-2 px-6 py-2 bg-white/10 rounded-lg text-sm text-white">New Game</button></div>}
-            <p className="text-white/30 text-sm mb-3 font-medium">{turn === 'r' ? '🔴 Your turn' : '⚫ CPU thinking...'}</p>
-            <div className="inline-grid grid-cols-8 gap-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-2xl">
+        <GameHeader title="Checkers" gradient="from-rose-400 to-orange-400" goBack={goBack} onReset={reset}>
+            {status && <div className={`mb-5 py-4 px-8 rounded-2xl font-bold text-center text-lg backdrop-blur-sm border ${status.includes('You') ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/15 text-rose-400 border-rose-500/20'}`}>{status}<button onClick={reset} className="block mx-auto mt-3 px-6 py-2 bg-white/10 hover:bg-white/15 rounded-lg text-sm text-white transition-colors">New Game</button></div>}
+            <div className={`mb-4 text-sm font-semibold px-5 py-2 rounded-full ${turn === 'r' ? 'bg-rose-500/15 text-rose-300 border border-rose-500/20' : 'bg-slate-500/15 text-slate-300 border border-slate-500/20'}`}>{turn === 'r' ? '🔴 Your turn' : '⚫ CPU thinking...'}</div>
+            <div className="inline-grid grid-cols-8 gap-0 rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl" style={{ boxShadow: '0 0 60px rgba(244,63,94,0.06), 0 25px 50px rgba(0,0,0,0.4)' }}>
                 {board.flat().map((cell, i) => { const r = Math.floor(i/8), c = i%8; const isDark = (r+c)%2===1;
                     const isValid = isValidTarget(r, c); const isSel = selected?.[0]===r&&selected?.[1]===c;
                     return (<button key={i} onClick={() => handleClick(r, c)}
-                        className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center transition-all relative ${isDark ? 'bg-[#769656]' : 'bg-[#eeeed2]'} ${isSel ? 'ring-2 ring-inset ring-yellow-400' : ''}`}>
-                        {isValid && <div className="absolute inset-0 flex items-center justify-center"><div className="w-3 h-3 rounded-full bg-yellow-400/50"/></div>}
-                        {cell?.toLowerCase()==='r' ? <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full ${cell==='R' ? 'bg-gradient-to-br from-red-400 to-red-600 ring-2 ring-amber-300' : 'bg-gradient-to-br from-red-500 to-red-700'} shadow-lg`}/> :
-                         cell?.toLowerCase()==='b' ? <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full ${cell==='B' ? 'bg-gradient-to-br from-gray-700 to-gray-900 ring-2 ring-amber-300' : 'bg-gradient-to-br from-gray-800 to-black'} shadow-lg`}/> : ''}
+                        className={`w-[52px] h-[52px] sm:w-[62px] sm:h-[62px] flex items-center justify-center transition-all duration-150 relative ${isDark ? 'bg-[#2d3250]' : 'bg-[#424769]'} ${isSel ? 'brightness-150' : ''} hover:brightness-125`}>
+                        {isValid && <div className="absolute inset-0 flex items-center justify-center z-10"><div className="w-4 h-4 rounded-full bg-cyan-400/30 shadow-[0_0_8px_rgba(34,211,238,0.3)]"/></div>}
+                        {cell?.toLowerCase()==='r' ? <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full ${cell==='R' ? 'bg-gradient-to-br from-rose-400 to-red-600 ring-2 ring-amber-300/60' : 'bg-gradient-to-br from-rose-500 to-red-700'} shadow-[0_0_15px_rgba(244,63,94,0.3)]`} style={{ boxShadow: 'inset 0 -3px 6px rgba(0,0,0,0.3), 0 0 12px rgba(244,63,94,0.2)' }}/> :
+                         cell?.toLowerCase()==='b' ? <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full ${cell==='B' ? 'bg-gradient-to-br from-slate-500 to-slate-800 ring-2 ring-amber-300/60' : 'bg-gradient-to-br from-slate-600 to-slate-900'}`} style={{ boxShadow: 'inset 0 -3px 6px rgba(0,0,0,0.4), 0 0 10px rgba(100,116,139,0.15)' }}/> : ''}
                     </button>);
                 })}
             </div>
