@@ -146,11 +146,9 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                     await playPromiseRef.current;
                     setNeedsInteraction(false); // play succeeded
                 } catch (e) {
-                    if (e.name === 'NotAllowedError') {
-                        // Browser blocked autoplay — need user interaction
+                    if (e.name !== 'AbortError') {
+                        console.error('Audio playback blocked or failed:', e);
                         setNeedsInteraction(true);
-                    } else if (e.name !== 'AbortError') {
-                        console.error('Audio play failed:', e);
                     }
                 } finally { playPromiseRef.current = null; }
             } else {
@@ -210,7 +208,7 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
     return (
         <>
             {/* ── PERSISTENT AUDIO — never unmounts ── */}
-            <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onEnded={handleNext} preload="auto" />
+            <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onEnded={handleNext} preload="auto" crossOrigin="anonymous" />
 
             {/* ── MINIMIZED MINI-PLAYER ── */}
             <AnimatePresence>
