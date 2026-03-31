@@ -3,16 +3,29 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { setHighScore, getHighScore } from './gameData';
 
-// ═══ GAME HEADER ═══
+// ═══ GAME HEADER — Full-width with themed background ═══
 export function GameHeader({ title, gradient, goBack, onReset, children }) {
     return (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="relative max-w-lg mx-auto px-4 sm:px-8 py-6 text-center">
-            <div className="flex items-center justify-between mb-4">
-                <button onClick={goBack} className="flex items-center gap-1.5 text-white/30 hover:text-white text-sm transition-colors">← Lobby</button>
-                <h2 className={`text-xl sm:text-2xl font-black bg-gradient-to-r ${gradient} bg-clip-text text-transparent`}>{title}</h2>
-                <button onClick={onReset} className="text-white/30 hover:text-white transition-colors" title="Reset">🔄</button>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="relative w-full min-h-[calc(100vh-0px)] flex flex-col">
+            {/* Themed background */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                <div className={`absolute top-[-300px] left-1/2 -translate-x-1/2 w-[900px] h-[900px] bg-gradient-to-br ${gradient} opacity-[0.07] rounded-full blur-[120px]`} />
+                <div className={`absolute bottom-[-200px] right-[-100px] w-[500px] h-[500px] bg-gradient-to-br ${gradient} opacity-[0.05] rounded-full blur-[100px]`} />
+                <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
             </div>
-            {children}
+            {/* Top bar */}
+            <div className="relative flex items-center justify-between px-4 sm:px-8 py-4 border-b border-white/5 backdrop-blur-sm bg-white/[0.02]">
+                <button onClick={goBack} className="flex items-center gap-1.5 text-white/30 hover:text-white text-sm transition-colors font-medium">
+                    <span className="text-lg">←</span> Lobby
+                </button>
+                <h2 className={`text-xl sm:text-2xl font-black bg-gradient-to-r ${gradient} bg-clip-text text-transparent`}>{title}</h2>
+                <button onClick={onReset} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/30 hover:text-white transition-all" title="Reset">🔄</button>
+            </div>
+            {/* Game content — centered and spacious */}
+            <div className="relative flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-6 sm:py-10 overflow-y-auto">
+                {children}
+            </div>
         </motion.div>
     );
 }
@@ -20,11 +33,11 @@ export function GameHeader({ title, gradient, goBack, onReset, children }) {
 // ═══ SCORE PANEL ═══
 export function ScorePanel({ items }) {
     return (
-        <div className="flex justify-center gap-2 sm:gap-3 mb-4">
+        <div className="flex justify-center gap-2 sm:gap-4 mb-6">
             {items.map((item, i) => (
-                <div key={i} className={`rounded-xl px-3 sm:px-5 py-2 backdrop-blur-sm border ${item.border || 'border-white/10'} ${item.bg || 'bg-white/5'}`}>
+                <div key={i} className={`rounded-xl px-4 sm:px-6 py-2.5 backdrop-blur-sm border ${item.border || 'border-white/10'} ${item.bg || 'bg-white/5'}`}>
                     <p className="text-[9px] uppercase tracking-wider font-semibold text-white/40">{item.label}</p>
-                    <p className={`text-lg sm:text-2xl font-black ${item.color || 'text-white'}`}>{item.value}</p>
+                    <p className={`text-xl sm:text-2xl font-black ${item.color || 'text-white'}`}>{item.value}</p>
                 </div>
             ))}
         </div>
@@ -54,7 +67,6 @@ export function Game2048({ goBack, saveScoreToDb }) {
         newTile(b); const ns = score + sc; setScore(ns); setBoard(b);
         if (b.flat().includes(2048) && !won) setWon(true);
         setHighScore('2048', ns); saveScoreToDb?.('2048', ns, b.flat().includes(2048));
-        // Check game over
         let canMove = false;
         for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
             if (!b[r][c]) canMove = true;
@@ -65,11 +77,10 @@ export function Game2048({ goBack, saveScoreToDb }) {
     }, [board, score, gameOver, won]);
 
     useEffect(() => {
-        const h = (e) => { if (e.key === 'ArrowLeft' || e.key === 'a') move('left'); if (e.key === 'ArrowRight' || e.key === 'd') move('right'); if (e.key === 'ArrowUp' || e.key === 'w') move('up'); if (e.key === 'ArrowDown' || e.key === 's') move('down'); };
+        const h = (e) => { if (['ArrowLeft','a'].includes(e.key)) move('left'); if (['ArrowRight','d'].includes(e.key)) move('right'); if (['ArrowUp','w'].includes(e.key)) move('up'); if (['ArrowDown','s'].includes(e.key)) move('down'); };
         window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
     }, [move]);
 
-    // Touch swipe
     const touchRef = useRef(null);
     const onTouchStart = (e) => { touchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
     const onTouchEnd = (e) => { if (!touchRef.current) return; const dx = e.changedTouches[0].clientX - touchRef.current.x; const dy = e.changedTouches[0].clientY - touchRef.current.y; if (Math.abs(dx) > Math.abs(dy)) { move(dx > 0 ? 'right' : 'left'); } else { move(dy > 0 ? 'down' : 'up'); } touchRef.current = null; };
@@ -80,11 +91,11 @@ export function Game2048({ goBack, saveScoreToDb }) {
     return (
         <GameHeader title="2048" gradient="from-amber-400 to-red-400" goBack={goBack} onReset={reset}>
             <ScorePanel items={[{ label: 'Score', value: score, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' }, { label: 'Best', value: getHighScore('2048') || '—', color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' }]} />
-            {(gameOver || won) && <div className={`mb-4 p-3 rounded-xl font-bold ${won ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>{won ? '🏆 You reached 2048!' : '💀 Game Over!'}<button onClick={reset} className="block mx-auto mt-2 px-4 py-1 bg-white/10 rounded-lg text-sm text-white">Play Again</button></div>}
-            <div className="inline-grid grid-cols-4 gap-2 bg-white/5 rounded-xl p-2" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-                {board.flat().map((v, i) => (<div key={i} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-lg flex items-center justify-center font-black transition-all ${v ? tileColor(v) : 'bg-white/5'} ${v >= 1024 ? 'text-lg' : v >= 128 ? 'text-xl' : 'text-2xl'}`}>{v || ''}</div>))}
+            {(gameOver || won) && <div className={`mb-6 p-4 rounded-xl font-bold text-center ${won ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>{won ? '🏆 You reached 2048!' : '💀 Game Over!'}<button onClick={reset} className="block mx-auto mt-2 px-6 py-2 bg-white/10 hover:bg-white/15 rounded-lg text-sm text-white transition-colors">Play Again</button></div>}
+            <div className="inline-grid grid-cols-4 gap-2.5 bg-white/[0.04] backdrop-blur-sm rounded-2xl p-3 border border-white/5" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+                {board.flat().map((v, i) => (<div key={i} className={`w-[72px] h-[72px] sm:w-[88px] sm:h-[88px] rounded-xl flex items-center justify-center font-black transition-all duration-150 ${v ? tileColor(v) : 'bg-white/[0.04]'} ${v >= 1024 ? 'text-lg sm:text-xl' : v >= 128 ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl'}`}>{v || ''}</div>))}
             </div>
-            <p className="text-white/15 text-xs mt-3">Arrow keys / WASD / Swipe</p>
+            <p className="text-white/20 text-xs mt-4">Arrow keys / WASD / Swipe to move</p>
         </GameHeader>
     );
 }
@@ -99,20 +110,20 @@ export function WordleGame({ goBack, saveScoreToDb }) {
     const [won, setWon] = useState(false);
     const MAX = 6;
 
-    const submit = () => {
+    const submit = useCallback(() => {
         if (current.length !== 5 || gameOver) return;
         const g = [...guesses, current.toUpperCase()];
         setGuesses(g); setCurrent('');
         if (current.toUpperCase() === target) { setWon(true); setGameOver(true); const sc = (MAX - g.length + 1) * 100; setHighScore('wordle', sc); saveScoreToDb?.('wordle', sc, true); }
         else if (g.length >= MAX) { setGameOver(true); saveScoreToDb?.('wordle', 0, false); }
-    };
+    }, [current, gameOver, guesses, target]);
 
     useEffect(() => {
         const h = (e) => { if (gameOver) return; if (e.key === 'Backspace') setCurrent(p => p.slice(0, -1)); else if (e.key === 'Enter') submit(); else if (/^[a-zA-Z]$/.test(e.key) && current.length < 5) setCurrent(p => p + e.key.toUpperCase()); };
         window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
-    }, [current, gameOver, guesses]);
+    }, [current, gameOver, submit]);
 
-    const getColor = (letter, idx, guess) => {
+    const getColor = (letter, idx) => {
         if (target[idx] === letter) return 'bg-emerald-500 border-emerald-400';
         if (target.includes(letter)) return 'bg-amber-500 border-amber-400';
         return 'bg-white/10 border-white/20';
@@ -122,23 +133,23 @@ export function WordleGame({ goBack, saveScoreToDb }) {
 
     return (
         <GameHeader title="Wordle" gradient="from-emerald-400 to-teal-400" goBack={goBack} onReset={reset}>
-            {gameOver && <div className={`mb-3 p-3 rounded-xl font-bold text-sm ${won ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>{won ? `🎉 Got it in ${guesses.length}!` : `💀 Answer: ${target}`}<button onClick={reset} className="block mx-auto mt-2 px-4 py-1 bg-white/10 rounded-lg text-xs text-white">Play Again</button></div>}
-            <div className="space-y-1.5 mb-4">
+            {gameOver && <div className={`mb-4 p-4 rounded-xl font-bold text-center ${won ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>{won ? `🎉 Got it in ${guesses.length}!` : `💀 Answer: ${target}`}<button onClick={reset} className="block mx-auto mt-2 px-6 py-2 bg-white/10 rounded-lg text-xs text-white">Play Again</button></div>}
+            <div className="space-y-2 mb-6">
                 {Array(MAX).fill(null).map((_, ri) => {
                     const g = guesses[ri]; const isCurrent = ri === guesses.length && !gameOver;
-                    return (<div key={ri} className="flex justify-center gap-1.5">
+                    return (<div key={ri} className="flex justify-center gap-2">
                         {Array(5).fill(null).map((_, ci) => {
                             const letter = g ? g[ci] : (isCurrent ? current[ci] : '');
-                            return (<div key={ci} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg flex items-center justify-center text-lg font-black border-2 transition-all ${g ? getColor(g[ci], ci, g) : 'border-white/10 bg-white/5'}`}>{letter || ''}</div>);
+                            return (<div key={ci} className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center text-xl font-black border-2 transition-all ${g ? getColor(g[ci], ci) : isCurrent && current[ci] ? 'border-indigo-400 bg-white/5' : 'border-white/10 bg-white/[0.03]'}`}>{letter || ''}</div>);
                         })}
                     </div>);
                 })}
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5 w-full max-w-md">
                 {kb.map((row, ri) => (<div key={ri} className="flex justify-center gap-1">
-                    {ri === 2 && <button onClick={submit} className="px-2 py-2 bg-emerald-500/20 text-emerald-400 rounded text-xs font-bold">ENT</button>}
-                    {row.split('').map(k => (<button key={k} onClick={() => { if (!gameOver && current.length < 5) setCurrent(p => p + k); }} className="w-7 h-9 sm:w-8 sm:h-10 bg-white/10 hover:bg-white/20 rounded text-xs font-bold transition-colors">{k}</button>))}
-                    {ri === 2 && <button onClick={() => setCurrent(p => p.slice(0, -1))} className="px-2 py-2 bg-white/10 rounded text-xs font-bold">⌫</button>}
+                    {ri === 2 && <button onClick={submit} className="px-3 py-3 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-xs font-bold transition-colors">ENT</button>}
+                    {row.split('').map(k => (<button key={k} onClick={() => { if (!gameOver && current.length < 5) setCurrent(p => p + k); }} className="w-8 h-11 sm:w-9 sm:h-12 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold transition-colors">{k}</button>))}
+                    {ri === 2 && <button onClick={() => setCurrent(p => p.slice(0, -1))} className="px-3 py-3 bg-white/10 hover:bg-white/15 rounded-lg text-xs font-bold transition-colors">⌫</button>}
                 </div>))}
             </div>
         </GameHeader>
@@ -158,6 +169,7 @@ export function MinesweeperGame({ goBack, saveScoreToDb }) {
     const [board, setBoard] = useState(initBoard);
     const [gameOver, setGameOver] = useState(false);
     const [won, setWon] = useState(false);
+    const [flagCount, setFlagCount] = useState(0);
 
     const reveal = (r, c) => {
         if (gameOver || board[r][c].revealed || board[r][c].flagged) return;
@@ -168,86 +180,117 @@ export function MinesweeperGame({ goBack, saveScoreToDb }) {
         const unrevealed = b.flat().filter(c => !c.revealed && !c.mine).length;
         if (unrevealed === 0) { setWon(true); setGameOver(true); const sc = 1000; setHighScore('minesweeper', sc); saveScoreToDb?.('minesweeper', sc, true); }
     };
-    const flag = (e, r, c) => { e.preventDefault(); if (gameOver || board[r][c].revealed) return; const b = board.map(row => row.map(cell => ({ ...cell }))); b[r][c].flagged = !b[r][c].flagged; setBoard(b); };
-    const reset = () => { setBoard(initBoard()); setGameOver(false); setWon(false); };
+    const flag = (e, r, c) => { e.preventDefault(); if (gameOver || board[r][c].revealed) return; const b = board.map(row => row.map(cell => ({ ...cell }))); b[r][c].flagged = !b[r][c].flagged; setBoard(b); setFlagCount(b.flat().filter(c => c.flagged).length); };
+    const reset = () => { setBoard(initBoard()); setGameOver(false); setWon(false); setFlagCount(0); };
     const numColor = ['', 'text-blue-400', 'text-green-400', 'text-red-400', 'text-purple-400', 'text-amber-400', 'text-cyan-400', 'text-pink-400', 'text-white'];
 
     return (
         <GameHeader title="Minesweeper" gradient="from-slate-400 to-zinc-400" goBack={goBack} onReset={reset}>
-            {gameOver && <div className={`mb-3 p-3 rounded-xl font-bold text-sm ${won ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>{won ? '🏆 Cleared!' : '💥 Boom!'}<button onClick={reset} className="block mx-auto mt-2 px-4 py-1 bg-white/10 rounded-lg text-xs text-white">Retry</button></div>}
-            <div className="inline-grid gap-0.5" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
+            <ScorePanel items={[{ label: '💣 Mines', value: MINES, color: 'text-red-400' }, { label: '🚩 Flags', value: flagCount, color: 'text-amber-400' }]} />
+            {gameOver && <div className={`mb-4 p-4 rounded-xl font-bold text-center ${won ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>{won ? '🏆 Cleared!' : '💥 Boom!'}<button onClick={reset} className="block mx-auto mt-2 px-6 py-2 bg-white/10 rounded-lg text-xs text-white">Retry</button></div>}
+            <div className="inline-grid gap-1 bg-white/[0.03] backdrop-blur-sm rounded-xl p-2 border border-white/5" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
                 {board.flat().map((cell, i) => { const r = Math.floor(i / COLS), c = i % COLS; return (
                     <button key={i} onClick={() => reveal(r, c)} onContextMenu={(e) => flag(e, r, c)}
-                        className={`w-8 h-8 sm:w-9 sm:h-9 rounded text-xs font-bold flex items-center justify-center transition-all ${cell.revealed ? (cell.mine ? 'bg-red-500/30' : 'bg-white/10') : 'bg-white/5 hover:bg-white/15 cursor-pointer border border-white/5'}`}>
+                        className={`w-10 h-10 sm:w-11 sm:h-11 rounded-lg text-sm font-bold flex items-center justify-center transition-all ${cell.revealed ? (cell.mine ? 'bg-red-500/30 border border-red-500/30' : 'bg-white/10 border border-white/5') : 'bg-white/[0.04] hover:bg-white/10 cursor-pointer border border-white/5'}`}>
                         {cell.flagged ? '🚩' : cell.revealed ? (cell.mine ? '💣' : (cell.count > 0 ? <span className={numColor[cell.count]}>{cell.count}</span> : '')) : ''}
                     </button>
                 ); })}
             </div>
-            <p className="text-white/15 text-xs mt-3">Click to reveal · Right-click to flag</p>
+            <p className="text-white/20 text-xs mt-4">Click to reveal · Right-click to flag</p>
         </GameHeader>
     );
 }
 
-// ═══ FLAPPY BIRD ═══
+// ═══ FLAPPY BIRD (fixed) ═══
 export function FlappyBirdGame({ goBack, saveScoreToDb }) {
-    const W = 320, H = 480, GRAVITY = 0.4, JUMP = -7, PIPE_W = 50, GAP = 140, PIPE_SPEED = 2;
+    const W = 360, H = 520, GRAVITY = 0.35, JUMP = -6.5, PIPE_W = 52, GAP = 150, PIPE_SPEED = 2.5;
     const canvasRef = useRef(null);
-    const stateRef = useRef({ bird: { y: H / 2, vel: 0 }, pipes: [], score: 0, running: false, gameOver: false });
+    const stateRef = useRef({ bird: { y: H / 2, vel: 0 }, pipes: [], score: 0, running: false, gameOver: false, frame: 0 });
     const [score, setScore] = useState(0);
     const [gameOver, setGameOver] = useState(false);
     const [started, setStarted] = useState(false);
     const rafRef = useRef(null);
 
-    const start = () => {
-        stateRef.current = { bird: { y: H / 2, vel: 0 }, pipes: [{ x: W + 100, gapY: 100 + Math.random() * (H - GAP - 100) }], score: 0, running: true, gameOver: false };
+    const start = useCallback(() => {
+        stateRef.current = { bird: { y: H / 2, vel: 0 }, pipes: [{ x: W + 80, gapY: 100 + Math.random() * (H - GAP - 140) }], score: 0, running: true, gameOver: false, frame: 0 };
         setScore(0); setGameOver(false); setStarted(true);
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         rafRef.current = requestAnimationFrame(loop);
-    };
+    }, []);
 
-    const jump = useCallback(() => { if (stateRef.current.gameOver) { start(); return; } stateRef.current.bird.vel = JUMP; if (!stateRef.current.running) start(); }, []);
+    const jump = useCallback(() => { if (stateRef.current.gameOver) { start(); return; } stateRef.current.bird.vel = JUMP; if (!stateRef.current.running) start(); }, [start]);
 
     useEffect(() => {
         const h = (e) => { if (e.key === ' ' || e.key === 'ArrowUp') { e.preventDefault(); jump(); } };
         window.addEventListener('keydown', h); return () => { window.removeEventListener('keydown', h); if (rafRef.current) cancelAnimationFrame(rafRef.current); };
     }, [jump]);
 
-    const loop = () => {
+    const loop = useCallback(() => {
         const s = stateRef.current; if (!s.running) return;
+        s.frame++;
         s.bird.vel += GRAVITY; s.bird.y += s.bird.vel;
-        // Pipes
         s.pipes.forEach(p => { p.x -= PIPE_SPEED; });
-        if (s.pipes.length && s.pipes[s.pipes.length - 1].x < W - 200) s.pipes.push({ x: W, gapY: 80 + Math.random() * (H - GAP - 80) });
+        if (s.pipes.length && s.pipes[s.pipes.length - 1].x < W - 220) s.pipes.push({ x: W, gapY: 80 + Math.random() * (H - GAP - 120) });
         s.pipes = s.pipes.filter(p => p.x > -PIPE_W);
-        // Collision
-        const bx = 60, by = s.bird.y, br = 12;
-        if (by < 0 || by > H) { s.running = false; s.gameOver = true; setGameOver(true); setHighScore('flappy', s.score); saveScoreToDb?.('flappy', s.score, false); }
+        const bx = 70, by = s.bird.y, br = 14;
+        if (by < 0 || by > H - 10) { s.running = false; s.gameOver = true; setGameOver(true); setHighScore('flappy', s.score); saveScoreToDb?.('flappy', s.score, false); }
         for (const p of s.pipes) {
             if (bx + br > p.x && bx - br < p.x + PIPE_W) {
                 if (by - br < p.gapY || by + br > p.gapY + GAP) { s.running = false; s.gameOver = true; setGameOver(true); setHighScore('flappy', s.score); saveScoreToDb?.('flappy', s.score, false); break; }
             }
             if (!p.scored && p.x + PIPE_W < bx) { p.scored = true; s.score++; setScore(s.score); }
         }
-        // Draw
         const ctx = canvasRef.current?.getContext('2d');
         if (ctx) {
-            ctx.fillStyle = '#0c0e1a'; ctx.fillRect(0, 0, W, H);
-            ctx.fillStyle = '#6366f1'; ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#22c55e';
-            for (const p of s.pipes) { ctx.fillRect(p.x, 0, PIPE_W, p.gapY); ctx.fillRect(p.x, p.gapY + GAP, PIPE_W, H - p.gapY - GAP); }
-            ctx.fillStyle = 'white'; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(s.score, W / 2, 40);
+            // Sky gradient
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+            skyGrad.addColorStop(0, '#0f172a'); skyGrad.addColorStop(0.6, '#1e293b'); skyGrad.addColorStop(1, '#0f172a');
+            ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, W, H);
+            // Stars
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            for (let i = 0; i < 30; i++) { const sx = (i * 73 + s.frame * 0.1) % W; const sy = (i * 47) % (H * 0.5); ctx.fillRect(sx, sy, 1.5, 1.5); }
+            // Ground
+            ctx.fillStyle = '#1a2744'; ctx.fillRect(0, H - 10, W, 10);
+            // Pipes
+            for (const p of s.pipes) {
+                const pGrad = ctx.createLinearGradient(p.x, 0, p.x + PIPE_W, 0);
+                pGrad.addColorStop(0, '#22c55e'); pGrad.addColorStop(0.5, '#16a34a'); pGrad.addColorStop(1, '#15803d');
+                ctx.fillStyle = pGrad;
+                ctx.beginPath(); ctx.roundRect(p.x, 0, PIPE_W, p.gapY, [0, 0, 6, 6]); ctx.fill();
+                ctx.beginPath(); ctx.roundRect(p.x, p.gapY + GAP, PIPE_W, H - p.gapY - GAP, [6, 6, 0, 0]); ctx.fill();
+                // Pipe caps
+                ctx.fillStyle = '#4ade80';
+                ctx.fillRect(p.x - 3, p.gapY - 16, PIPE_W + 6, 16);
+                ctx.fillRect(p.x - 3, p.gapY + GAP, PIPE_W + 6, 16);
+            }
+            // Bird
+            ctx.save(); ctx.translate(bx, by);
+            const rot = Math.min(Math.max(s.bird.vel * 3, -30), 70) * Math.PI / 180;
+            ctx.rotate(rot);
+            ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.ellipse(0, 0, 16, 12, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fef08a'; ctx.beginPath(); ctx.ellipse(-2, -3, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.arc(6, -3, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(7, -4, 1.2, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(22, -2); ctx.lineTo(22, 4); ctx.closePath(); ctx.fill();
+            ctx.restore();
+            // Score
+            ctx.fillStyle = 'white'; ctx.font = 'bold 32px sans-serif'; ctx.textAlign = 'center';
+            ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 8;
+            ctx.fillText(s.score, W / 2, 50);
+            ctx.shadowBlur = 0;
         }
         rafRef.current = requestAnimationFrame(loop);
-    };
+    }, []);
 
     return (
         <GameHeader title="Flappy Bird" gradient="from-sky-400 to-cyan-400" goBack={goBack} onReset={start}>
             <ScorePanel items={[{ label: 'Score', value: score, color: 'text-sky-400' }, { label: 'Best', value: getHighScore('flappy') || '—', color: 'text-amber-400' }]} />
-            <div className="relative inline-block">
-                <canvas ref={canvasRef} width={W} height={H} onClick={jump} className="rounded-xl border border-white/10 cursor-pointer" style={{ maxWidth: '100%', height: 'auto' }} />
-                {!started && <div className="absolute inset-0 flex items-center justify-center"><button onClick={start} className="px-6 py-3 bg-sky-500 rounded-xl font-bold text-white shadow-lg">▶ Tap to Start</button></div>}
-                {gameOver && <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl"><div className="text-center"><p className="text-xl font-bold text-rose-400 mb-2">Game Over! Score: {score}</p><button onClick={start} className="px-5 py-2 bg-sky-500 rounded-lg font-bold text-white">Retry</button></div></div>}
+            <div className="relative inline-block rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-sky-500/10">
+                <canvas ref={canvasRef} width={W} height={H} onClick={jump} className="cursor-pointer block" style={{ maxWidth: '100%', height: 'auto' }} />
+                {!started && <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm"><button onClick={start} className="px-8 py-4 bg-gradient-to-r from-sky-500 to-cyan-500 rounded-2xl font-bold text-white shadow-xl text-lg">▶ Tap to Start</button></div>}
+                {gameOver && <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm"><div className="text-center bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10"><p className="text-2xl font-bold text-rose-400 mb-1">Game Over!</p><p className="text-4xl font-black text-white mb-4">{score}</p><button onClick={start} className="px-8 py-3 bg-gradient-to-r from-sky-500 to-cyan-500 rounded-xl font-bold text-white">Retry</button></div></div>}
             </div>
+            <p className="text-white/20 text-xs mt-4">Spacebar / Click / Tap to flap</p>
         </GameHeader>
     );
 }
@@ -288,11 +331,11 @@ export function Connect4Game({ goBack, saveScoreToDb }) {
     return (
         <GameHeader title="Connect 4" gradient="from-red-400 to-pink-400" goBack={goBack} onReset={reset}>
             <ScorePanel items={[{ label: '🔴 Red', value: scores.R, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' }, { label: '🟡 Yellow', value: scores.Y, color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' }]} />
-            {winner && <div className={`mb-3 p-3 rounded-xl font-bold text-sm ${winner === 'draw' ? 'bg-white/10 text-white/60' : winner === 'R' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{winner === 'draw' ? '🤝 Draw!' : `${winner === 'R' ? '🔴 Red' : '🟡 Yellow'} Wins!`}<button onClick={reset} className="block mx-auto mt-2 px-4 py-1 bg-white/10 rounded-lg text-xs text-white">Again</button></div>}
-            {!winner && <p className="text-white/30 text-xs mb-2">{turn === 'R' ? '🔴 Red' : '🟡 Yellow'}'s turn</p>}
-            <div className="inline-grid gap-1 bg-indigo-900/40 rounded-xl p-2" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
+            {winner && <div className={`mb-4 p-4 rounded-xl font-bold text-center ${winner === 'draw' ? 'bg-white/10 text-white/60' : winner === 'R' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{winner === 'draw' ? '🤝 Draw!' : `${winner === 'R' ? '🔴 Red' : '🟡 Yellow'} Wins!`}<button onClick={reset} className="block mx-auto mt-2 px-6 py-2 bg-white/10 rounded-lg text-xs text-white">Again</button></div>}
+            {!winner && <p className="text-white/30 text-sm mb-3 font-medium">{turn === 'R' ? '🔴 Red' : '🟡 Yellow'}'s turn</p>}
+            <div className="inline-grid gap-1.5 bg-indigo-900/40 backdrop-blur-sm rounded-2xl p-3 border border-indigo-500/20" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
                 {board.flat().map((cell, i) => { const c = i % COLS; return (
-                    <button key={i} onClick={() => drop(c)} className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 transition-all ${cell === 'R' ? 'bg-red-500 border-red-400 shadow-lg shadow-red-500/30' : cell === 'Y' ? 'bg-yellow-400 border-yellow-300 shadow-lg shadow-yellow-500/30' : 'bg-white/5 border-white/10 hover:bg-white/15 cursor-pointer'}`} />
+                    <button key={i} onClick={() => drop(c)} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 transition-all ${cell === 'R' ? 'bg-red-500 border-red-400 shadow-lg shadow-red-500/30' : cell === 'Y' ? 'bg-yellow-400 border-yellow-300 shadow-lg shadow-yellow-500/30' : 'bg-white/5 border-white/10 hover:bg-white/15 cursor-pointer'}`} />
                 ); })}
             </div>
         </GameHeader>
@@ -301,7 +344,7 @@ export function Connect4Game({ goBack, saveScoreToDb }) {
 
 // ═══ PING PONG ═══
 export function PongGame({ goBack, saveScoreToDb }) {
-    const W = 400, H = 300;
+    const W = 480, H = 360;
     const canvasRef = useRef(null);
     const stateRef = useRef({ p1: H/2-30, p2: H/2-30, ball: { x: W/2, y: H/2, vx: 3, vy: 2 }, s1: 0, s2: 0, running: false });
     const [scores, setScores] = useState([0, 0]);
@@ -309,7 +352,7 @@ export function PongGame({ goBack, saveScoreToDb }) {
     const keysRef = useRef({});
     const rafRef = useRef(null);
 
-    const start = () => { stateRef.current = { ...stateRef.current, ball: { x: W/2, y: H/2, vx: 3*(Math.random()>0.5?1:-1), vy: 2*(Math.random()>0.5?1:-1) }, running: true }; setStarted(true); if (rafRef.current) cancelAnimationFrame(rafRef.current); rafRef.current = requestAnimationFrame(loop); };
+    const start = useCallback(() => { stateRef.current = { ...stateRef.current, ball: { x: W/2, y: H/2, vx: 3*(Math.random()>0.5?1:-1), vy: 2*(Math.random()>0.5?1:-1) }, running: true }; setStarted(true); if (rafRef.current) cancelAnimationFrame(rafRef.current); rafRef.current = requestAnimationFrame(loop); }, []);
 
     useEffect(() => {
         const kd = (e) => { keysRef.current[e.key] = true; }; const ku = (e) => { keysRef.current[e.key] = false; };
@@ -317,37 +360,47 @@ export function PongGame({ goBack, saveScoreToDb }) {
         return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); if (rafRef.current) cancelAnimationFrame(rafRef.current); };
     }, []);
 
-    const loop = () => {
+    const loop = useCallback(() => {
         const s = stateRef.current; if (!s.running) return;
         const k = keysRef.current;
         if (k['w'] || k['ArrowUp']) s.p1 = Math.max(0, s.p1 - 5);
         if (k['s'] || k['ArrowDown']) s.p1 = Math.min(H - 60, s.p1 + 5);
-        // CPU
         if (s.ball.y < s.p2 + 30) s.p2 = Math.max(0, s.p2 - 3.5);
         else s.p2 = Math.min(H - 60, s.p2 + 3.5);
         s.ball.x += s.ball.vx; s.ball.y += s.ball.vy;
         if (s.ball.y <= 0 || s.ball.y >= H) s.ball.vy *= -1;
-        if (s.ball.x <= 15 && s.ball.y >= s.p1 && s.ball.y <= s.p1 + 60) { s.ball.vx = Math.abs(s.ball.vx) * 1.05; }
-        if (s.ball.x >= W - 15 && s.ball.y >= s.p2 && s.ball.y <= s.p2 + 60) { s.ball.vx = -Math.abs(s.ball.vx) * 1.05; }
+        if (s.ball.x <= 18 && s.ball.y >= s.p1 && s.ball.y <= s.p1 + 60) { s.ball.vx = Math.abs(s.ball.vx) * 1.05; }
+        if (s.ball.x >= W - 18 && s.ball.y >= s.p2 && s.ball.y <= s.p2 + 60) { s.ball.vx = -Math.abs(s.ball.vx) * 1.05; }
         if (s.ball.x < 0) { s.s2++; setScores([s.s1, s.s2]); s.ball = { x: W/2, y: H/2, vx: 3, vy: 2*(Math.random()>0.5?1:-1) }; }
         if (s.ball.x > W) { s.s1++; setScores([s.s1, s.s2]); s.ball = { x: W/2, y: H/2, vx: -3, vy: 2*(Math.random()>0.5?1:-1) }; setHighScore('pong', s.s1); saveScoreToDb?.('pong', s.s1, true); }
         const ctx = canvasRef.current?.getContext('2d');
         if (ctx) {
-            ctx.fillStyle = '#0c0e1a'; ctx.fillRect(0, 0, W, H);
-            ctx.setLineDash([5, 5]); ctx.strokeStyle = '#ffffff20'; ctx.beginPath(); ctx.moveTo(W/2, 0); ctx.lineTo(W/2, H); ctx.stroke(); ctx.setLineDash([]);
-            ctx.fillStyle = '#6366f1'; ctx.fillRect(5, s.p1, 10, 60);
-            ctx.fillStyle = '#ef4444'; ctx.fillRect(W - 15, s.p2, 10, 60);
-            ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(s.ball.x, s.ball.y, 6, 0, Math.PI*2); ctx.fill();
-            ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(`${s.s1} - ${s.s2}`, W/2, 30);
+            const bg = ctx.createLinearGradient(0, 0, 0, H);
+            bg.addColorStop(0, '#0c0e1a'); bg.addColorStop(1, '#111827');
+            ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+            ctx.setLineDash([6, 6]); ctx.strokeStyle = '#ffffff15'; ctx.beginPath(); ctx.moveTo(W/2, 0); ctx.lineTo(W/2, H); ctx.stroke(); ctx.setLineDash([]);
+            // Paddles with glow
+            ctx.shadowColor = '#6366f1'; ctx.shadowBlur = 15;
+            ctx.fillStyle = '#6366f1'; ctx.beginPath(); ctx.roundRect(6, s.p1, 12, 60, 6); ctx.fill();
+            ctx.shadowColor = '#ef4444'; ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.roundRect(W - 18, s.p2, 12, 60, 6); ctx.fill();
+            ctx.shadowBlur = 0;
+            // Ball with trail
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.beginPath(); ctx.arc(s.ball.x - s.ball.vx * 2, s.ball.y - s.ball.vy * 2, 5, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(s.ball.x, s.ball.y, 7, 0, Math.PI*2); ctx.fill();
+            ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            ctx.fillText(s.s1, W/2 - 50, 40); ctx.fillText(s.s2, W/2 + 50, 40);
         }
         rafRef.current = requestAnimationFrame(loop);
-    };
+    }, []);
 
     return (
         <GameHeader title="Ping Pong" gradient="from-cyan-400 to-blue-400" goBack={goBack} onReset={() => { stateRef.current.s1 = 0; stateRef.current.s2 = 0; setScores([0,0]); start(); }}>
-            <canvas ref={canvasRef} width={W} height={H} onClick={() => { if (!started) start(); }} className="rounded-xl border border-white/10 cursor-pointer mx-auto block" style={{ maxWidth: '100%', height: 'auto' }} />
-            {!started && <button onClick={start} className="mt-3 px-6 py-2 bg-cyan-500 rounded-xl font-bold text-white">▶ Start</button>}
-            <p className="text-white/15 text-xs mt-2">W/S or ↑/↓ to move paddle</p>
+            <div className="relative inline-block rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+                <canvas ref={canvasRef} width={W} height={H} onClick={() => { if (!started) start(); }} className="cursor-pointer block" style={{ maxWidth: '100%', height: 'auto' }} />
+                {!started && <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm"><button onClick={start} className="px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-2xl font-bold text-white shadow-xl text-lg">▶ Start</button></div>}
+            </div>
+            <p className="text-white/20 text-xs mt-4">W/S or ↑/↓ to move paddle</p>
         </GameHeader>
     );
 }

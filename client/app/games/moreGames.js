@@ -32,43 +32,38 @@ export function TetrisGame({ goBack, saveScoreToDb }) {
     const place = (s) => {
         const { board, piece, pos } = s;
         for (let r = 0; r < piece.shape.length; r++) for (let c = 0; c < piece.shape[r].length; c++) { if (piece.shape[r][c]) board[pos.y + r][pos.x + c] = piece.color; }
-        // Clear lines
         let cleared = 0;
         for (let r = ROWS - 1; r >= 0; r--) { if (board[r].every(c => c)) { board.splice(r, 1); board.unshift(Array(COLS).fill(null)); cleared++; r++; } }
         s.lines += cleared; s.score += cleared * cleared * 100;
         setScore(s.score); setLines(s.lines);
-        // New piece
         const np = newPiece(); const npos = { x: Math.floor((COLS - np.shape[0].length) / 2), y: 0 };
         if (!valid(board, np, npos)) { s.running = false; s.gameOver = true; setGameOver(true); setHighScore('tetris', s.score); saveScoreToDb?.('tetris', s.score, false); return; }
         s.piece = np; s.pos = npos;
     };
 
-    const tick = () => {
-        const s = stateRef.current; if (!s.running) return;
-        const npos = { ...s.pos, y: s.pos.y + 1 };
-        if (valid(s.board, s.piece, npos)) { s.pos = npos; } else { place(s); }
-        draw();
-    };
+    const tick = () => { const s = stateRef.current; if (!s.running) return; const npos = { ...s.pos, y: s.pos.y + 1 }; if (valid(s.board, s.piece, npos)) { s.pos = npos; } else { place(s); } draw(); };
 
     const draw = () => {
         const ctx = canvasRef.current?.getContext('2d'); if (!ctx) return;
-        const s = stateRef.current; const CW = 20;
-        ctx.fillStyle = '#0c0e1a'; ctx.fillRect(0, 0, COLS * CW, ROWS * CW);
-        // Grid
-        ctx.strokeStyle = '#ffffff08';
-        for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { ctx.strokeRect(c * CW, r * CW, CW, CW); if (s.board[r][c]) { ctx.fillStyle = s.board[r][c]; ctx.fillRect(c * CW + 1, r * CW + 1, CW - 2, CW - 2); } }
-        // Piece
-        if (s.piece) { ctx.fillStyle = s.piece.color; for (let r = 0; r < s.piece.shape.length; r++) for (let c = 0; c < s.piece.shape[r].length; c++) { if (s.piece.shape[r][c]) ctx.fillRect((s.pos.x + c) * CW + 1, (s.pos.y + r) * CW + 1, CW - 2, CW - 2); } }
+        const s = stateRef.current; const CW = 24;
+        const bg = ctx.createLinearGradient(0, 0, 0, ROWS * CW);
+        bg.addColorStop(0, '#0c0e1a'); bg.addColorStop(1, '#111827');
+        ctx.fillStyle = bg; ctx.fillRect(0, 0, COLS * CW, ROWS * CW);
+        ctx.strokeStyle = '#ffffff06';
+        for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+            ctx.strokeRect(c * CW, r * CW, CW, CW);
+            if (s.board[r][c]) { ctx.fillStyle = s.board[r][c]; ctx.beginPath(); ctx.roundRect(c * CW + 1, r * CW + 1, CW - 2, CW - 2, 3); ctx.fill(); }
+        }
+        if (s.piece) { ctx.fillStyle = s.piece.color; for (let r = 0; r < s.piece.shape.length; r++) for (let c = 0; c < s.piece.shape[r].length; c++) { if (s.piece.shape[r][c]) { ctx.beginPath(); ctx.roundRect((s.pos.x + c) * CW + 1, (s.pos.y + r) * CW + 1, CW - 2, CW - 2, 3); ctx.fill(); } } }
     };
 
-    const start = () => {
+    const start = useCallback(() => {
         const np = newPiece();
         stateRef.current = { board: Array(ROWS).fill(null).map(() => Array(COLS).fill(null)), piece: np, pos: { x: Math.floor((COLS - np.shape[0].length) / 2), y: 0 }, score: 0, lines: 0, running: true, gameOver: false };
         setScore(0); setLines(0); setGameOver(false); setStarted(true);
         if (intervalRef.current) clearInterval(intervalRef.current);
-        intervalRef.current = setInterval(tick, SPEED);
-        draw();
-    };
+        intervalRef.current = setInterval(tick, SPEED); draw();
+    }, []);
 
     useEffect(() => {
         const h = (e) => {
@@ -87,23 +82,23 @@ export function TetrisGame({ goBack, saveScoreToDb }) {
     return (
         <GameHeader title="Tetris" gradient="from-purple-400 to-indigo-400" goBack={goBack} onReset={start}>
             <ScorePanel items={[{ label: 'Score', value: score, color: 'text-purple-400' }, { label: 'Lines', value: lines, color: 'text-indigo-400' }, { label: 'Best', value: getHighScore('tetris') || '—', color: 'text-amber-400' }]} />
-            <div className="relative inline-block">
-                <canvas ref={canvasRef} width={200} height={400} className="rounded-xl border border-white/10" style={{ maxWidth: '100%', height: 'auto' }} />
-                {!started && <div className="absolute inset-0 flex items-center justify-center"><button onClick={start} className="px-6 py-3 bg-purple-500 rounded-xl font-bold text-white">▶ Start</button></div>}
-                {gameOver && <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl"><div className="text-center"><p className="text-lg font-bold text-rose-400 mb-2">Game Over! {score} pts</p><button onClick={start} className="px-5 py-2 bg-purple-500 rounded-lg font-bold text-white">Retry</button></div></div>}
+            <div className="relative inline-block rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-purple-500/10">
+                <canvas ref={canvasRef} width={240} height={480} className="block" style={{ maxWidth: '100%', height: 'auto' }} />
+                {!started && <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm"><button onClick={start} className="px-8 py-4 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-2xl font-bold text-white shadow-xl text-lg">▶ Start</button></div>}
+                {gameOver && <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm"><div className="text-center bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10"><p className="text-xl font-bold text-rose-400 mb-1">Game Over!</p><p className="text-3xl font-black text-white mb-4">{score} pts</p><button onClick={start} className="px-8 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl font-bold text-white">Retry</button></div></div>}
             </div>
-            <div className="flex justify-center gap-2 mt-3">
-                {[['←', () => { const s = stateRef.current; const np = {...s.pos, x: s.pos.x-1}; if (valid(s.board, s.piece, np)) s.pos = np; draw(); }],
-                  ['↻', () => { const s = stateRef.current; const rot = {...s.piece, shape: rotate(s.piece.shape)}; if (valid(s.board, rot, s.pos)) s.piece = rot; draw(); }],
-                  ['↓', () => { const s = stateRef.current; const np = {...s.pos, y: s.pos.y+1}; if (valid(s.board, s.piece, np)) s.pos = np; draw(); }],
-                  ['→', () => { const s = stateRef.current; const np = {...s.pos, x: s.pos.x+1}; if (valid(s.board, s.piece, np)) s.pos = np; draw(); }]
-                ].map(([l, fn]) => <button key={l} onClick={fn} className="w-10 h-10 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg font-bold text-white/50">{l}</button>)}
+            <div className="flex justify-center gap-2 mt-4">
+                {[['←', () => { const s = stateRef.current; if (!s.running) return; const np = {...s.pos, x:s.pos.x-1}; if (valid(s.board,s.piece,np)) s.pos=np; draw(); }],
+                  ['↻', () => { const s = stateRef.current; if (!s.running) return; const rot = {...s.piece, shape:rotate(s.piece.shape)}; if (valid(s.board,rot,s.pos)) s.piece=rot; draw(); }],
+                  ['↓', () => { const s = stateRef.current; if (!s.running) return; const np = {...s.pos, y:s.pos.y+1}; if (valid(s.board,s.piece,np)) s.pos=np; draw(); }],
+                  ['→', () => { const s = stateRef.current; if (!s.running) return; const np = {...s.pos, x:s.pos.x+1}; if (valid(s.board,s.piece,np)) s.pos=np; draw(); }]
+                ].map(([l, fn]) => <button key={l} onClick={fn} className="w-12 h-12 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-bold text-white/50 text-lg transition-colors">{l}</button>)}
             </div>
         </GameHeader>
     );
 }
 
-// ═══ CHESS (Simplified vs CPU) ═══
+// ═══ CHESS (with proper rules) ═══
 export function ChessGame({ goBack, saveScoreToDb }) {
     const INIT = [
         ['♜','♞','♝','♛','♚','♝','♞','♜'],
@@ -117,77 +112,97 @@ export function ChessGame({ goBack, saveScoreToDb }) {
     ];
     const WHITE = ['♔','♕','♖','♗','♘','♙'];
     const BLACK = ['♚','♛','♜','♝','♞','♟'];
-
     const [board, setBoard] = useState(INIT.map(r => [...r]));
     const [selected, setSelected] = useState(null);
     const [turn, setTurn] = useState('white');
     const [captured, setCaptured] = useState({ white: [], black: [] });
     const [status, setStatus] = useState('');
+    const [validMoves, setValidMoves] = useState([]);
 
     const isWhite = (p) => p && WHITE.includes(p);
     const isBlack = (p) => p && BLACK.includes(p);
+    const isOwn = (p, color) => color === 'white' ? isWhite(p) : isBlack(p);
+    const isEnemy = (p, color) => color === 'white' ? isBlack(p) : isWhite(p);
+
+    const getValidMoves = (b, r, c) => {
+        const p = b[r][c]; if (!p) return [];
+        const moves = []; const color = isWhite(p) ? 'white' : 'black';
+        const addIf = (tr, tc) => { if (tr < 0 || tr > 7 || tc < 0 || tc > 7) return false; if (isOwn(b[tr][tc], color)) return false; moves.push([tr, tc]); return !b[tr][tc]; };
+        const piece = p;
+        // Pawn
+        if (piece === '♙') { const d = -1; if (r+d>=0 && !b[r+d][c]) { moves.push([r+d,c]); if (r===6 && !b[r+d*2][c]) moves.push([r+d*2,c]); } if (c>0 && isBlack(b[r+d]?.[c-1])) moves.push([r+d,c-1]); if (c<7 && isBlack(b[r+d]?.[c+1])) moves.push([r+d,c+1]); }
+        if (piece === '♟') { const d = 1; if (r+d<=7 && !b[r+d][c]) { moves.push([r+d,c]); if (r===1 && !b[r+d*2][c]) moves.push([r+d*2,c]); } if (c>0 && isWhite(b[r+d]?.[c-1])) moves.push([r+d,c-1]); if (c<7 && isWhite(b[r+d]?.[c+1])) moves.push([r+d,c+1]); }
+        // Knight
+        if (piece === '♘' || piece === '♞') { for (const [dr,dc] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]) addIf(r+dr,c+dc); }
+        // Bishop / Queen diagonal
+        if ('♗♝♕♛'.includes(piece)) { for (const [dr,dc] of [[-1,-1],[-1,1],[1,-1],[1,1]]) { for (let i=1;i<8;i++) { if (!addIf(r+dr*i,c+dc*i)) break; } } }
+        // Rook / Queen straight
+        if ('♖♜♕♛'.includes(piece)) { for (const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]) { for (let i=1;i<8;i++) { if (!addIf(r+dr*i,c+dc*i)) break; } } }
+        // King
+        if (piece === '♔' || piece === '♚') { for (let dr=-1;dr<=1;dr++) for (let dc=-1;dc<=1;dc++) { if (dr||dc) addIf(r+dr,c+dc); } }
+        return moves;
+    };
 
     const handleClick = (r, c) => {
-        if (turn !== 'white') return;
+        if (turn !== 'white' || status) return;
         const piece = board[r][c];
         if (selected) {
             const [sr, sc] = selected;
-            const sp = board[sr][sc];
-            if (r === sr && c === sc) { setSelected(null); return; }
-            // Simple move (no validation beyond basic)
-            if (isWhite(sp)) {
-                const target = board[r][c];
-                if (isWhite(target)) { setSelected([r, c]); return; }
+            const isValid = validMoves.some(([vr, vc]) => vr === r && vc === c);
+            if (isValid) {
                 const nb = board.map(row => [...row]);
+                const target = nb[r][c];
                 if (target && isBlack(target)) setCaptured(p => ({...p, white: [...p.white, target]}));
-                nb[r][c] = sp; nb[sr][sc] = null;
-                // Check if king captured
-                if (target === '♚') { setStatus('White wins!'); saveScoreToDb?.('chess', 1, true); }
-                setBoard(nb); setSelected(null); setTurn('black');
-                // CPU move after delay
-                setTimeout(() => cpuMove(nb), 500);
-            }
-        } else if (piece && isWhite(piece)) { setSelected([r, c]); }
+                if (target === '♚') { setStatus('🏆 White wins!'); saveScoreToDb?.('chess', 1, true); }
+                nb[r][c] = nb[sr][sc]; nb[sr][sc] = null;
+                // Pawn promotion
+                if (nb[r][c] === '♙' && r === 0) nb[r][c] = '♕';
+                setBoard(nb); setSelected(null); setValidMoves([]); setTurn('black');
+                setTimeout(() => cpuMove(nb), 400);
+            } else if (isWhite(piece)) { setSelected([r, c]); setValidMoves(getValidMoves(board, r, c)); }
+            else { setSelected(null); setValidMoves([]); }
+        } else if (piece && isWhite(piece)) { setSelected([r, c]); setValidMoves(getValidMoves(board, r, c)); }
     };
 
     const cpuMove = (b) => {
-        const moves = [];
+        const allMoves = [];
         for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
             if (isBlack(b[r][c])) {
-                for (let tr = 0; tr < 8; tr++) for (let tc = 0; tc < 8; tc++) {
-                    if (tr === r && tc === c) continue;
-                    if (!isBlack(b[tr][tc])) moves.push({ fr: r, fc: c, tr, tc, capture: b[tr][tc] });
-                }
+                const moves = getValidMoves(b, r, c);
+                moves.forEach(([tr, tc]) => allMoves.push({ fr: r, fc: c, tr, tc, capture: b[tr][tc] }));
             }
         }
-        if (!moves.length) { setStatus('Stalemate!'); return; }
-        // Prefer captures
-        const captures = moves.filter(m => m.capture);
-        const m = captures.length ? captures[Math.floor(Math.random() * captures.length)] : moves[Math.floor(Math.random() * moves.length)];
+        if (!allMoves.length) { setStatus('Stalemate!'); return; }
+        const captures = allMoves.filter(m => m.capture);
+        const m = captures.length ? captures[Math.floor(Math.random() * captures.length)] : allMoves[Math.floor(Math.random() * allMoves.length)];
         const nb = b.map(row => [...row]);
         if (m.capture) setCaptured(p => ({...p, black: [...p.black, m.capture]}));
-        if (m.capture === '♔') { setStatus('Black wins!'); }
+        if (m.capture === '♔') setStatus('💀 Black wins!');
         nb[m.tr][m.tc] = nb[m.fr][m.fc]; nb[m.fr][m.fc] = null;
+        if (nb[m.tr][m.tc] === '♟' && m.tr === 7) nb[m.tr][m.tc] = '♛';
         setBoard(nb); setTurn('white');
     };
 
-    const reset = () => { setBoard(INIT.map(r => [...r])); setSelected(null); setTurn('white'); setCaptured({ white: [], black: [] }); setStatus(''); };
+    const reset = () => { setBoard(INIT.map(r => [...r])); setSelected(null); setTurn('white'); setCaptured({ white: [], black: [] }); setStatus(''); setValidMoves([]); };
+    const isValidTarget = (r, c) => validMoves.some(([vr, vc]) => vr === r && vc === c);
 
     return (
-        <GameHeader title="Chess" gradient="from-neutral-400 to-stone-400" goBack={goBack} onReset={reset}>
-            {status && <div className="mb-3 p-3 rounded-xl font-bold text-sm bg-amber-500/20 text-amber-400">{status}<button onClick={reset} className="block mx-auto mt-2 px-4 py-1 bg-white/10 rounded-lg text-xs text-white">New Game</button></div>}
-            <p className="text-white/30 text-xs mb-2">{turn === 'white' ? '⬜ Your turn' : '⬛ CPU thinking...'}</p>
-            <div className="inline-grid grid-cols-8 gap-0 rounded-lg overflow-hidden border border-white/10">
+        <GameHeader title="Chess" gradient="from-neutral-300 to-stone-400" goBack={goBack} onReset={reset}>
+            {status && <div className="mb-4 p-4 rounded-xl font-bold text-center bg-amber-500/20 text-amber-400 text-lg">{status}<button onClick={reset} className="block mx-auto mt-2 px-6 py-2 bg-white/10 rounded-lg text-sm text-white">New Game</button></div>}
+            <div className="flex justify-center gap-4 mb-3 text-sm text-white/40">
+                <span>⬜ Captured: {captured.white.join(' ')}</span>
+                <span>⬛ Captured: {captured.black.join(' ')}</span>
+            </div>
+            <p className="text-white/30 text-sm mb-3 font-medium">{turn === 'white' ? '⬜ Your turn' : '⬛ CPU thinking...'}</p>
+            <div className="inline-grid grid-cols-8 gap-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-2xl">
                 {board.flat().map((cell, i) => { const r = Math.floor(i / 8), c = i % 8; const isDark = (r + c) % 2 === 1;
+                    const isValid = isValidTarget(r, c); const isSel = selected?.[0]===r&&selected?.[1]===c;
                     return (<button key={i} onClick={() => handleClick(r, c)}
-                        className={`w-9 h-9 sm:w-11 sm:h-11 flex items-center justify-center text-lg sm:text-2xl transition-all ${isDark ? 'bg-stone-600' : 'bg-stone-300'} ${selected?.[0]===r&&selected?.[1]===c ? 'ring-2 ring-indigo-400 ring-inset' : ''} hover:brightness-110`}>
+                        className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center text-2xl sm:text-3xl transition-all relative ${isDark ? 'bg-[#779952]' : 'bg-[#edeed1]'} ${isSel ? 'ring-2 ring-inset ring-yellow-400 brightness-110' : ''} hover:brightness-110`}>
+                        {isValid && <div className={`absolute inset-0 ${cell ? 'ring-2 ring-inset ring-red-400/60 rounded-full m-1' : ''}`}><div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full ${cell ? '' : 'bg-black/20'}`}/></div>}
                         {cell || ''}
                     </button>);
                 })}
-            </div>
-            <div className="flex justify-center gap-4 mt-2 text-xs text-white/30">
-                <span>⬜ {captured.white.join('')}</span>
-                <span>⬛ {captured.black.join('')}</span>
             </div>
         </GameHeader>
     );
@@ -205,65 +220,74 @@ export function CheckersGame({ goBack, saveScoreToDb }) {
     const [selected, setSelected] = useState(null);
     const [turn, setTurn] = useState('r');
     const [status, setStatus] = useState('');
+    const [validMoves, setValidMoves] = useState([]);
+
+    const getMoves = (b, r, c) => {
+        const p = b[r][c]; if (!p) return [];
+        const moves = []; const isKing = p === p.toUpperCase();
+        const dirs = p.toLowerCase() === 'r' ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]];
+        const allDirs = isKing ? [[-1,-1],[-1,1],[1,-1],[1,1]] : dirs;
+        for (const [dr, dc] of allDirs) {
+            const nr = r+dr, nc = c+dc;
+            if (nr>=0&&nr<8&&nc>=0&&nc<8&&!b[nr][nc]) moves.push({ tr: nr, tc: nc, jump: false });
+            const jr = r+dr*2, jc = c+dc*2;
+            if (jr>=0&&jr<8&&jc>=0&&jc<8&&!b[jr][jc]&&nr>=0&&nr<8&&nc>=0&&nc<8&&b[nr][nc]&&b[nr][nc].toLowerCase()!==p.toLowerCase())
+                moves.push({ tr: jr, tc: jc, mr: nr, mc: nc, jump: true });
+        }
+        return moves;
+    };
 
     const handleClick = (r, c) => {
         if (turn !== 'r' || status) return;
         if (selected) {
-            const [sr, sc] = selected;
-            const dr = r - sr, dc = c - sc;
-            if (Math.abs(dr) === 1 && Math.abs(dc) === 1 && !board[r][c]) {
-                const nb = board.map(row => [...row]); nb[r][c] = nb[sr][sc]; nb[sr][sc] = null;
-                if (r === 0) nb[r][c] = 'R'; // King
-                setBoard(nb); setSelected(null); setTurn('b');
-                setTimeout(() => cpuMove(nb), 400);
-            } else if (Math.abs(dr) === 2 && Math.abs(dc) === 2) {
-                const mr = sr + dr/2, mc = sc + dc/2;
-                if (board[mr][mc] && board[mr][mc].toLowerCase() === 'b' && !board[r][c]) {
-                    const nb = board.map(row => [...row]); nb[r][c] = nb[sr][sc]; nb[sr][sc] = null; nb[mr][mc] = null;
-                    if (r === 0) nb[r][c] = 'R';
-                    setBoard(nb); setSelected(null); setTurn('b');
-                    if (!nb.flat().some(p => p && p.toLowerCase() === 'b')) { setStatus('🏆 You win!'); saveScoreToDb?.('checkers', 1, true); return; }
-                    setTimeout(() => cpuMove(nb), 400);
-                } else { setSelected(board[r][c]?.toLowerCase() === 'r' ? [r, c] : null); }
-            } else { setSelected(board[r][c]?.toLowerCase() === 'r' ? [r, c] : null); }
-        } else if (board[r][c]?.toLowerCase() === 'r') { setSelected([r, c]); }
+            const move = validMoves.find(m => m.tr === r && m.tc === c);
+            if (move) {
+                const nb = board.map(row => [...row]);
+                nb[r][c] = nb[selected[0]][selected[1]]; nb[selected[0]][selected[1]] = null;
+                if (move.jump) nb[move.mr][move.mc] = null;
+                if (r === 0 && nb[r][c] === 'r') nb[r][c] = 'R';
+                setBoard(nb); setSelected(null); setValidMoves([]);
+                if (!nb.flat().some(p => p && p.toLowerCase() === 'b')) { setStatus('🏆 You win!'); saveScoreToDb?.('checkers', 1, true); return; }
+                setTurn('b'); setTimeout(() => cpuMove(nb), 400);
+            } else if (board[r][c]?.toLowerCase() === 'r') {
+                setSelected([r, c]); setValidMoves(getMoves(board, r, c));
+            } else { setSelected(null); setValidMoves([]); }
+        } else if (board[r][c]?.toLowerCase() === 'r') { setSelected([r, c]); setValidMoves(getMoves(board, r, c)); }
     };
 
     const cpuMove = (b) => {
-        const moves = [];
+        const allMoves = [];
         for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
             if (b[r][c]?.toLowerCase() === 'b') {
-                for (const [dr, dc] of [[1,-1],[1,1],[-1,-1],[-1,1]]) {
-                    const nr = r+dr, nc = c+dc;
-                    if (nr>=0&&nr<8&&nc>=0&&nc<8&&!b[nr][nc]) moves.push({fr:r,fc:c,tr:nr,tc:nc,jump:false});
-                    const jr = r+dr*2, jc = c+dc*2;
-                    if (jr>=0&&jr<8&&jc>=0&&jc<8&&!b[jr][jc]&&b[nr]?.[nc]?.toLowerCase()==='r') moves.push({fr:r,fc:c,tr:jr,tc:jc,mr:nr,mc:nc,jump:true});
-                }
+                getMoves(b, r, c).forEach(m => allMoves.push({ ...m, fr: r, fc: c }));
             }
         }
-        if (!moves.length) { setStatus('🏆 You win!'); saveScoreToDb?.('checkers', 1, true); return; }
-        const jumps = moves.filter(m => m.jump);
-        const m = jumps.length ? jumps[Math.floor(Math.random()*jumps.length)] : moves[Math.floor(Math.random()*moves.length)];
+        if (!allMoves.length) { setStatus('🏆 You win!'); saveScoreToDb?.('checkers', 1, true); return; }
+        const jumps = allMoves.filter(m => m.jump);
+        const m = jumps.length ? jumps[Math.floor(Math.random()*jumps.length)] : allMoves[Math.floor(Math.random()*allMoves.length)];
         const nb = b.map(row => [...row]);
         nb[m.tr][m.tc] = nb[m.fr][m.fc]; nb[m.fr][m.fc] = null;
         if (m.jump) nb[m.mr][m.mc] = null;
-        if (m.tr === 7) nb[m.tr][m.tc] = 'B';
-        if (!nb.flat().some(p => p?.toLowerCase() === 'r')) { setStatus('💀 CPU wins!'); }
+        if (m.tr === 7 && nb[m.tr][m.tc] === 'b') nb[m.tr][m.tc] = 'B';
+        if (!nb.flat().some(p => p?.toLowerCase() === 'r')) setStatus('💀 CPU wins!');
         setBoard(nb); setTurn('r');
     };
 
-    const reset = () => { setBoard(initBoard()); setSelected(null); setTurn('r'); setStatus(''); };
+    const reset = () => { setBoard(initBoard()); setSelected(null); setTurn('r'); setStatus(''); setValidMoves([]); };
+    const isValidTarget = (r, c) => validMoves.some(m => m.tr === r && m.tc === c);
 
     return (
         <GameHeader title="Checkers" gradient="from-orange-400 to-amber-400" goBack={goBack} onReset={reset}>
-            {status && <div className="mb-3 p-3 rounded-xl font-bold text-sm bg-amber-500/20 text-amber-400">{status}<button onClick={reset} className="block mx-auto mt-2 px-4 py-1 bg-white/10 rounded-lg text-xs text-white">New Game</button></div>}
-            <p className="text-white/30 text-xs mb-2">{turn === 'r' ? '🔴 Your turn' : '⚫ CPU...'}</p>
-            <div className="inline-grid grid-cols-8 gap-0 rounded-lg overflow-hidden border border-white/10">
+            {status && <div className="mb-4 p-4 rounded-xl font-bold text-center bg-amber-500/20 text-amber-400 text-lg">{status}<button onClick={reset} className="block mx-auto mt-2 px-6 py-2 bg-white/10 rounded-lg text-sm text-white">New Game</button></div>}
+            <p className="text-white/30 text-sm mb-3 font-medium">{turn === 'r' ? '🔴 Your turn' : '⚫ CPU thinking...'}</p>
+            <div className="inline-grid grid-cols-8 gap-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-2xl">
                 {board.flat().map((cell, i) => { const r = Math.floor(i/8), c = i%8; const isDark = (r+c)%2===1;
+                    const isValid = isValidTarget(r, c); const isSel = selected?.[0]===r&&selected?.[1]===c;
                     return (<button key={i} onClick={() => handleClick(r, c)}
-                        className={`w-9 h-9 sm:w-11 sm:h-11 flex items-center justify-center transition-all ${isDark ? 'bg-stone-700' : 'bg-stone-300'} ${selected?.[0]===r&&selected?.[1]===c ? 'ring-2 ring-yellow-400 ring-inset' : ''}`}>
-                        {cell?.toLowerCase()==='r' ? <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full ${cell==='R' ? 'bg-red-400 ring-2 ring-amber-300' : 'bg-red-500'} shadow-lg`}/> :
-                         cell?.toLowerCase()==='b' ? <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full ${cell==='B' ? 'bg-gray-800 ring-2 ring-amber-300' : 'bg-gray-900'} shadow-lg`}/> : ''}
+                        className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center transition-all relative ${isDark ? 'bg-[#769656]' : 'bg-[#eeeed2]'} ${isSel ? 'ring-2 ring-inset ring-yellow-400' : ''}`}>
+                        {isValid && <div className="absolute inset-0 flex items-center justify-center"><div className="w-3 h-3 rounded-full bg-yellow-400/50"/></div>}
+                        {cell?.toLowerCase()==='r' ? <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full ${cell==='R' ? 'bg-gradient-to-br from-red-400 to-red-600 ring-2 ring-amber-300' : 'bg-gradient-to-br from-red-500 to-red-700'} shadow-lg`}/> :
+                         cell?.toLowerCase()==='b' ? <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full ${cell==='B' ? 'bg-gradient-to-br from-gray-700 to-gray-900 ring-2 ring-amber-300' : 'bg-gradient-to-br from-gray-800 to-black'} shadow-lg`}/> : ''}
                     </button>);
                 })}
             </div>
@@ -306,12 +330,12 @@ export function BattleshipGame({ goBack, saveScoreToDb }) {
     return (
         <GameHeader title="Battleship" gradient="from-blue-400 to-indigo-400" goBack={goBack} onReset={reset}>
             <ScorePanel items={[{ label: 'Hits', value: `${hits}/${TOTAL}`, color: 'text-red-400' }, { label: 'Shots', value: moves, color: 'text-blue-400' }]} />
-            {won && <div className="mb-3 p-3 rounded-xl font-bold text-sm bg-emerald-500/20 text-emerald-400">🏆 Fleet sunk in {moves} shots!</div>}
-            <div className="inline-grid gap-0.5" style={{ gridTemplateColumns: `repeat(${SIZE}, 1fr)` }}>
+            {won && <div className="mb-4 p-4 rounded-xl font-bold text-center bg-emerald-500/20 text-emerald-400 text-lg">🏆 Fleet sunk in {moves} shots!</div>}
+            <div className="inline-grid gap-1 bg-blue-900/20 backdrop-blur-sm rounded-xl p-2 border border-blue-500/10" style={{ gridTemplateColumns: `repeat(${SIZE}, 1fr)` }}>
                 {shots.flat().map((cell, i) => { const r = Math.floor(i/SIZE), c = i%SIZE;
                     return (<button key={i} onClick={() => shoot(r, c)}
-                        className={`w-8 h-8 sm:w-10 sm:h-10 rounded text-xs font-bold flex items-center justify-center transition-all border ${cell === 'hit' ? 'bg-red-500/30 border-red-500/50 text-red-400' : cell === 'miss' ? 'bg-white/5 border-white/10 text-white/20' : 'bg-blue-900/20 border-blue-500/10 hover:bg-blue-500/20 cursor-pointer'}`}>
-                        {cell === 'hit' ? '💥' : cell === 'miss' ? '•' : ''}
+                        className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg text-sm font-bold flex items-center justify-center transition-all border ${cell === 'hit' ? 'bg-red-500/30 border-red-500/40 text-red-400' : cell === 'miss' ? 'bg-white/5 border-white/5 text-white/15' : 'bg-blue-900/30 border-blue-500/10 hover:bg-blue-500/20 cursor-pointer'}`}>
+                        {cell === 'hit' ? '💥' : cell === 'miss' ? '·' : '~'}
                     </button>);
                 })}
             </div>
@@ -319,42 +343,59 @@ export function BattleshipGame({ goBack, saveScoreToDb }) {
     );
 }
 
-// ═══ LUDO (Simplified) ═══
+// ═══ LUDO ═══
 export function LudoGame({ goBack }) {
     const [dice, setDice] = useState(null);
     const [turn, setTurn] = useState(0);
     const [positions, setPositions] = useState([[0,0],[0,0],[0,0],[0,0]]);
+    const [rolling, setRolling] = useState(false);
     const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500'];
+    const gradients = ['from-red-500 to-rose-600', 'from-blue-500 to-indigo-600', 'from-green-500 to-emerald-600', 'from-yellow-500 to-amber-600'];
     const names = ['🔴 Red', '🔵 Blue', '🟢 Green', '🟡 Yellow'];
     const [winner, setWinner] = useState(null);
 
     const roll = () => {
-        if (winner) return;
-        const d = Math.floor(Math.random()*6)+1; setDice(d);
-        const np = [...positions]; const [p1, p2] = np[turn];
-        const newP1 = p1 + d;
-        if (newP1 >= 30) { setWinner(turn); return; }
-        np[turn] = [newP1, p2]; setPositions(np);
-        setTurn((turn + 1) % 4);
+        if (winner || rolling) return;
+        setRolling(true);
+        let count = 0;
+        const anim = setInterval(() => {
+            setDice(Math.floor(Math.random()*6)+1);
+            count++;
+            if (count >= 8) {
+                clearInterval(anim);
+                const d = Math.floor(Math.random()*6)+1;
+                setDice(d); setRolling(false);
+                const np = [...positions]; const newP = np[turn][0] + d;
+                if (newP >= 30) { setWinner(turn); return; }
+                np[turn] = [newP, np[turn][1]]; setPositions(np);
+                setTurn((turn + 1) % 4);
+            }
+        }, 80);
     };
     const reset = () => { setDice(null); setTurn(0); setPositions([[0,0],[0,0],[0,0],[0,0]]); setWinner(null); };
 
     return (
         <GameHeader title="Ludo" gradient="from-yellow-400 to-orange-400" goBack={goBack} onReset={reset}>
-            {winner !== null && <div className="mb-3 p-3 rounded-xl font-bold text-sm bg-amber-500/20 text-amber-400">🏆 {names[winner]} wins!<button onClick={reset} className="block mx-auto mt-2 px-4 py-1 bg-white/10 rounded-lg text-xs text-white">New Game</button></div>}
-            <p className="text-white/30 text-xs mb-3">{names[turn]}'s turn {dice && `· Rolled: ${dice}`}</p>
-            <div className="space-y-2 mb-4">
+            {winner !== null && <div className="mb-4 p-4 rounded-xl font-bold text-center bg-amber-500/20 text-amber-400 text-lg">🏆 {names[winner]} wins!<button onClick={reset} className="block mx-auto mt-2 px-6 py-2 bg-white/10 rounded-lg text-sm text-white">New Game</button></div>}
+            {/* Dice */}
+            <div className={`w-24 h-24 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 flex items-center justify-center text-5xl font-black mb-6 transition-transform ${rolling ? 'animate-bounce' : ''}`}>
+                {dice || '🎲'}
+            </div>
+            <p className="text-white/30 text-sm mb-6 font-medium">{names[turn]}'s turn</p>
+            {/* Progress bars */}
+            <div className="w-full max-w-md space-y-3 mb-8">
                 {positions.map((pos, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded-full ${colors[i]}`} />
-                        <div className="flex-1 h-3 bg-white/5 rounded-full overflow-hidden">
-                            <div className={`h-full ${colors[i]} rounded-full transition-all duration-500`} style={{ width: `${(pos[0]/30)*100}%` }} />
+                    <div key={i} className={`flex items-center gap-3 p-3 rounded-xl ${turn === i ? 'bg-white/5 border border-white/10' : ''}`}>
+                        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradients[i]} shadow-lg flex-shrink-0`} />
+                        <div className="flex-1 h-4 bg-white/5 rounded-full overflow-hidden">
+                            <motion.div animate={{ width: `${(pos[0]/30)*100}%` }} className={`h-full bg-gradient-to-r ${gradients[i]} rounded-full`} transition={{ type: 'spring', stiffness: 100 }} />
                         </div>
-                        <span className="text-xs text-white/30 w-8 text-right">{pos[0]}/30</span>
+                        <span className="text-sm text-white/30 w-12 text-right font-mono">{pos[0]}/30</span>
                     </div>
                 ))}
             </div>
-            <button onClick={roll} disabled={!!winner} className="px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl font-bold text-white shadow-lg disabled:opacity-30">
+            <button onClick={roll} disabled={!!winner || rolling}
+                className="px-10 py-4 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl font-bold text-white shadow-xl text-lg disabled:opacity-30 hover:shadow-2xl hover:shadow-amber-500/30 transition-all">
                 🎲 Roll Dice
             </button>
         </GameHeader>

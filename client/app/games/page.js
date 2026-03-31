@@ -23,9 +23,9 @@ export default function GamesPage() {
     useEffect(() => { setMounted(true); }, []);
 
     const handlePick = (g) => {
-        if (!g.modes || g.modes.length === 0) { setActiveGame(g.id); setGameMode('solo'); }
-        else if (g.modes.length === 1) { setActiveGame(g.id); setGameMode(g.modes[0]); }
-        else setSelectingMode(g);
+        if (!g.modes || g.modes.length === 0) { setActiveGame(g.id); setGameMode('solo'); setSelectingMode(null); }
+        else if (g.modes.length === 1) { setActiveGame(g.id); setGameMode(g.modes[0]); setSelectingMode(null); }
+        else { setSelectingMode(g); setActiveGame(null); setGameMode(null); }
     };
 
     const startWithMode = (mode) => { setActiveGame(selectingMode.id); setGameMode(mode); setSelectingMode(null); };
