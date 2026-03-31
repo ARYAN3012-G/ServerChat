@@ -815,3 +815,7 @@
 {"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-03-29 11:15:23"}
 {"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-03-29 11:15:24"}
 {"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-03-29 11:15:24"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 01:03:58"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 01:03:59"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 01:03:59"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 01:04:00"}

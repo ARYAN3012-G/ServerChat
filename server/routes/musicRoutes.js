@@ -23,15 +23,21 @@ async function fetchFromAPI(path) {
     return null;
 }
 
+// Decode HTML entities (fixes &amp;quot; etc in song names)
+function decodeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&#x27;/g, "'").replace(/&#x2F;/g, '/');
+}
+
 // Normalize song data from different API formats
 function normalizeSong(song, base) {
     // jiosaavn-api-privatecvc2 format
     if (base.includes('privatecvc2')) {
         return {
             id: song.id,
-            title: song.name,
-            artist: song.primaryArtists || song.featuredArtists || 'Unknown',
-            album: song.album?.name || '',
+            title: decodeHtml(song.name),
+            artist: decodeHtml(song.primaryArtists || song.featuredArtists || 'Unknown'),
+            album: decodeHtml(song.album?.name || ''),
             duration: song.duration ? `${Math.floor(song.duration / 60)}:${String(song.duration % 60).padStart(2, '0')}` : '0:00',
             durationSec: parseInt(song.duration) || 0,
             image: song.image?.[2]?.link || song.image?.[1]?.link || song.image?.[0]?.link || '',
@@ -44,9 +50,9 @@ function normalizeSong(song, base) {
     // saavn.dev format (original)
     return {
         id: song.id,
-        title: song.name,
-        artist: song.artists?.primary?.map(a => a.name).join(', ') || song.artists?.all?.map(a => a.name).join(', ') || 'Unknown',
-        album: song.album?.name || '',
+        title: decodeHtml(song.name),
+        artist: decodeHtml(song.artists?.primary?.map(a => a.name).join(', ') || song.artists?.all?.map(a => a.name).join(', ') || 'Unknown'),
+        album: decodeHtml(song.album?.name || ''),
         duration: song.duration ? `${Math.floor(song.duration / 60)}:${String(song.duration % 60).padStart(2, '0')}` : '0:00',
         durationSec: song.duration || 0,
         image: song.image?.[2]?.url || song.image?.[1]?.url || song.image?.[0]?.url || '',
