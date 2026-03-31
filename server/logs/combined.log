@@ -4460,3 +4460,28 @@
 {"level":"info","message":"✅ MongoDB connected: ac-tn9v0gj-shard-00-00.wlavg6r.mongodb.net","service":"serverchat","timestamp":"2026-04-01 01:03:59"}
 {"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 01:04:00"}
 {"level":"warn","message":"⚠️ Redis connection failed, running without Redis","service":"serverchat","timestamp":"2026-04-01 01:04:00"}
+{"level":"info","message":"✅ Cloudinary configured","service":"serverchat","timestamp":"2026-04-01 01:25:45"}
+{"level":"info","message":"⚡ Socket.io initialized","service":"serverchat","timestamp":"2026-04-01 01:25:45"}
+{"level":"info","message":"🚀 ServerChat API running on port 5000","service":"serverchat","timestamp":"2026-04-01 01:25:45"}
+{"level":"info","message":"📡 Environment: development","service":"serverchat","timestamp":"2026-04-01 01:25:45"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 01:25:45"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 01:25:45"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 01:25:46"}
+{"level":"info","message":"✅ MongoDB connected: ac-tn9v0gj-shard-00-02.wlavg6r.mongodb.net","service":"serverchat","timestamp":"2026-04-01 01:25:46"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 01:25:46"}
+{"level":"warn","message":"⚠️ Redis connection failed, running without Redis","service":"serverchat","timestamp":"2026-04-01 01:25:46"}
+{"level":"info","message":"127.0.0.1 - - [31/Mar/2026:20:06:02 +0000] \"GET / HTTP/1.1\" 404 139 \"-\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\"","service":"serverchat","timestamp":"2026-04-01 01:36:02"}
+{"level":"info","message":"127.0.0.1 - - [31/Mar/2026:20:10:56 +0000] \"POST /api/auth/register HTTP/1.1\" 201 1066 \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\"","service":"serverchat","timestamp":"2026-04-01 01:40:56"}
+{"level":"info","message":"🔌 User connected: testuser (69cc2a4f7a3b61075457954c)","service":"serverchat","timestamp":"2026-04-01 01:40:57"}
+{"level":"warn","message":"Redis presence error (non-fatal): Connection is closed.","service":"serverchat","timestamp":"2026-04-01 01:40:57"}
+{"level":"info","message":"🔌 User disconnected: testuser - transport close","service":"serverchat","timestamp":"2026-04-01 01:41:27"}
+{"level":"warn","message":"Redis presence disconnect error (non-fatal): Connection is closed.","service":"serverchat","timestamp":"2026-04-01 01:41:27"}
+{"level":"info","message":"🔌 User connected: testuser (69cc2a4f7a3b61075457954c)","service":"serverchat","timestamp":"2026-04-01 01:41:34"}
+{"level":"info","message":"127.0.0.1 - - [31/Mar/2026:20:11:34 +0000] \"GET /api/auth/me HTTP/1.1\" 200 641 \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\"","service":"serverchat","timestamp":"2026-04-01 01:41:34"}
+{"level":"warn","message":"Redis presence error (non-fatal): Connection is closed.","service":"serverchat","timestamp":"2026-04-01 01:41:34"}
+{"level":"info","message":"127.0.0.1 - - [31/Mar/2026:20:11:34 +0000] \"GET /api/auth/me HTTP/1.1\" 200 640 \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\"","service":"serverchat","timestamp":"2026-04-01 01:41:34"}
+{"level":"info","message":"127.0.0.1 - - [31/Mar/2026:20:11:48 +0000] \"POST /api/auth/login HTTP/1.1\" 200 1065 \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\"","service":"serverchat","timestamp":"2026-04-01 01:41:48"}
+{"level":"info","message":"127.0.0.1 - - [31/Mar/2026:20:11:52 +0000] \"GET /api/auth/me HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\"","service":"serverchat","timestamp":"2026-04-01 01:41:52"}
+{"level":"info","message":"127.0.0.1 - - [31/Mar/2026:20:11:52 +0000] \"GET /api/servers/me HTTP/1.1\" 200 2 \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\"","service":"serverchat","timestamp":"2026-04-01 01:41:52"}
+{"level":"info","message":"127.0.0.1 - - [31/Mar/2026:20:11:52 +0000] \"GET /api/auth/me HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\"","service":"serverchat","timestamp":"2026-04-01 01:41:52"}
+{"level":"info","message":"127.0.0.1 - - [31/Mar/2026:20:11:52 +0000] \"GET /api/servers/me HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\"","service":"serverchat","timestamp":"2026-04-01 01:41:52"}
