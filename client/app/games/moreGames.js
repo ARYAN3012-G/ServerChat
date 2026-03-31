@@ -554,7 +554,7 @@ export function BattleshipGame({ goBack, saveScoreToDb }) {
             <div className="inline-grid gap-1 bg-blue-900/20 backdrop-blur-sm rounded-xl p-2 border border-blue-500/10" style={{ gridTemplateColumns: `repeat(${SIZE}, 1fr)` }}>
                 {shots.flat().map((cell, i) => { const r = Math.floor(i/SIZE), c = i%SIZE;
                     return (<button key={i} onClick={() => shoot(r, c)}
-                        className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg text-sm font-bold flex items-center justify-center transition-all border ${cell === 'hit' ? 'bg-red-500/30 border-red-500/40 text-red-400' : cell === 'miss' ? 'bg-white/5 border-white/5 text-white/15' : 'bg-blue-900/30 border-blue-500/10 hover:bg-blue-500/20 cursor-pointer'}`}>
+                        className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg text-sm font-bold flex items-center justify-center transition-all border ${cell === 'hit' ? 'bg-red-500/30 border-red-500/40 text-red-400' : cell === 'miss' ? 'bg-white/5 border-white/5 text-white/15' : 'bg-blue-900/30 border-blue-500/10 hover:bg-blue-500/20 cursor-pointer'}`}>
                         {cell === 'hit' ? '💥' : cell === 'miss' ? '·' : '~'}
                     </button>);
                 })}

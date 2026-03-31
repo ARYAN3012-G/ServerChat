@@ -193,7 +193,7 @@ export function MinesweeperGame({ goBack, saveScoreToDb }) {
             <div className="inline-grid gap-1 bg-white/[0.03] backdrop-blur-sm rounded-xl p-2 border border-white/5" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
                 {board.flat().map((cell, i) => { const r = Math.floor(i / COLS), c = i % COLS; return (
                     <button key={i} onClick={() => reveal(r, c)} onContextMenu={(e) => flag(e, r, c)}
-                        className={`w-10 h-10 sm:w-11 sm:h-11 rounded-lg text-sm font-bold flex items-center justify-center transition-all ${cell.revealed ? (cell.mine ? 'bg-red-500/30 border border-red-500/30' : 'bg-white/10 border border-white/5') : 'bg-white/[0.04] hover:bg-white/10 cursor-pointer border border-white/5'}`}>
+                        className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl text-sm font-bold flex items-center justify-center transition-all ${cell.revealed ? (cell.mine ? 'bg-red-500/30 border border-red-500/30' : 'bg-white/10 border border-white/5') : 'bg-white/[0.04] hover:bg-white/10 cursor-pointer border border-white/5'}`}>
                         {cell.flagged ? '🚩' : cell.revealed ? (cell.mine ? '💣' : (cell.count > 0 ? <span className={numColor[cell.count]}>{cell.count}</span> : '')) : ''}
                     </button>
                 ); })}
@@ -203,11 +203,11 @@ export function MinesweeperGame({ goBack, saveScoreToDb }) {
     );
 }
 
-// ═══ FLAPPY BIRD (tuned physics) ═══
+// ═══ FLAPPY BIRD (easy physics, big canvas) ═══
 export function FlappyBirdGame({ goBack, saveScoreToDb }) {
-    const W = 360, H = 520, GRAVITY = 0.18, JUMP = -4.8, PIPE_W = 52, GAP = 175, PIPE_SPEED = 1.8;
+    const W = 500, H = 680, GRAVITY = 0.12, JUMP = -4.2, PIPE_W = 58, GAP = 210, PIPE_SPEED = 1.5;
     const canvasRef = useRef(null);
-    const stateRef = useRef({ bird: { y: H / 2, vel: -2 }, pipes: [], score: 0, running: false, gameOver: false, frame: 0 });
+    const stateRef = useRef({ bird: { y: H / 2, vel: -1.5 }, pipes: [], score: 0, running: false, gameOver: false, frame: 0 });
     const [score, setScore] = useState(0);
     const [gameOver, setGameOver] = useState(false);
     const [started, setStarted] = useState(false);
@@ -220,9 +220,9 @@ export function FlappyBirdGame({ goBack, saveScoreToDb }) {
         s.frame++;
         s.bird.vel += GRAVITY; s.bird.y += s.bird.vel;
         s.pipes.forEach(p => { p.x -= PIPE_SPEED; });
-        if (s.pipes.length && s.pipes[s.pipes.length - 1].x < W - 220) s.pipes.push({ x: W, gapY: 80 + Math.random() * (H - GAP - 120) });
+        if (s.pipes.length && s.pipes[s.pipes.length - 1].x < W - 280) s.pipes.push({ x: W, gapY: 100 + Math.random() * (H - GAP - 160) });
         s.pipes = s.pipes.filter(p => p.x > -PIPE_W);
-        const bx = 70, by = s.bird.y, br = 14;
+        const bx = 90, by = s.bird.y, br = 16;
         const die = () => { s.running = false; s.gameOver = true; setGameOver(true); setHighScore('flappy', s.score); saveRef.current?.('flappy', s.score, false); };
         if (by < 0 || by > H - 10) { die(); }
         for (const p of s.pipes) {
@@ -252,8 +252,8 @@ export function FlappyBirdGame({ goBack, saveScoreToDb }) {
             ctx.save(); ctx.translate(bx, by);
             const rot = Math.min(Math.max(s.bird.vel * 3, -30), 70) * Math.PI / 180;
             ctx.rotate(rot);
-            ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.ellipse(0, 0, 16, 12, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#fef08a'; ctx.beginPath(); ctx.ellipse(-2, -3, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.ellipse(0, 0, 20, 15, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fef08a'; ctx.beginPath(); ctx.ellipse(-2, -4, 10, 7, 0, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.arc(6, -3, 3, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(7, -4, 1.2, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(22, -2); ctx.lineTo(22, 4); ctx.closePath(); ctx.fill();
@@ -267,7 +267,7 @@ export function FlappyBirdGame({ goBack, saveScoreToDb }) {
     }, []);
 
     const start = useCallback(() => {
-        stateRef.current = { bird: { y: H / 2, vel: -2 }, pipes: [{ x: W + 160, gapY: 100 + Math.random() * (H - GAP - 140) }], score: 0, running: true, gameOver: false, frame: 0 };
+        stateRef.current = { bird: { y: H / 2, vel: -1.5 }, pipes: [{ x: W + 200, gapY: 120 + Math.random() * (H - GAP - 180) }], score: 0, running: true, gameOver: false, frame: 0 };
         setScore(0); setGameOver(false); setStarted(true);
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         rafRef.current = requestAnimationFrame(gameLoop);
@@ -338,7 +338,7 @@ export function Connect4Game({ goBack, saveScoreToDb }) {
             {!winner && <p className="text-white/30 text-sm mb-3 font-medium">{turn === 'R' ? '🔴 Red' : '🟡 Yellow'}'s turn</p>}
             <div className="inline-grid gap-1.5 bg-indigo-900/40 backdrop-blur-sm rounded-2xl p-3 border border-indigo-500/20" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
                 {board.flat().map((cell, i) => { const c = i % COLS; return (
-                    <button key={i} onClick={() => drop(c)} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 transition-all ${cell === 'R' ? 'bg-red-500 border-red-400 shadow-lg shadow-red-500/30' : cell === 'Y' ? 'bg-yellow-400 border-yellow-300 shadow-lg shadow-yellow-500/30' : 'bg-white/5 border-white/10 hover:bg-white/15 cursor-pointer'}`} />
+                    <button key={i} onClick={() => drop(c)} className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full border-2 transition-all ${cell === 'R' ? 'bg-red-500 border-red-400 shadow-lg shadow-red-500/30' : cell === 'Y' ? 'bg-yellow-400 border-yellow-300 shadow-lg shadow-yellow-500/30' : 'bg-white/5 border-white/10 hover:bg-white/15 cursor-pointer'}`} />
                 ); })}
             </div>
         </GameHeader>
@@ -347,7 +347,7 @@ export function Connect4Game({ goBack, saveScoreToDb }) {
 
 // ═══ PING PONG ═══
 export function PongGame({ goBack, saveScoreToDb }) {
-    const W = 480, H = 360;
+    const W = 600, H = 420;
     const canvasRef = useRef(null);
     const stateRef = useRef({ p1: H/2-30, p2: H/2-30, ball: { x: W/2, y: H/2, vx: 3, vy: 2 }, s1: 0, s2: 0, running: false });
     const [scores, setScores] = useState([0, 0]);
