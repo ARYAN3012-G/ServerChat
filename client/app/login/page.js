@@ -86,7 +86,7 @@ export default function LoginPage() {
                         refreshToken: rToken,
                     }));
                     toast.success('Welcome back!');
-                    router.push('/channels');
+                    router.push(getRedirectPath());
                 } catch (e) {
                     console.error('OAuth hydration failed:', e);
                     toast.error(e.response?.data?.message || 'Login failed — please try again');
@@ -98,6 +98,16 @@ export default function LoginPage() {
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Empty deps — run once on mount only
+
+    // ─── Check for pending invite ───
+    const getRedirectPath = useCallback(() => {
+        const pending = typeof window !== 'undefined' ? localStorage.getItem('pendingInvite') : null;
+        if (pending) {
+            localStorage.removeItem('pendingInvite');
+            return `/invite/${pending}`;
+        }
+        return '/channels';
+    }, []);
 
     // ─── Hydrate Redux from localStorage (for regular page loads) ───
     const hydrateAndRedirect = useCallback(async (path) => {
@@ -112,8 +122,8 @@ export default function LoginPage() {
                 }));
             } catch (e) { /* will redirect to login naturally */ }
         }
-        router.push(path);
-    }, [dispatch, router]);
+        router.push(path || getRedirectPath());
+    }, [dispatch, router, getRedirectPath]);
 
     // ─── Face API loading via npm dynamic import ───
     useEffect(() => {
@@ -179,7 +189,7 @@ export default function LoginPage() {
                 toast.success('Enter your 2FA code');
             } else {
                 toast.success('Welcome back!');
-                router.push('/channels');
+                router.push(getRedirectPath());
             }
         } catch (error) {
             const data = error.response?.data;
@@ -215,7 +225,7 @@ export default function LoginPage() {
                 localStorage.setItem('refreshToken', data.refreshToken);
                 dispatch(setCredentials(data));
                 toast.success('Welcome back!');
-                router.push('/channels');
+                router.push(getRedirectPath());
             }
         } catch (error) {
             toast.error(error.response?.data?.message || 'Login failed');
@@ -252,7 +262,7 @@ export default function LoginPage() {
             dispatch(setCredentials(data));
             stopCamera();
             toast.success('Welcome back!');
-            router.push('/channels');
+            router.push(getRedirectPath());
         } catch (error) {
             if (error.message === 'timeout') {
                 toast.error('Detection timed out. Try better lighting or move closer.');

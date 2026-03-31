@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiSettings, FiUsers, FiEdit2, FiLink, FiAlertTriangle, FiX, FiCopy, FiCheck, FiChevronDown, FiTrash2, FiShield, FiStar, FiLogOut, FiArrowRight } from 'react-icons/fi';
+import { FiSettings, FiUsers, FiEdit2, FiLink, FiAlertTriangle, FiX, FiCopy, FiCheck, FiChevronDown, FiTrash2, FiShield, FiStar, FiLogOut, FiArrowRight, FiInbox, FiCheckCircle, FiXCircle, FiMusic, FiGlobe, FiLock } from 'react-icons/fi';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
 const TABS = [
     { id: 'overview', label: 'Overview', icon: FiSettings },
     { id: 'members', label: 'Members', icon: FiUsers },
+    { id: 'requests', label: 'Requests', icon: FiInbox },
     { id: 'nicknames', label: 'Nicknames', icon: FiEdit2 },
     { id: 'invites', label: 'Invites', icon: FiLink },
     { id: 'danger', label: 'Danger Zone', icon: FiAlertTriangle },
@@ -54,6 +55,11 @@ export default function ServerSettingsModal({ server, user, onClose, onServerUpd
     const [leaveAfterTransfer, setLeaveAfterTransfer] = useState(false);
     const [transferring, setTransferring] = useState(false);
 
+    // Join Requests state
+    const [joinRequests, setJoinRequests] = useState([]);
+    const [loadingRequests, setLoadingRequests] = useState(false);
+    const [processingRequest, setProcessingRequest] = useState(null);
+
     const myMember = server?.members?.find(m => m.user?._id === user?._id);
     const myRole = myMember?.role || 'member';
     const isOwner = myRole === 'owner';
@@ -64,12 +70,50 @@ export default function ServerSettingsModal({ server, user, onClose, onServerUpd
             setServerName(server.name || '');
             setServerDesc(server.description || '');
             setIsPublic(server.isPublic || false);
-            // Init nicknames
             const nicks = {};
             server.members?.forEach(m => { nicks[m.user?._id] = m.nickname || ''; });
             setNicknames(nicks);
+            // Load join requests for private servers
+            if (!server.isPublic && isAdmin) fetchJoinRequests();
         }
     }, [server]);
+
+    const fetchJoinRequests = async () => {
+        if (!server?._id) return;
+        setLoadingRequests(true);
+        try {
+            const res = await api.get(`/servers/${server._id}/join-requests`);
+            setJoinRequests(res.data);
+        } catch (err) {
+            console.error('Failed to fetch join requests:', err);
+        }
+        setLoadingRequests(false);
+    };
+
+    const approveRequest = async (requestId) => {
+        setProcessingRequest(requestId);
+        try {
+            const res = await api.post(`/servers/${server._id}/join-requests/${requestId}/approve`);
+            toast.success('Request approved!');
+            setJoinRequests(prev => prev.filter(r => r._id !== requestId));
+            if (res.data.members) onServerUpdate?.({ ...server, members: res.data.members });
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to approve');
+        }
+        setProcessingRequest(null);
+    };
+
+    const rejectRequest = async (requestId) => {
+        setProcessingRequest(requestId);
+        try {
+            await api.post(`/servers/${server._id}/join-requests/${requestId}/reject`);
+            toast.success('Request rejected');
+            setJoinRequests(prev => prev.filter(r => r._id !== requestId));
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to reject');
+        }
+        setProcessingRequest(null);
+    };
 
     // ── Save Overview ──
     const saveOverview = async () => {
@@ -121,9 +165,17 @@ export default function ServerSettingsModal({ server, user, onClose, onServerUpd
     };
 
     // ── Copy Invite ──
-    const copyInvite = () => {
-        navigator.clipboard?.writeText(server?.inviteCode || '');
+    const getInviteUrl = (code, room) => {
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        let url = `${origin}/invite/${code || server?.inviteCode || ''}`;
+        if (room) url += `?room=${room}`;
+        return url;
+    };
+
+    const copyInvite = (text) => {
+        navigator.clipboard?.writeText(text || getInviteUrl());
         setCopied(true);
+        toast.success('Invite link copied!');
         setTimeout(() => setCopied(false), 2000);
     };
 
@@ -265,6 +317,47 @@ export default function ServerSettingsModal({ server, user, onClose, onServerUpd
                 </div>
             );
 
+            case 'requests': return (
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs text-white/30">Pending join requests for this private server</p>
+                        <button onClick={fetchJoinRequests} className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors">Refresh</button>
+                    </div>
+                    {loadingRequests && <div className="text-center py-6"><div className="w-5 h-5 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto" /></div>}
+                    {!loadingRequests && joinRequests.length === 0 && (
+                        <div className="text-center py-8 bg-dark-950/50 border border-white/5 rounded-xl">
+                            <FiInbox className="w-8 h-8 text-white/10 mx-auto mb-2" />
+                            <p className="text-xs text-white/20">No pending requests</p>
+                            <p className="text-[10px] text-white/10 mt-0.5">New join requests will appear here</p>
+                        </div>
+                    )}
+                    {joinRequests.map((req) => (
+                        <motion.div key={req._id} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center gap-3 px-3 py-3 rounded-xl bg-dark-950/50 border border-white/10 hover:border-white/15 transition-colors">
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 bg-indigo-500/20 text-indigo-300">
+                                {(req.user?.username?.[0] || 'U').toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-white truncate">{req.user?.username || 'User'}</p>
+                                <p className="text-[10px] text-white/25">{req.user?.email}</p>
+                                {req.message && <p className="text-[11px] text-white/40 mt-0.5 italic">"{req.message}"</p>}
+                                <p className="text-[9px] text-white/15 mt-0.5">{new Date(req.createdAt).toLocaleDateString()}</p>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <button onClick={() => approveRequest(req._id)} disabled={processingRequest === req._id}
+                                    className="px-2.5 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-[10px] font-medium transition-colors flex items-center gap-1 disabled:opacity-50">
+                                    <FiCheckCircle className="w-3 h-3" /> Approve
+                                </button>
+                                <button onClick={() => rejectRequest(req._id)} disabled={processingRequest === req._id}
+                                    className="px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] font-medium transition-colors flex items-center gap-1 disabled:opacity-50">
+                                    <FiXCircle className="w-3 h-3" /> Reject
+                                </button>
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+            );
+
             case 'nicknames': return (
                 <div className="space-y-3">
                     <p className="text-xs text-white/30 mb-2">Set custom nicknames for members in this server</p>
@@ -298,19 +391,54 @@ export default function ServerSettingsModal({ server, user, onClose, onServerUpd
 
             case 'invites': return (
                 <div className="space-y-4">
+                    {/* Full Invite Link */}
                     <div className="bg-dark-950 border border-white/10 rounded-xl p-4">
-                        <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Permanent Invite Code</p>
-                        <div className="flex items-center gap-3">
-                            <code className="flex-1 bg-dark-900 px-3 py-2 rounded-lg text-sm text-indigo-400 font-mono border border-white/5">{server?.inviteCode || '—'}</code>
-                            <button onClick={copyInvite}
-                                className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${copied ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500 hover:bg-indigo-600 text-white'}`}>
+                        <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Server Invite Link</p>
+                        <div className="flex items-center gap-2">
+                            <input readOnly value={getInviteUrl()} className="flex-1 bg-dark-900 px-3 py-2 rounded-lg text-xs text-indigo-400 font-mono border border-white/5 outline-none truncate" />
+                            <button onClick={() => copyInvite()}
+                                className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${copied ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500 hover:bg-indigo-600 text-white'}`}>
                                 {copied ? 'Copied!' : 'Copy'}
                             </button>
                         </div>
                     </div>
+
+                    {/* Deep Links */}
+                    <div className="bg-dark-950 border border-white/10 rounded-xl p-4">
+                        <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">Deep Links</p>
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                    <FiMusic className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                                    <span className="text-xs text-white/50">Music Room</span>
+                                </div>
+                                <button onClick={() => copyInvite(getInviteUrl(null, 'music'))}
+                                    className="px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-[10px] font-medium transition-colors whitespace-nowrap flex items-center gap-1">
+                                    <FiCopy className="w-3 h-3" /> Copy Music Link
+                                </button>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                    <span className="text-sm flex-shrink-0">🎮</span>
+                                    <span className="text-xs text-white/50">Games Hub</span>
+                                </div>
+                                <button onClick={() => copyInvite(getInviteUrl(null, 'games'))}
+                                    className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-[10px] font-medium transition-colors whitespace-nowrap flex items-center gap-1">
+                                    <FiCopy className="w-3 h-3" /> Copy Games Link
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Invite Code */}
+                    <div className="bg-dark-950/50 border border-white/5 rounded-xl px-4 py-3">
+                        <p className="text-[10px] text-white/20 mb-1">Permanent Invite Code</p>
+                        <code className="text-xs text-white/40 font-mono">{server?.inviteCode || '—'}</code>
+                    </div>
+
                     {server?.inviteLinks?.length > 0 && (
                         <div>
-                            <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Invite Links</p>
+                            <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Generated Links</p>
                             <div className="space-y-2">
                                 {server.inviteLinks.map((link, i) => (
                                     <div key={i} className="flex items-center justify-between bg-dark-950/50 border border-white/5 rounded-xl px-3 py-2">
@@ -318,6 +446,7 @@ export default function ServerSettingsModal({ server, user, onClose, onServerUpd
                                         <div className="flex items-center gap-2 text-[10px] text-white/20">
                                             <span>{link.uses} uses</span>
                                             {link.maxUses > 0 && <span>/ {link.maxUses} max</span>}
+                                            <button onClick={() => copyInvite(getInviteUrl(link.code))} className="text-indigo-400 hover:text-indigo-300"><FiCopy className="w-3 h-3" /></button>
                                         </div>
                                     </div>
                                 ))}
@@ -418,12 +547,15 @@ export default function ServerSettingsModal({ server, user, onClose, onServerUpd
                     <div className="flex-1 p-2 space-y-0.5 overflow-y-auto">
                         {TABS.map(tab => {
                             if (tab.id === 'nicknames' && !isAdmin) return null;
+                            if (tab.id === 'requests' && (server?.isPublic || !isAdmin)) return null;
                             const Icon = tab.icon;
+                            const hasCount = tab.id === 'requests' && joinRequests.length > 0;
                             return (
                                 <button key={tab.id} onClick={() => { setActiveTab(tab.id); setMobileSidebarOpen(false); }}
                                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${activeTab === tab.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white hover:bg-white/5'}`}>
                                     <Icon className="w-3.5 h-3.5 flex-shrink-0" />
                                     {tab.label}
+                                    {hasCount && <span className="ml-auto bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{joinRequests.length}</span>}
                                 </button>
                             );
                         })}

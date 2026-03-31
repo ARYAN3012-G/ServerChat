@@ -1,5 +1,6 @@
 const Server = require('../models/Server');
 const Channel = require('../models/Channel');
+const JoinRequest = require('../models/JoinRequest');
 const { logger } = require('../config/logger');
 const { getIO } = require('../sockets');
 
@@ -132,7 +133,7 @@ exports.joinServer = async (req, res, next) => {
         // Check if already a member
         const isMember = server.members.some(m => m.user.toString() === req.user._id.toString());
         if (isMember) {
-            return res.status(400).json({ message: 'You are already a member of this server' });
+            return res.status(400).json({ message: 'You are already a member of this server', alreadyMember: true, serverId: server._id });
         }
 
         // Check if server is full
@@ -140,11 +141,32 @@ exports.joinServer = async (req, res, next) => {
             return res.status(400).json({ message: 'Server is full' });
         }
 
-        server.members.push({
-            user: req.user._id,
-            role: 'member',
-            joinedAt: new Date(),
-        });
+        // ── PRIVATE SERVER: create join request instead of adding directly ──
+        if (!server.isPublic) {
+            // Check for existing pending request
+            const existing = await JoinRequest.findOne({ server: server._id, user: req.user._id, status: 'pending' });
+            if (existing) {
+                return res.status(200).json({ pending: true, message: 'Your join request is already pending approval' });
+            }
+            await JoinRequest.create({
+                server: server._id,
+                user: req.user._id,
+                message: req.body?.message || '',
+                inviteCode,
+            });
+            // Notify server admins via socket
+            try {
+                const io = getIO();
+                if (io) {
+                    const adminIds = server.members.filter(m => ['owner', 'admin'].includes(m.role)).map(m => m.user.toString());
+                    adminIds.forEach(aid => io.to(`user:${aid}`).emit('server:join-request', { serverId: server._id.toString(), username: req.user.username }));
+                }
+            } catch (e) { logger.error('Failed to notify admins:', e); }
+            return res.status(200).json({ pending: true, message: 'Join request sent! Waiting for admin approval.' });
+        }
+
+        // ── PUBLIC SERVER: join directly ──
+        server.members.push({ user: req.user._id, role: 'member', joinedAt: new Date() });
         server.memberCount += 1;
         await server.save();
 
@@ -157,7 +179,6 @@ exports.joinServer = async (req, res, next) => {
         try {
             const io = getIO();
             if (io) {
-                // Broadcast to all channels in this server so existing members get updated
                 const channelIds = populated.channels.map(ch => ch._id.toString());
                 channelIds.forEach(chId => {
                     io.to(`channel:${chId}`).emit('server:member-joined', {
@@ -439,7 +460,171 @@ exports.kickMember = async (req, res, next) => {
         server.memberCount = Math.max(0, server.memberCount - 1);
         await server.save();
 
+        // Notify kicked user via socket
+        try {
+            const io = getIO();
+            if (io) io.to(`user:${userId}`).emit('server:kicked', { serverId: server._id.toString(), serverName: server.name });
+        } catch (e) {}
+
         res.json({ message: 'Member kicked' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ══════════════════════════════════════════
+// INVITE PREVIEW (NO AUTH — for invite page)
+// ══════════════════════════════════════════
+exports.getInvitePreview = async (req, res, next) => {
+    try {
+        const { code } = req.params;
+
+        // Find by permanent code or invite link code
+        let server = await Server.findOne({ inviteCode: code }).populate('owner', 'username avatar').select('name icon description memberCount isPublic owner createdAt');
+        if (!server) {
+            server = await Server.findOne({ 'inviteLinks.code': code }).populate('owner', 'username avatar').select('name icon description memberCount isPublic owner inviteLinks createdAt');
+            if (server) {
+                const invite = server.inviteLinks.find(l => l.code === code);
+                if (invite?.expiresAt && invite.expiresAt < new Date()) {
+                    return res.status(400).json({ message: 'Invite link has expired' });
+                }
+                if (invite?.maxUses > 0 && invite.uses >= invite.maxUses) {
+                    return res.status(400).json({ message: 'Invite link has reached maximum uses' });
+                }
+            }
+        }
+
+        if (!server) {
+            return res.status(404).json({ message: 'Invalid or expired invite link' });
+        }
+
+        res.json({
+            _id: server._id,
+            name: server.name,
+            icon: server.icon,
+            description: server.description,
+            memberCount: server.memberCount,
+            isPublic: server.isPublic,
+            owner: server.owner,
+            createdAt: server.createdAt,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ══════════════════════════════════════════
+// JOIN REQUESTS (admin/owner only)
+// ══════════════════════════════════════════
+exports.getJoinRequests = async (req, res, next) => {
+    try {
+        const server = await Server.findById(req.params.id);
+        if (!server) return res.status(404).json({ message: 'Server not found' });
+
+        const requester = server.members.find(m => m.user.toString() === req.user._id.toString());
+        if (!requester || !['owner', 'admin'].includes(requester.role)) {
+            return res.status(403).json({ message: 'Insufficient permissions' });
+        }
+
+        const requests = await JoinRequest.find({ server: req.params.id, status: 'pending' })
+            .populate('user', 'username avatar email')
+            .sort({ createdAt: -1 });
+
+        res.json(requests);
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.approveJoinRequest = async (req, res, next) => {
+    try {
+        const server = await Server.findById(req.params.id);
+        if (!server) return res.status(404).json({ message: 'Server not found' });
+
+        const requester = server.members.find(m => m.user.toString() === req.user._id.toString());
+        if (!requester || !['owner', 'admin'].includes(requester.role)) {
+            return res.status(403).json({ message: 'Insufficient permissions' });
+        }
+
+        const joinReq = await JoinRequest.findById(req.params.requestId);
+        if (!joinReq || joinReq.server.toString() !== req.params.id) {
+            return res.status(404).json({ message: 'Join request not found' });
+        }
+        if (joinReq.status !== 'pending') {
+            return res.status(400).json({ message: 'Request already processed' });
+        }
+
+        // Check if already a member (edge case: joined via another invite)
+        const alreadyMember = server.members.some(m => m.user.toString() === joinReq.user.toString());
+        if (alreadyMember) {
+            joinReq.status = 'approved';
+            joinReq.reviewedBy = req.user._id;
+            joinReq.reviewedAt = new Date();
+            await joinReq.save();
+            return res.json({ message: 'User is already a member' });
+        }
+
+        // Check server capacity
+        if (server.memberCount >= server.maxMembers) {
+            return res.status(400).json({ message: 'Server is full' });
+        }
+
+        // Add member
+        server.members.push({ user: joinReq.user, role: 'member', joinedAt: new Date() });
+        server.memberCount += 1;
+        await server.save();
+
+        // Update request status
+        joinReq.status = 'approved';
+        joinReq.reviewedBy = req.user._id;
+        joinReq.reviewedAt = new Date();
+        await joinReq.save();
+
+        // Notify the approved user via socket
+        try {
+            const io = getIO();
+            if (io) io.to(`user:${joinReq.user.toString()}`).emit('server:request-approved', { serverId: server._id.toString(), serverName: server.name });
+        } catch (e) {}
+
+        const populated = await Server.findById(server._id)
+            .populate('members.user', 'username avatar status');
+
+        res.json({ message: 'Request approved', members: populated.members });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.rejectJoinRequest = async (req, res, next) => {
+    try {
+        const server = await Server.findById(req.params.id);
+        if (!server) return res.status(404).json({ message: 'Server not found' });
+
+        const requester = server.members.find(m => m.user.toString() === req.user._id.toString());
+        if (!requester || !['owner', 'admin'].includes(requester.role)) {
+            return res.status(403).json({ message: 'Insufficient permissions' });
+        }
+
+        const joinReq = await JoinRequest.findById(req.params.requestId);
+        if (!joinReq || joinReq.server.toString() !== req.params.id) {
+            return res.status(404).json({ message: 'Join request not found' });
+        }
+        if (joinReq.status !== 'pending') {
+            return res.status(400).json({ message: 'Request already processed' });
+        }
+
+        joinReq.status = 'rejected';
+        joinReq.reviewedBy = req.user._id;
+        joinReq.reviewedAt = new Date();
+        await joinReq.save();
+
+        // Notify rejected user
+        try {
+            const io = getIO();
+            if (io) io.to(`user:${joinReq.user.toString()}`).emit('server:request-rejected', { serverId: server._id.toString(), serverName: server.name });
+        } catch (e) {}
+
+        res.json({ message: 'Request rejected' });
     } catch (error) {
         next(error);
     }

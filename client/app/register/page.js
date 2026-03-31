@@ -38,7 +38,13 @@ export default function RegisterPage() {
         try {
             await register(formData.username, formData.email, formData.password);
             toast.success('Account created! Welcome to ServerChat! 🎉');
-            router.push('/channels');
+            const pendingInvite = localStorage.getItem('pendingInvite');
+            if (pendingInvite) {
+                localStorage.removeItem('pendingInvite');
+                router.push(`/invite/${pendingInvite}`);
+            } else {
+                router.push('/channels');
+            }
         } catch (error) {
             toast.error(error.response?.data?.message || 'Registration failed');
         } finally {

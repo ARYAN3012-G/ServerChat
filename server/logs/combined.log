@@ -4485,3 +4485,43 @@
 {"level":"info","message":"127.0.0.1 - - [31/Mar/2026:20:11:52 +0000] \"GET /api/servers/me HTTP/1.1\" 200 2 \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\"","service":"serverchat","timestamp":"2026-04-01 01:41:52"}
 {"level":"info","message":"127.0.0.1 - - [31/Mar/2026:20:11:52 +0000] \"GET /api/auth/me HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\"","service":"serverchat","timestamp":"2026-04-01 01:41:52"}
 {"level":"info","message":"127.0.0.1 - - [31/Mar/2026:20:11:52 +0000] \"GET /api/servers/me HTTP/1.1\" 304 - \"http://localhost:3000/\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36\"","service":"serverchat","timestamp":"2026-04-01 01:41:52"}
+{"level":"info","message":"✅ Cloudinary configured","service":"serverchat","timestamp":"2026-04-01 02:05:32"}
+{"level":"info","message":"⚡ Socket.io initialized","service":"serverchat","timestamp":"2026-04-01 02:05:32"}
+{"level":"info","message":"🚀 ServerChat API running on port 5000","service":"serverchat","timestamp":"2026-04-01 02:05:33"}
+{"level":"info","message":"📡 Environment: development","service":"serverchat","timestamp":"2026-04-01 02:05:33"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:05:34"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:05:34"}
+{"level":"info","message":"✅ MongoDB connected: ac-tn9v0gj-shard-00-01.wlavg6r.mongodb.net","service":"serverchat","timestamp":"2026-04-01 02:05:34"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:05:34"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:05:35"}
+{"level":"warn","message":"⚠️ Redis connection failed, running without Redis","service":"serverchat","timestamp":"2026-04-01 02:05:35"}
+{"level":"info","message":"✅ Cloudinary configured","service":"serverchat","timestamp":"2026-04-01 02:18:56"}
+{"level":"info","message":"⚡ Socket.io initialized","service":"serverchat","timestamp":"2026-04-01 02:18:56"}
+{"level":"info","message":"🚀 ServerChat API running on port 5000","service":"serverchat","timestamp":"2026-04-01 02:18:57"}
+{"level":"info","message":"📡 Environment: development","service":"serverchat","timestamp":"2026-04-01 02:18:57"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:18:57"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:18:57"}
+{"level":"info","message":"✅ MongoDB connected: ac-tn9v0gj-shard-00-02.wlavg6r.mongodb.net","service":"serverchat","timestamp":"2026-04-01 02:18:58"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:18:58"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:18:58"}
+{"level":"warn","message":"⚠️ Redis connection failed, running without Redis","service":"serverchat","timestamp":"2026-04-01 02:18:58"}
+{"level":"info","message":"✅ Cloudinary configured","service":"serverchat","timestamp":"2026-04-01 02:20:16"}
+{"level":"info","message":"⚡ Socket.io initialized","service":"serverchat","timestamp":"2026-04-01 02:20:16"}
+{"level":"info","message":"🚀 ServerChat API running on port 5000","service":"serverchat","timestamp":"2026-04-01 02:20:20"}
+{"level":"info","message":"📡 Environment: development","service":"serverchat","timestamp":"2026-04-01 02:20:20"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:20:20"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:20:21"}
+{"level":"info","message":"✅ MongoDB connected: ac-tn9v0gj-shard-00-00.wlavg6r.mongodb.net","service":"serverchat","timestamp":"2026-04-01 02:20:21"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:20:21"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:20:22"}
+{"level":"warn","message":"⚠️ Redis connection failed, running without Redis","service":"serverchat","timestamp":"2026-04-01 02:20:22"}
+{"level":"info","message":"✅ Cloudinary configured","service":"serverchat","timestamp":"2026-04-01 02:20:32"}
+{"level":"info","message":"⚡ Socket.io initialized","service":"serverchat","timestamp":"2026-04-01 02:20:32"}
+{"level":"info","message":"🚀 ServerChat API running on port 5000","service":"serverchat","timestamp":"2026-04-01 02:20:33"}
+{"level":"info","message":"📡 Environment: development","service":"serverchat","timestamp":"2026-04-01 02:20:33"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:20:33"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:20:33"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:20:34"}
+{"level":"error","message":"❌ Redis error: ","service":"serverchat","timestamp":"2026-04-01 02:20:34"}
+{"level":"warn","message":"⚠️ Redis connection failed, running without Redis","service":"serverchat","timestamp":"2026-04-01 02:20:34"}
+{"level":"info","message":"✅ MongoDB connected: ac-tn9v0gj-shard-00-00.wlavg6r.mongodb.net","service":"serverchat","timestamp":"2026-04-01 02:20:34"}
