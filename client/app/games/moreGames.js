@@ -98,7 +98,7 @@ export function TetrisGame({ goBack, saveScoreToDb }) {
     );
 }
 
-// ═══ CHESS (with proper rules + visible colors) ═══
+// ═══ CHESS — Full featured with settings, timers, move history ═══
 export function ChessGame({ goBack, saveScoreToDb }) {
     const INIT = [
         ['br','bn','bb','bq','bk','bb','bn','br'],
@@ -111,16 +111,59 @@ export function ChessGame({ goBack, saveScoreToDb }) {
         ['wr','wn','wb','wq','wk','wb','wn','wr'],
     ];
     const pieceSymbols = { wk:'♔', wq:'♕', wr:'♖', wb:'♗', wn:'♘', wp:'♙', bk:'♚', bq:'♛', br:'♜', bb:'♝', bn:'♞', bp:'♟' };
+    const pieceNames = { k:'King', q:'Queen', r:'Rook', b:'Bishop', n:'Knight', p:'Pawn' };
+    const pieceValues = { p:1, n:3, b:3, r:5, q:9, k:0 };
+    const colNames = 'abcdefgh';
+
+    // Settings state
+    const [settings, setSettings] = useState(null); // null = show settings screen
+    const TIME_OPTS = [
+        { label: '⚡ Bullet', desc: '1 min', seconds: 60 },
+        { label: '🔥 Blitz', desc: '3 min', seconds: 180 },
+        { label: '⏱️ Rapid', desc: '10 min', seconds: 600 },
+        { label: '🏛️ Classical', desc: '30 min', seconds: 1800 },
+        { label: '♾️ Unlimited', desc: 'No limit', seconds: 0 },
+    ];
+    const DIFF_OPTS = [
+        { label: 'Easy', desc: 'Random moves', depth: 0, color: 'text-emerald-400' },
+        { label: 'Medium', desc: 'Smart captures', depth: 1, color: 'text-amber-400' },
+        { label: 'Hard', desc: 'Strategic play', depth: 2, color: 'text-rose-400' },
+    ];
+
+    // Game state
     const [board, setBoard] = useState(INIT.map(r => [...r]));
     const [selected, setSelected] = useState(null);
     const [turn, setTurn] = useState('w');
     const [captured, setCaptured] = useState({ w: [], b: [] });
     const [status, setStatus] = useState('');
     const [validMoves, setValidMoves] = useState([]);
+    const [moveHistory, setMoveHistory] = useState([]);
+    const [selTime, setSelTime] = useState(2);
+    const [selDiff, setSelDiff] = useState(1);
+    const [boardHistory, setBoardHistory] = useState([]);
+    const [whiteTime, setWhiteTime] = useState(0);
+    const [blackTime, setBlackTime] = useState(0);
+    const timerRef = useRef(null);
 
     const side = (p) => p?.[0];
     const isOwn = (p, t) => side(p) === t;
     const isEnemy = (p, t) => p && side(p) !== t;
+
+    // Timer
+    useEffect(() => {
+        if (!settings || settings.time === 0 || status) return;
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => {
+            if (turn === 'w') {
+                setWhiteTime(t => { if (t <= 1) { setStatus('⏰ White ran out of time!'); return 0; } return t - 1; });
+            } else {
+                setBlackTime(t => { if (t <= 1) { setStatus('⏰ Black ran out of time!'); return 0; } return t - 1; });
+            }
+        }, 1000);
+        return () => clearInterval(timerRef.current);
+    }, [turn, settings, status]);
+
+    const formatTime = (s) => { const m = Math.floor(s/60); const sec = s%60; return `${m}:${sec.toString().padStart(2,'0')}`; };
 
     const getValidMoves = (b, r, c) => {
         const p = b[r][c]; if (!p) return [];
@@ -128,7 +171,7 @@ export function ChessGame({ goBack, saveScoreToDb }) {
         const addIf = (tr, tc) => { if (tr < 0 || tr > 7 || tc < 0 || tc > 7) return false; if (isOwn(b[tr][tc], t)) return false; moves.push([tr, tc]); return !b[tr][tc]; };
         if (type === 'p') {
             const d = t === 'w' ? -1 : 1; const startRow = t === 'w' ? 6 : 1;
-            if (r+d>=0 && r+d<=7 && !b[r+d][c]) { moves.push([r+d,c]); if (r===startRow && !b[r+d*2][c]) moves.push([r+d*2,c]); }
+            if (r+d>=0 && r+d<=7 && !b[r+d][c]) { moves.push([r+d,c]); if (r===startRow && !b[r+d*2]?.[c] === undefined ? false : !b[r+d*2][c]) moves.push([r+d*2,c]); }
             if (c>0 && isEnemy(b[r+d]?.[c-1], t)) moves.push([r+d,c-1]);
             if (c<7 && isEnemy(b[r+d]?.[c+1], t)) moves.push([r+d,c+1]);
         }
@@ -139,6 +182,15 @@ export function ChessGame({ goBack, saveScoreToDb }) {
         return moves;
     };
 
+    const addMoveNotation = (piece, fr, fc, tr, tc, capture) => {
+        const name = piece[1] === 'p' ? '' : pieceNames[piece[1]]?.[0] || '';
+        const from = colNames[fc] + (8 - fr);
+        const to = colNames[tc] + (8 - tr);
+        const cap = capture ? 'x' : '';
+        const prefix = side(piece) === 'w' ? '' : '';
+        return `${name}${from}${cap}${to}`;
+    };
+
     const handleClick = (r, c) => {
         if (turn !== 'w' || status) return;
         const piece = board[r][c];
@@ -146,77 +198,230 @@ export function ChessGame({ goBack, saveScoreToDb }) {
             const [sr, sc] = selected;
             const isValid = validMoves.some(([vr, vc]) => vr === r && vc === c);
             if (isValid) {
+                setBoardHistory(h => [...h, { board: board.map(row => [...row]), captured: { w: [...captured.w], b: [...captured.b] }, turn }]);
                 const nb = board.map(row => [...row]);
                 const target = nb[r][c];
+                const movingPiece = nb[sr][sc];
                 if (target && side(target) === 'b') setCaptured(p => ({...p, w: [...p.w, target]}));
                 if (target?.[1] === 'k') { setStatus('🏆 White wins!'); saveScoreToDb?.('chess', 1, true); }
                 nb[r][c] = nb[sr][sc]; nb[sr][sc] = null;
                 if (nb[r][c] === 'wp' && r === 0) nb[r][c] = 'wq';
+                const notation = addMoveNotation(movingPiece, sr, sc, r, c, target);
+                setMoveHistory(h => [...h, notation]);
                 setBoard(nb); setSelected(null); setValidMoves([]); setTurn('b');
-                setTimeout(() => cpuMove(nb), 400);
+                setTimeout(() => cpuMove(nb), settings?.difficulty === 2 ? 600 : 300);
             } else if (isOwn(piece, 'w')) { setSelected([r, c]); setValidMoves(getValidMoves(board, r, c)); }
             else { setSelected(null); setValidMoves([]); }
         } else if (piece && isOwn(piece, 'w')) { setSelected([r, c]); setValidMoves(getValidMoves(board, r, c)); }
     };
 
     const cpuMove = (b) => {
+        const diff = settings?.difficulty || 0;
         const allMoves = [];
         for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
             if (isOwn(b[r][c], 'b')) {
                 getValidMoves(b, r, c).forEach(([tr, tc]) => {
                     let val = 0;
-                    if (b[tr][tc]) { const v = {p:1,n:3,b:3,r:5,q:9,k:100}; val = v[b[tr][tc][1]] || 0; }
+                    if (b[tr][tc]) { val = (pieceValues[b[tr][tc][1]] || 0) * 10; }
+                    // Center control bonus (medium+)
+                    if (diff >= 1) { if (tr >= 3 && tr <= 4 && tc >= 3 && tc <= 4) val += 2; if (tr >= 2 && tr <= 5 && tc >= 2 && tc <= 5) val += 1; }
+                    // Attack near king (hard)
+                    if (diff >= 2) {
+                        for (let kr = 0; kr < 8; kr++) for (let kc = 0; kc < 8; kc++) {
+                            if (b[kr][kc] === 'wk') { const dist = Math.abs(tr-kr) + Math.abs(tc-kc); if (dist <= 2) val += 5; if (dist <= 3) val += 2; }
+                        }
+                    }
                     allMoves.push({ fr: r, fc: c, tr, tc, capture: b[tr][tc], val });
                 });
             }
         }
-        if (!allMoves.length) { setStatus('Stalemate!'); return; }
+        if (!allMoves.length) { setStatus('♟ Stalemate!'); return; }
         allMoves.sort((a,b) => b.val - a.val);
-        const m = allMoves[0].val > 0 ? allMoves[0] : allMoves[Math.floor(Math.random() * allMoves.length)];
+        let m;
+        if (diff === 0) { m = allMoves[Math.floor(Math.random() * allMoves.length)]; }
+        else if (diff === 1) { m = allMoves[0].val > 0 ? allMoves[0] : allMoves[Math.floor(Math.random() * allMoves.length)]; }
+        else { const top = allMoves.slice(0, Math.min(3, allMoves.length)); m = top[Math.floor(Math.random() * top.length)]; }
+        setBoardHistory(h => [...h, { board: b.map(row => [...row]), captured: { w: [...captured.w], b: [...captured.b] }, turn: 'b' }]);
         const nb = b.map(row => [...row]);
+        const movingPiece = nb[m.fr][m.fc];
         if (m.capture) setCaptured(p => ({...p, b: [...p.b, m.capture]}));
         if (m.capture?.[1] === 'k') setStatus('💀 Black wins!');
         nb[m.tr][m.tc] = nb[m.fr][m.fc]; nb[m.fr][m.fc] = null;
         if (nb[m.tr][m.tc] === 'bp' && m.tr === 7) nb[m.tr][m.tc] = 'bq';
+        const notation = addMoveNotation(movingPiece, m.fr, m.fc, m.tr, m.tc, m.capture);
+        setMoveHistory(h => [...h, notation]);
         setBoard(nb); setTurn('w');
     };
 
-    const reset = () => { setBoard(INIT.map(r => [...r])); setSelected(null); setTurn('w'); setCaptured({ w: [], b: [] }); setStatus(''); setValidMoves([]); };
+    const undoMove = () => {
+        if (boardHistory.length < 2 || status) return;
+        const prev = boardHistory[boardHistory.length - 2];
+        setBoard(prev.board.map(r => [...r]));
+        setCaptured({ w: [...prev.captured.w], b: [...prev.captured.b] });
+        setTurn('w');
+        setBoardHistory(h => h.slice(0, -2));
+        setMoveHistory(h => h.slice(0, -2));
+        setSelected(null); setValidMoves([]);
+    };
+
+    const startGame = (timeOpt, diffOpt) => {
+        setSettings({ time: timeOpt.seconds, difficulty: diffOpt.depth, timeName: timeOpt.label, diffName: diffOpt.label });
+        setBoard(INIT.map(r => [...r])); setSelected(null); setTurn('w');
+        setCaptured({ w: [], b: [] }); setStatus(''); setValidMoves([]);
+        setMoveHistory([]); setBoardHistory([]);
+        setWhiteTime(timeOpt.seconds); setBlackTime(timeOpt.seconds);
+    };
+
+    const reset = () => { setSettings(null); if (timerRef.current) clearInterval(timerRef.current); };
     const isValidTarget = (r, c) => validMoves.some(([vr, vc]) => vr === r && vc === c);
+    const getAdvantage = () => {
+        const wVal = captured.w.reduce((s, p) => s + (pieceValues[p[1]] || 0), 0);
+        const bVal = captured.b.reduce((s, p) => s + (pieceValues[p[1]] || 0), 0);
+        return wVal - bVal;
+    };
+
+    // Settings Screen
+    if (!settings) {
+        return (
+            <GameHeader title="Chess" gradient="from-violet-400 to-indigo-500" goBack={goBack} onReset={() => {}}>
+                <div className="w-full max-w-md space-y-6">
+                    <div className="text-center mb-2">
+                        <span className="text-5xl">♔</span>
+                        <p className="text-white/40 text-sm mt-2">Configure your match</p>
+                    </div>
+                    {/* Time control */}
+                    <div>
+                        <p className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-3">⏱ Time Control</p>
+                        <div className="grid grid-cols-5 gap-2">
+                            {TIME_OPTS.map((t, i) => (
+                                <button key={i} onClick={() => setSelTime(i)}
+                                    className={`rounded-xl py-3 px-2 text-center transition-all border ${i === selTime ? 'bg-violet-500/20 border-violet-500/40 text-violet-300 scale-105' : 'bg-white/[0.03] border-white/[0.06] text-white/50 hover:bg-white/[0.06]'}`}>
+                                    <p className="text-xs font-bold">{t.label.split(' ')[0]}</p>
+                                    <p className="text-[10px] opacity-60 mt-0.5">{t.desc}</p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    {/* Difficulty */}
+                    <div>
+                        <p className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-3">🎯 CPU Difficulty</p>
+                        <div className="grid grid-cols-3 gap-3">
+                            {DIFF_OPTS.map((d, i) => (
+                                <button key={i} onClick={() => setSelDiff(i)}
+                                    className={`rounded-xl py-4 px-3 text-center transition-all border ${i === selDiff ? 'bg-violet-500/20 border-violet-500/40 scale-105' : 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]'}`}>
+                                    <p className={`text-sm font-bold ${d.color}`}>{d.label}</p>
+                                    <p className="text-[10px] text-white/30 mt-1">{d.desc}</p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    {/* Start */}
+                    <button onClick={() => startGame(TIME_OPTS[selTime], DIFF_OPTS[selDiff])}
+                        className="w-full py-4 bg-gradient-to-r from-violet-500 to-indigo-500 hover:from-violet-400 hover:to-indigo-400 rounded-2xl font-bold text-white text-lg shadow-xl shadow-violet-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                        ♟ Start Game
+                    </button>
+                </div>
+            </GameHeader>
+        );
+    }
 
     return (
         <GameHeader title="Chess" gradient="from-violet-400 to-indigo-500" goBack={goBack} onReset={reset}>
-            {status && <div className={`mb-5 py-4 px-8 rounded-2xl font-bold text-center text-lg backdrop-blur-sm border ${status.includes('White') ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : status.includes('Black') ? 'bg-rose-500/15 text-rose-400 border-rose-500/20' : 'bg-white/10 text-white/60 border-white/10'}`}>{status}<button onClick={reset} className="block mx-auto mt-3 px-6 py-2 bg-white/10 hover:bg-white/15 rounded-lg text-sm text-white transition-colors">New Game</button></div>}
-            {/* Capture panels */}
-            <div className="flex justify-center gap-4 mb-4">
-                <div className="flex items-center gap-2 bg-white/[0.04] backdrop-blur-sm rounded-xl px-4 py-2 border border-white/5">
-                    <span className="text-xs text-white/30 font-medium">YOU</span>
-                    <div className="flex gap-0.5 text-lg">{captured.w.map((p,i) => <span key={i} className="opacity-70">{pieceSymbols[p]}</span>)}</div>
-                    {!captured.w.length && <span className="text-white/10 text-xs">—</span>}
+            {status && <div className={`mb-5 py-4 px-8 rounded-2xl font-bold text-center text-lg backdrop-blur-sm border ${status.includes('White') || status.includes('Black ran') ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : status.includes('Black') || status.includes('White ran') ? 'bg-rose-500/15 text-rose-400 border-rose-500/20' : 'bg-white/10 text-white/60 border-white/10'}`}>{status}<button onClick={reset} className="block mx-auto mt-3 px-6 py-2 bg-white/10 hover:bg-white/15 rounded-lg text-sm text-white transition-colors">New Game</button></div>}
+
+            <div className="flex flex-col lg:flex-row items-start justify-center gap-4 w-full max-w-5xl">
+                {/* Left panel — captured pieces + info */}
+                <div className="hidden lg:flex flex-col gap-3 w-48 shrink-0">
+                    {/* Settings info */}
+                    <div className="bg-white/[0.03] backdrop-blur-sm rounded-xl p-3 border border-white/[0.06]">
+                        <p className="text-[10px] uppercase tracking-wider text-white/30 font-semibold mb-1">Settings</p>
+                        <p className="text-xs text-violet-300">{settings.timeName} · {settings.diffName}</p>
+                    </div>
+                    {/* Your captured */}
+                    <div className="bg-white/[0.03] backdrop-blur-sm rounded-xl p-3 border border-white/[0.06]">
+                        <p className="text-[10px] uppercase tracking-wider text-white/30 font-semibold mb-1.5">♔ You captured</p>
+                        <div className="flex flex-wrap gap-1">{captured.w.length ? captured.w.map((p,i) => <span key={i} className="text-xl" style={{ color: '#f5c542' }}>{pieceSymbols[p]}</span>) : <span className="text-white/10 text-xs">None yet</span>}</div>
+                        {getAdvantage() > 0 && <p className="text-emerald-400 text-xs mt-1.5 font-bold">+{getAdvantage()} material</p>}
+                    </div>
+                    {/* CPU captured */}
+                    <div className="bg-white/[0.03] backdrop-blur-sm rounded-xl p-3 border border-white/[0.06]">
+                        <p className="text-[10px] uppercase tracking-wider text-white/30 font-semibold mb-1.5">♚ CPU captured</p>
+                        <div className="flex flex-wrap gap-1">{captured.b.length ? captured.b.map((p,i) => <span key={i} className="text-xl" style={{ color: '#e8e8f0' }}>{pieceSymbols[p]}</span>) : <span className="text-white/10 text-xs">None yet</span>}</div>
+                        {getAdvantage() < 0 && <p className="text-rose-400 text-xs mt-1.5 font-bold">+{Math.abs(getAdvantage())} material</p>}
+                    </div>
+                    {/* Undo */}
+                    <button onClick={undoMove} disabled={boardHistory.length < 2 || !!status} className="w-full py-2 text-xs font-medium bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] rounded-xl text-white/40 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed">↩ Undo Move</button>
                 </div>
-                <div className="flex items-center gap-2 bg-white/[0.04] backdrop-blur-sm rounded-xl px-4 py-2 border border-white/5">
-                    <span className="text-xs text-white/30 font-medium">CPU</span>
-                    <div className="flex gap-0.5 text-lg">{captured.b.map((p,i) => <span key={i} className="opacity-70">{pieceSymbols[p]}</span>)}</div>
-                    {!captured.b.length && <span className="text-white/10 text-xs">—</span>}
+
+                {/* Center — board */}
+                <div className="flex flex-col items-center">
+                    {/* Timers */}
+                    <div className="flex justify-between w-full max-w-[420px] sm:max-w-[500px] mb-3 gap-4">
+                        <div className={`flex-1 flex items-center gap-2 rounded-xl px-4 py-2 border ${turn === 'b' && settings.time > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+                            <span className="text-amber-400 text-lg">♚</span>
+                            <span className="text-xs text-white/40">CPU</span>
+                            {settings.time > 0 && <span className={`ml-auto font-mono font-bold text-sm ${turn === 'b' ? 'text-amber-400' : 'text-white/30'}`}>{formatTime(blackTime)}</span>}
+                        </div>
+                        <div className={`flex-1 flex items-center gap-2 rounded-xl px-4 py-2 border ${turn === 'w' && settings.time > 0 ? 'bg-violet-500/10 border-violet-500/20' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+                            <span className="text-violet-300 text-lg">♔</span>
+                            <span className="text-xs text-white/40">You</span>
+                            {settings.time > 0 && <span className={`ml-auto font-mono font-bold text-sm ${turn === 'w' ? 'text-violet-300' : 'text-white/30'}`}>{formatTime(whiteTime)}</span>}
+                        </div>
+                    </div>
+                    {/* Mobile captured bar */}
+                    <div className="lg:hidden flex justify-center gap-3 mb-3 w-full">
+                        <div className="flex items-center gap-1.5 bg-white/[0.03] rounded-lg px-3 py-1.5 border border-white/[0.06]">
+                            <span className="text-[10px] text-white/30">YOU</span>
+                            <div className="flex gap-0.5">{captured.w.map((p,i) => <span key={i} className="text-base" style={{ color: '#f5c542' }}>{pieceSymbols[p]}</span>)}</div>
+                            {getAdvantage() > 0 && <span className="text-emerald-400 text-[10px] font-bold">+{getAdvantage()}</span>}
+                        </div>
+                        <div className="flex items-center gap-1.5 bg-white/[0.03] rounded-lg px-3 py-1.5 border border-white/[0.06]">
+                            <span className="text-[10px] text-white/30">CPU</span>
+                            <div className="flex gap-0.5">{captured.b.map((p,i) => <span key={i} className="text-base" style={{ color: '#e8e8f0' }}>{pieceSymbols[p]}</span>)}</div>
+                            {getAdvantage() < 0 && <span className="text-rose-400 text-[10px] font-bold">+{Math.abs(getAdvantage())}</span>}
+                        </div>
+                    </div>
+                    {/* Turn indicator */}
+                    <div className={`mb-3 text-sm font-semibold px-5 py-2 rounded-full ${turn === 'w' ? 'bg-violet-500/15 text-violet-300 border border-violet-500/20' : 'bg-amber-500/15 text-amber-300 border border-amber-500/20'}`}>{turn === 'w' ? '♔ Your turn' : '♚ CPU thinking...'}</div>
+                    {/* Board */}
+                    <div className="relative">
+                        <div className="inline-grid grid-cols-8 gap-0 rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl shadow-violet-500/10" style={{ boxShadow: '0 0 60px rgba(124,58,237,0.08), 0 25px 50px rgba(0,0,0,0.4)' }}>
+                            {board.flat().map((cell, i) => { const r = Math.floor(i / 8), c = i % 8; const isDark = (r + c) % 2 === 1;
+                                const isValid = isValidTarget(r, c); const isSel = selected?.[0]===r&&selected?.[1]===c;
+                                const lastMove = moveHistory.length > 0;
+                                return (<button key={i} onClick={() => handleClick(r, c)}
+                                    className={`w-[44px] h-[44px] sm:w-[56px] sm:h-[56px] md:w-[60px] md:h-[60px] flex items-center justify-center text-2xl sm:text-3xl md:text-[2.1rem] transition-all duration-150 relative ${isDark ? 'bg-[#2d3250]' : 'bg-[#424769]'} ${isSel ? 'brightness-150 ring-1 ring-inset ring-violet-400/60' : ''} hover:brightness-125`}
+                                    style={isSel ? { boxShadow: 'inset 0 0 20px rgba(139,92,246,0.3)' } : {}}>
+                                    {isValid && <div className="absolute inset-0 flex items-center justify-center z-10"><div className={`rounded-full transition-all ${cell ? 'w-[90%] h-[90%] ring-[3px] ring-inset ring-cyan-400/50' : 'w-4 h-4 bg-cyan-400/30 shadow-[0_0_8px_rgba(34,211,238,0.3)]'}`}/></div>}
+                                    {cell && <span className="relative z-0 select-none" style={{
+                                        color: side(cell) === 'w' ? '#e8e8f0' : '#f5c542',
+                                        textShadow: side(cell) === 'w' ? '0 0 12px rgba(200,200,255,0.4), 0 2px 4px rgba(0,0,0,0.5)' : '0 0 10px rgba(245,197,66,0.3), 0 2px 4px rgba(0,0,0,0.5)',
+                                        filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.4))',
+                                    }}>{pieceSymbols[cell]}</span>}
+                                </button>);
+                            })}
+                        </div>
+                    </div>
+                    {/* Mobile undo */}
+                    <button onClick={undoMove} disabled={boardHistory.length < 2 || !!status} className="lg:hidden mt-3 px-5 py-2 text-xs font-medium bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] rounded-xl text-white/40 hover:text-white transition-all disabled:opacity-30">↩ Undo Move</button>
                 </div>
-            </div>
-            <div className={`mb-4 text-sm font-semibold px-5 py-2 rounded-full ${turn === 'w' ? 'bg-violet-500/15 text-violet-300 border border-violet-500/20' : 'bg-amber-500/15 text-amber-300 border border-amber-500/20'}`}>{turn === 'w' ? '♔ Your turn' : '♚ CPU thinking...'}</div>
-            {/* Board with coordinate labels */}
-            <div className="relative">
-                <div className="inline-grid grid-cols-8 gap-0 rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl shadow-violet-500/10" style={{ boxShadow: '0 0 60px rgba(124,58,237,0.08), 0 25px 50px rgba(0,0,0,0.4)' }}>
-                    {board.flat().map((cell, i) => { const r = Math.floor(i / 8), c = i % 8; const isDark = (r + c) % 2 === 1;
-                        const isValid = isValidTarget(r, c); const isSel = selected?.[0]===r&&selected?.[1]===c;
-                        return (<button key={i} onClick={() => handleClick(r, c)}
-                            className={`w-[52px] h-[52px] sm:w-[62px] sm:h-[62px] flex items-center justify-center text-3xl sm:text-[2.2rem] transition-all duration-150 relative ${isDark ? 'bg-[#2d3250]' : 'bg-[#424769]'} ${isSel ? 'brightness-150 ring-1 ring-inset ring-violet-400/60' : ''} hover:brightness-125`}
-                            style={isSel ? { boxShadow: 'inset 0 0 20px rgba(139,92,246,0.3)' } : {}}>
-                            {isValid && <div className="absolute inset-0 flex items-center justify-center z-10"><div className={`rounded-full transition-all ${cell ? 'w-[90%] h-[90%] ring-[3px] ring-inset ring-cyan-400/50' : 'w-4 h-4 bg-cyan-400/30 shadow-[0_0_8px_rgba(34,211,238,0.3)]'}`}/></div>}
-                            {cell && <span className="relative z-0 select-none" style={{
-                                color: side(cell) === 'w' ? '#e8e8f0' : '#f5c542',
-                                textShadow: side(cell) === 'w' ? '0 0 12px rgba(200,200,255,0.4), 0 2px 4px rgba(0,0,0,0.5)' : '0 0 10px rgba(245,197,66,0.3), 0 2px 4px rgba(0,0,0,0.5)',
-                                filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.4))',
-                            }}>{pieceSymbols[cell]}</span>}
-                        </button>);
-                    })}
+
+                {/* Right panel — move history */}
+                <div className="hidden lg:block w-52 shrink-0">
+                    <div className="bg-white/[0.03] backdrop-blur-sm rounded-xl border border-white/[0.06] overflow-hidden">
+                        <div className="px-3 py-2 border-b border-white/[0.06]">
+                            <p className="text-[10px] uppercase tracking-wider text-white/30 font-semibold">📜 Move History</p>
+                        </div>
+                        <div className="max-h-[360px] overflow-y-auto p-2 space-y-0.5 scrollbar-thin scrollbar-thumb-white/10">
+                            {moveHistory.length === 0 && <p className="text-white/10 text-xs text-center py-4">No moves yet</p>}
+                            {moveHistory.map((m, i) => (
+                                <div key={i} className={`flex items-center gap-2 px-2 py-1 rounded-lg text-xs ${i === moveHistory.length - 1 ? 'bg-violet-500/10' : ''} ${i % 2 === 0 ? 'text-violet-300' : 'text-amber-300/70'}`}>
+                                    <span className="text-white/20 w-5 text-right font-mono">{Math.floor(i/2)+1}{i%2===0 ? '.' : '…'}</span>
+                                    <span className="font-medium">{m}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
         </GameHeader>

@@ -203,11 +203,11 @@ export function MinesweeperGame({ goBack, saveScoreToDb }) {
     );
 }
 
-// ═══ FLAPPY BIRD (fixed loop) ═══
+// ═══ FLAPPY BIRD (tuned physics) ═══
 export function FlappyBirdGame({ goBack, saveScoreToDb }) {
-    const W = 360, H = 520, GRAVITY = 0.35, JUMP = -6.5, PIPE_W = 52, GAP = 150, PIPE_SPEED = 2.5;
+    const W = 360, H = 520, GRAVITY = 0.18, JUMP = -4.8, PIPE_W = 52, GAP = 175, PIPE_SPEED = 1.8;
     const canvasRef = useRef(null);
-    const stateRef = useRef({ bird: { y: H / 2, vel: 0 }, pipes: [], score: 0, running: false, gameOver: false, frame: 0 });
+    const stateRef = useRef({ bird: { y: H / 2, vel: -2 }, pipes: [], score: 0, running: false, gameOver: false, frame: 0 });
     const [score, setScore] = useState(0);
     const [gameOver, setGameOver] = useState(false);
     const [started, setStarted] = useState(false);
@@ -267,7 +267,7 @@ export function FlappyBirdGame({ goBack, saveScoreToDb }) {
     }, []);
 
     const start = useCallback(() => {
-        stateRef.current = { bird: { y: H / 2, vel: 0 }, pipes: [{ x: W + 80, gapY: 100 + Math.random() * (H - GAP - 140) }], score: 0, running: true, gameOver: false, frame: 0 };
+        stateRef.current = { bird: { y: H / 2, vel: -2 }, pipes: [{ x: W + 160, gapY: 100 + Math.random() * (H - GAP - 140) }], score: 0, running: true, gameOver: false, frame: 0 };
         setScore(0); setGameOver(false); setStarted(true);
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         rafRef.current = requestAnimationFrame(gameLoop);
