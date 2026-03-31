@@ -98,53 +98,49 @@ export function TetrisGame({ goBack, saveScoreToDb }) {
     );
 }
 
-// ═══ CHESS (with proper rules) ═══
+// ═══ CHESS (with proper rules + visible colors) ═══
 export function ChessGame({ goBack, saveScoreToDb }) {
     const INIT = [
-        ['♜','♞','♝','♛','♚','♝','♞','♜'],
-        ['♟','♟','♟','♟','♟','♟','♟','♟'],
+        ['br','bn','bb','bq','bk','bb','bn','br'],
+        ['bp','bp','bp','bp','bp','bp','bp','bp'],
         [null,null,null,null,null,null,null,null],
         [null,null,null,null,null,null,null,null],
         [null,null,null,null,null,null,null,null],
         [null,null,null,null,null,null,null,null],
-        ['♙','♙','♙','♙','♙','♙','♙','♙'],
-        ['♖','♘','♗','♕','♔','♗','♘','♖'],
+        ['wp','wp','wp','wp','wp','wp','wp','wp'],
+        ['wr','wn','wb','wq','wk','wb','wn','wr'],
     ];
-    const WHITE = ['♔','♕','♖','♗','♘','♙'];
-    const BLACK = ['♚','♛','♜','♝','♞','♟'];
+    const pieceSymbols = { wk:'♔', wq:'♕', wr:'♖', wb:'♗', wn:'♘', wp:'♙', bk:'♚', bq:'♛', br:'♜', bb:'♝', bn:'♞', bp:'♟' };
     const [board, setBoard] = useState(INIT.map(r => [...r]));
     const [selected, setSelected] = useState(null);
-    const [turn, setTurn] = useState('white');
-    const [captured, setCaptured] = useState({ white: [], black: [] });
+    const [turn, setTurn] = useState('w');
+    const [captured, setCaptured] = useState({ w: [], b: [] });
     const [status, setStatus] = useState('');
     const [validMoves, setValidMoves] = useState([]);
 
-    const isWhite = (p) => p && WHITE.includes(p);
-    const isBlack = (p) => p && BLACK.includes(p);
-    const isOwn = (p, color) => color === 'white' ? isWhite(p) : isBlack(p);
-    const isEnemy = (p, color) => color === 'white' ? isBlack(p) : isWhite(p);
+    const side = (p) => p?.[0];
+    const isOwn = (p, t) => side(p) === t;
+    const isEnemy = (p, t) => p && side(p) !== t;
 
     const getValidMoves = (b, r, c) => {
         const p = b[r][c]; if (!p) return [];
-        const moves = []; const color = isWhite(p) ? 'white' : 'black';
-        const addIf = (tr, tc) => { if (tr < 0 || tr > 7 || tc < 0 || tc > 7) return false; if (isOwn(b[tr][tc], color)) return false; moves.push([tr, tc]); return !b[tr][tc]; };
-        const piece = p;
-        // Pawn
-        if (piece === '♙') { const d = -1; if (r+d>=0 && !b[r+d][c]) { moves.push([r+d,c]); if (r===6 && !b[r+d*2][c]) moves.push([r+d*2,c]); } if (c>0 && isBlack(b[r+d]?.[c-1])) moves.push([r+d,c-1]); if (c<7 && isBlack(b[r+d]?.[c+1])) moves.push([r+d,c+1]); }
-        if (piece === '♟') { const d = 1; if (r+d<=7 && !b[r+d][c]) { moves.push([r+d,c]); if (r===1 && !b[r+d*2][c]) moves.push([r+d*2,c]); } if (c>0 && isWhite(b[r+d]?.[c-1])) moves.push([r+d,c-1]); if (c<7 && isWhite(b[r+d]?.[c+1])) moves.push([r+d,c+1]); }
-        // Knight
-        if (piece === '♘' || piece === '♞') { for (const [dr,dc] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]) addIf(r+dr,c+dc); }
-        // Bishop / Queen diagonal
-        if ('♗♝♕♛'.includes(piece)) { for (const [dr,dc] of [[-1,-1],[-1,1],[1,-1],[1,1]]) { for (let i=1;i<8;i++) { if (!addIf(r+dr*i,c+dc*i)) break; } } }
-        // Rook / Queen straight
-        if ('♖♜♕♛'.includes(piece)) { for (const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]) { for (let i=1;i<8;i++) { if (!addIf(r+dr*i,c+dc*i)) break; } } }
-        // King
-        if (piece === '♔' || piece === '♚') { for (let dr=-1;dr<=1;dr++) for (let dc=-1;dc<=1;dc++) { if (dr||dc) addIf(r+dr,c+dc); } }
+        const t = side(p); const type = p[1]; const moves = [];
+        const addIf = (tr, tc) => { if (tr < 0 || tr > 7 || tc < 0 || tc > 7) return false; if (isOwn(b[tr][tc], t)) return false; moves.push([tr, tc]); return !b[tr][tc]; };
+        if (type === 'p') {
+            const d = t === 'w' ? -1 : 1; const startRow = t === 'w' ? 6 : 1;
+            if (r+d>=0 && r+d<=7 && !b[r+d][c]) { moves.push([r+d,c]); if (r===startRow && !b[r+d*2][c]) moves.push([r+d*2,c]); }
+            if (c>0 && isEnemy(b[r+d]?.[c-1], t)) moves.push([r+d,c-1]);
+            if (c<7 && isEnemy(b[r+d]?.[c+1], t)) moves.push([r+d,c+1]);
+        }
+        if (type === 'n') { for (const [dr,dc] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]) addIf(r+dr,c+dc); }
+        if (type === 'b' || type === 'q') { for (const [dr,dc] of [[-1,-1],[-1,1],[1,-1],[1,1]]) { for (let i=1;i<8;i++) { if (!addIf(r+dr*i,c+dc*i)) break; } } }
+        if (type === 'r' || type === 'q') { for (const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]) { for (let i=1;i<8;i++) { if (!addIf(r+dr*i,c+dc*i)) break; } } }
+        if (type === 'k') { for (let dr=-1;dr<=1;dr++) for (let dc=-1;dc<=1;dc++) { if (dr||dc) addIf(r+dr,c+dc); } }
         return moves;
     };
 
     const handleClick = (r, c) => {
-        if (turn !== 'white' || status) return;
+        if (turn !== 'w' || status) return;
         const piece = board[r][c];
         if (selected) {
             const [sr, sc] = selected;
@@ -152,55 +148,57 @@ export function ChessGame({ goBack, saveScoreToDb }) {
             if (isValid) {
                 const nb = board.map(row => [...row]);
                 const target = nb[r][c];
-                if (target && isBlack(target)) setCaptured(p => ({...p, white: [...p.white, target]}));
-                if (target === '♚') { setStatus('🏆 White wins!'); saveScoreToDb?.('chess', 1, true); }
+                if (target && side(target) === 'b') setCaptured(p => ({...p, w: [...p.w, target]}));
+                if (target?.[1] === 'k') { setStatus('🏆 White wins!'); saveScoreToDb?.('chess', 1, true); }
                 nb[r][c] = nb[sr][sc]; nb[sr][sc] = null;
-                // Pawn promotion
-                if (nb[r][c] === '♙' && r === 0) nb[r][c] = '♕';
-                setBoard(nb); setSelected(null); setValidMoves([]); setTurn('black');
+                if (nb[r][c] === 'wp' && r === 0) nb[r][c] = 'wq';
+                setBoard(nb); setSelected(null); setValidMoves([]); setTurn('b');
                 setTimeout(() => cpuMove(nb), 400);
-            } else if (isWhite(piece)) { setSelected([r, c]); setValidMoves(getValidMoves(board, r, c)); }
+            } else if (isOwn(piece, 'w')) { setSelected([r, c]); setValidMoves(getValidMoves(board, r, c)); }
             else { setSelected(null); setValidMoves([]); }
-        } else if (piece && isWhite(piece)) { setSelected([r, c]); setValidMoves(getValidMoves(board, r, c)); }
+        } else if (piece && isOwn(piece, 'w')) { setSelected([r, c]); setValidMoves(getValidMoves(board, r, c)); }
     };
 
     const cpuMove = (b) => {
         const allMoves = [];
         for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
-            if (isBlack(b[r][c])) {
-                const moves = getValidMoves(b, r, c);
-                moves.forEach(([tr, tc]) => allMoves.push({ fr: r, fc: c, tr, tc, capture: b[tr][tc] }));
+            if (isOwn(b[r][c], 'b')) {
+                getValidMoves(b, r, c).forEach(([tr, tc]) => {
+                    let val = 0;
+                    if (b[tr][tc]) { const v = {p:1,n:3,b:3,r:5,q:9,k:100}; val = v[b[tr][tc][1]] || 0; }
+                    allMoves.push({ fr: r, fc: c, tr, tc, capture: b[tr][tc], val });
+                });
             }
         }
         if (!allMoves.length) { setStatus('Stalemate!'); return; }
-        const captures = allMoves.filter(m => m.capture);
-        const m = captures.length ? captures[Math.floor(Math.random() * captures.length)] : allMoves[Math.floor(Math.random() * allMoves.length)];
+        allMoves.sort((a,b) => b.val - a.val);
+        const m = allMoves[0].val > 0 ? allMoves[0] : allMoves[Math.floor(Math.random() * allMoves.length)];
         const nb = b.map(row => [...row]);
-        if (m.capture) setCaptured(p => ({...p, black: [...p.black, m.capture]}));
-        if (m.capture === '♔') setStatus('💀 Black wins!');
+        if (m.capture) setCaptured(p => ({...p, b: [...p.b, m.capture]}));
+        if (m.capture?.[1] === 'k') setStatus('💀 Black wins!');
         nb[m.tr][m.tc] = nb[m.fr][m.fc]; nb[m.fr][m.fc] = null;
-        if (nb[m.tr][m.tc] === '♟' && m.tr === 7) nb[m.tr][m.tc] = '♛';
-        setBoard(nb); setTurn('white');
+        if (nb[m.tr][m.tc] === 'bp' && m.tr === 7) nb[m.tr][m.tc] = 'bq';
+        setBoard(nb); setTurn('w');
     };
 
-    const reset = () => { setBoard(INIT.map(r => [...r])); setSelected(null); setTurn('white'); setCaptured({ white: [], black: [] }); setStatus(''); setValidMoves([]); };
+    const reset = () => { setBoard(INIT.map(r => [...r])); setSelected(null); setTurn('w'); setCaptured({ w: [], b: [] }); setStatus(''); setValidMoves([]); };
     const isValidTarget = (r, c) => validMoves.some(([vr, vc]) => vr === r && vc === c);
 
     return (
-        <GameHeader title="Chess" gradient="from-neutral-300 to-stone-400" goBack={goBack} onReset={reset}>
+        <GameHeader title="Chess" gradient="from-amber-300 to-yellow-500" goBack={goBack} onReset={reset}>
             {status && <div className="mb-4 p-4 rounded-xl font-bold text-center bg-amber-500/20 text-amber-400 text-lg">{status}<button onClick={reset} className="block mx-auto mt-2 px-6 py-2 bg-white/10 rounded-lg text-sm text-white">New Game</button></div>}
-            <div className="flex justify-center gap-4 mb-3 text-sm text-white/40">
-                <span>⬜ Captured: {captured.white.join(' ')}</span>
-                <span>⬛ Captured: {captured.black.join(' ')}</span>
+            <div className="flex justify-center gap-6 mb-3 text-sm">
+                <span className="text-white/50">⬜ Captured: {captured.w.map(p => pieceSymbols[p]).join(' ')}</span>
+                <span className="text-white/50">⬛ Captured: {captured.b.map(p => pieceSymbols[p]).join(' ')}</span>
             </div>
-            <p className="text-white/30 text-sm mb-3 font-medium">{turn === 'white' ? '⬜ Your turn' : '⬛ CPU thinking...'}</p>
-            <div className="inline-grid grid-cols-8 gap-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-2xl">
+            <p className="text-white/30 text-sm mb-3 font-medium">{turn === 'w' ? '⬜ Your turn' : '⬛ CPU thinking...'}</p>
+            <div className="inline-grid grid-cols-8 gap-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-2xl shadow-amber-500/10">
                 {board.flat().map((cell, i) => { const r = Math.floor(i / 8), c = i % 8; const isDark = (r + c) % 2 === 1;
                     const isValid = isValidTarget(r, c); const isSel = selected?.[0]===r&&selected?.[1]===c;
                     return (<button key={i} onClick={() => handleClick(r, c)}
-                        className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center text-2xl sm:text-3xl transition-all relative ${isDark ? 'bg-[#779952]' : 'bg-[#edeed1]'} ${isSel ? 'ring-2 ring-inset ring-yellow-400 brightness-110' : ''} hover:brightness-110`}>
-                        {isValid && <div className={`absolute inset-0 ${cell ? 'ring-2 ring-inset ring-red-400/60 rounded-full m-1' : ''}`}><div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full ${cell ? '' : 'bg-black/20'}`}/></div>}
-                        {cell || ''}
+                        className={`w-12 h-12 sm:w-[60px] sm:h-[60px] flex items-center justify-center text-3xl sm:text-4xl transition-all relative ${isDark ? 'bg-[#779952]' : 'bg-[#edeed1]'} ${isSel ? 'ring-2 ring-inset ring-yellow-400 brightness-125' : ''} hover:brightness-110`}>
+                        {isValid && <div className="absolute inset-0 flex items-center justify-center z-10"><div className={`rounded-full ${cell ? 'w-full h-full ring-4 ring-inset ring-red-400/60' : 'w-4 h-4 bg-black/25'}`}/></div>}
+                        {cell && <span className="relative z-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" style={{ color: side(cell) === 'w' ? '#ffffff' : '#1a1a2e', WebkitTextStroke: side(cell) === 'w' ? '0.5px #888' : '0.5px #555', filter: side(cell) === 'b' ? 'drop-shadow(0 0 1px rgba(255,255,255,0.4))' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.6))' }}>{pieceSymbols[cell]}</span>}
                     </button>);
                 })}
             </div>

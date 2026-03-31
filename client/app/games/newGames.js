@@ -201,7 +201,7 @@ export function MinesweeperGame({ goBack, saveScoreToDb }) {
     );
 }
 
-// ═══ FLAPPY BIRD (fixed) ═══
+// ═══ FLAPPY BIRD (fixed loop) ═══
 export function FlappyBirdGame({ goBack, saveScoreToDb }) {
     const W = 360, H = 520, GRAVITY = 0.35, JUMP = -6.5, PIPE_W = 52, GAP = 150, PIPE_SPEED = 2.5;
     const canvasRef = useRef(null);
@@ -210,22 +210,10 @@ export function FlappyBirdGame({ goBack, saveScoreToDb }) {
     const [gameOver, setGameOver] = useState(false);
     const [started, setStarted] = useState(false);
     const rafRef = useRef(null);
+    const saveRef = useRef(saveScoreToDb);
+    saveRef.current = saveScoreToDb;
 
-    const start = useCallback(() => {
-        stateRef.current = { bird: { y: H / 2, vel: 0 }, pipes: [{ x: W + 80, gapY: 100 + Math.random() * (H - GAP - 140) }], score: 0, running: true, gameOver: false, frame: 0 };
-        setScore(0); setGameOver(false); setStarted(true);
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        rafRef.current = requestAnimationFrame(loop);
-    }, []);
-
-    const jump = useCallback(() => { if (stateRef.current.gameOver) { start(); return; } stateRef.current.bird.vel = JUMP; if (!stateRef.current.running) start(); }, [start]);
-
-    useEffect(() => {
-        const h = (e) => { if (e.key === ' ' || e.key === 'ArrowUp') { e.preventDefault(); jump(); } };
-        window.addEventListener('keydown', h); return () => { window.removeEventListener('keydown', h); if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-    }, [jump]);
-
-    const loop = useCallback(() => {
+    const gameLoop = useCallback(() => {
         const s = stateRef.current; if (!s.running) return;
         s.frame++;
         s.bird.vel += GRAVITY; s.bird.y += s.bird.vel;
@@ -233,37 +221,32 @@ export function FlappyBirdGame({ goBack, saveScoreToDb }) {
         if (s.pipes.length && s.pipes[s.pipes.length - 1].x < W - 220) s.pipes.push({ x: W, gapY: 80 + Math.random() * (H - GAP - 120) });
         s.pipes = s.pipes.filter(p => p.x > -PIPE_W);
         const bx = 70, by = s.bird.y, br = 14;
-        if (by < 0 || by > H - 10) { s.running = false; s.gameOver = true; setGameOver(true); setHighScore('flappy', s.score); saveScoreToDb?.('flappy', s.score, false); }
+        const die = () => { s.running = false; s.gameOver = true; setGameOver(true); setHighScore('flappy', s.score); saveRef.current?.('flappy', s.score, false); };
+        if (by < 0 || by > H - 10) { die(); }
         for (const p of s.pipes) {
             if (bx + br > p.x && bx - br < p.x + PIPE_W) {
-                if (by - br < p.gapY || by + br > p.gapY + GAP) { s.running = false; s.gameOver = true; setGameOver(true); setHighScore('flappy', s.score); saveScoreToDb?.('flappy', s.score, false); break; }
+                if (by - br < p.gapY || by + br > p.gapY + GAP) { die(); break; }
             }
             if (!p.scored && p.x + PIPE_W < bx) { p.scored = true; s.score++; setScore(s.score); }
         }
         const ctx = canvasRef.current?.getContext('2d');
         if (ctx) {
-            // Sky gradient
             const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
             skyGrad.addColorStop(0, '#0f172a'); skyGrad.addColorStop(0.6, '#1e293b'); skyGrad.addColorStop(1, '#0f172a');
             ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, W, H);
-            // Stars
             ctx.fillStyle = 'rgba(255,255,255,0.15)';
             for (let i = 0; i < 30; i++) { const sx = (i * 73 + s.frame * 0.1) % W; const sy = (i * 47) % (H * 0.5); ctx.fillRect(sx, sy, 1.5, 1.5); }
-            // Ground
             ctx.fillStyle = '#1a2744'; ctx.fillRect(0, H - 10, W, 10);
-            // Pipes
             for (const p of s.pipes) {
                 const pGrad = ctx.createLinearGradient(p.x, 0, p.x + PIPE_W, 0);
                 pGrad.addColorStop(0, '#22c55e'); pGrad.addColorStop(0.5, '#16a34a'); pGrad.addColorStop(1, '#15803d');
                 ctx.fillStyle = pGrad;
-                ctx.beginPath(); ctx.roundRect(p.x, 0, PIPE_W, p.gapY, [0, 0, 6, 6]); ctx.fill();
-                ctx.beginPath(); ctx.roundRect(p.x, p.gapY + GAP, PIPE_W, H - p.gapY - GAP, [6, 6, 0, 0]); ctx.fill();
-                // Pipe caps
+                ctx.fillRect(p.x, 0, PIPE_W, p.gapY);
+                ctx.fillRect(p.x, p.gapY + GAP, PIPE_W, H - p.gapY - GAP);
                 ctx.fillStyle = '#4ade80';
                 ctx.fillRect(p.x - 3, p.gapY - 16, PIPE_W + 6, 16);
                 ctx.fillRect(p.x - 3, p.gapY + GAP, PIPE_W + 6, 16);
             }
-            // Bird
             ctx.save(); ctx.translate(bx, by);
             const rot = Math.min(Math.max(s.bird.vel * 3, -30), 70) * Math.PI / 180;
             ctx.rotate(rot);
@@ -273,14 +256,32 @@ export function FlappyBirdGame({ goBack, saveScoreToDb }) {
             ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(7, -4, 1.2, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(22, -2); ctx.lineTo(22, 4); ctx.closePath(); ctx.fill();
             ctx.restore();
-            // Score
             ctx.fillStyle = 'white'; ctx.font = 'bold 32px sans-serif'; ctx.textAlign = 'center';
             ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 8;
             ctx.fillText(s.score, W / 2, 50);
             ctx.shadowBlur = 0;
         }
-        rafRef.current = requestAnimationFrame(loop);
+        if (s.running) rafRef.current = requestAnimationFrame(gameLoop);
     }, []);
+
+    const start = useCallback(() => {
+        stateRef.current = { bird: { y: H / 2, vel: 0 }, pipes: [{ x: W + 80, gapY: 100 + Math.random() * (H - GAP - 140) }], score: 0, running: true, gameOver: false, frame: 0 };
+        setScore(0); setGameOver(false); setStarted(true);
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(gameLoop);
+    }, [gameLoop]);
+
+    const jump = useCallback(() => {
+        if (stateRef.current.gameOver) { start(); return; }
+        stateRef.current.bird.vel = JUMP;
+        if (!stateRef.current.running) start();
+    }, [start]);
+
+    useEffect(() => {
+        const h = (e) => { if (e.key === ' ' || e.key === 'ArrowUp') { e.preventDefault(); jump(); } };
+        window.addEventListener('keydown', h);
+        return () => { window.removeEventListener('keydown', h); if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    }, [jump]);
 
     return (
         <GameHeader title="Flappy Bird" gradient="from-sky-400 to-cyan-400" goBack={goBack} onReset={start}>
