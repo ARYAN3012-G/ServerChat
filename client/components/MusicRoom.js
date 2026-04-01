@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiX, FiPlay, FiPause, FiSkipForward, FiSkipBack, FiVolume2, FiUsers, FiMusic, FiSearch, FiSend, FiMessageCircle, FiLock, FiStar, FiSmile, FiMinimize2, FiMaximize2, FiVolumeX } from 'react-icons/fi';
+import { FiX, FiPlay, FiPause, FiSkipForward, FiSkipBack, FiVolume2, FiUsers, FiMusic, FiSearch, FiSend, FiMessageCircle, FiLock, FiStar, FiSmile, FiMinimize2, FiMaximize2, FiVolumeX, FiLink, FiCopy } from 'react-icons/fi';
 import { getSocket } from '../services/socket';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -30,7 +30,7 @@ const LANGUAGE_TABS = [
 
 const EMOJI_LIST = ['😀','😂','❤️','🔥','🎵','🎶','👏','🙌','💃','🕺','✨','🎧','🎤','🎸','🥁','🎹','💯','👑','⭐','🌟','😍','🤩','😎','🥰','💜','💙','💚','🧡','🎉','🎊'];
 
-export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom, syncMusic, leaveMusicRoom, musicRoom, userId, isServerOwner }) {
+export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom, syncMusic, leaveMusicRoom, musicRoom, userId, isServerOwner, inviteCode }) {
     const [currentTrack, setCurrentTrack] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -208,7 +208,7 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
     return (
         <>
             {/* ── PERSISTENT AUDIO — never unmounts ── */}
-            <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onEnded={handleNext} preload="auto" crossOrigin="anonymous" />
+            <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onEnded={handleNext} preload="auto" />
 
             {/* ── MINIMIZED MINI-PLAYER ── */}
             <AnimatePresence>
@@ -291,7 +291,13 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                                         ))}
                                         {roomUsers.length > 3 && <div className="w-6 h-6 rounded-full bg-white/10 border-2 border-[#0c0e1a] flex items-center justify-center text-[8px] text-white/40">+{roomUsers.length - 3}</div>}
                                     </div>
-                                    <button onClick={() => setMinimized(true)} className="p-1.5 rounded-lg hover:bg-white/10 text-white/25 hover:text-white transition-colors ml-1" title="Minimize">
+                                    {inviteCode && (
+                                        <button onClick={() => { const url = `${window.location.origin}/invite/${inviteCode}?room=music`; navigator.clipboard?.writeText(url); toast.success('Music room invite copied!'); }}
+                                            className="p-1.5 rounded-lg hover:bg-indigo-500/20 text-white/25 hover:text-indigo-400 transition-colors ml-0.5" title="Copy Invite Link">
+                                            <FiLink className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                    <button onClick={() => setMinimized(true)} className="p-1.5 rounded-lg hover:bg-white/10 text-white/25 hover:text-white transition-colors" title="Minimize">
                                         <FiMinimize2 className="w-3.5 h-3.5" />
                                     </button>
                                     <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-white/25 hover:text-white transition-colors">

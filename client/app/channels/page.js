@@ -1504,6 +1504,7 @@ export default function ChannelsPage() {
                         joinGame={joinGame}
                         makeGameMove={makeGameMove}
                         requestRematch={requestRematch}
+                        inviteCode={currentServer?.inviteCode}
                     />
                 )
             }
@@ -1521,6 +1522,7 @@ export default function ChannelsPage() {
                         musicRoom={musicRoom}
                         userId={user?._id}
                         isServerOwner={currentServer?.owner?._id === user?._id || currentServer?.owner === user?._id}
+                        inviteCode={currentServer?.inviteCode}
                     />
                 )
             }

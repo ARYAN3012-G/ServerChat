@@ -297,6 +297,13 @@ export default function ServerSettingsModal({ server, user, onClose, onServerUpd
                                         </button>
                                         {roleDropdownUser === m.user?._id && (
                                             <div className="absolute right-0 top-8 w-36 bg-dark-800 border border-white/10 rounded-xl shadow-2xl z-10 p-1">
+                                                <div className="flex items-center justify-between px-2 py-1 mb-0.5">
+                                                    <span className="text-[9px] text-white/20 font-semibold uppercase">Change Role</span>
+                                                    <button onClick={(e) => { e.stopPropagation(); setRoleDropdownUser(null); }}
+                                                        className="p-0.5 rounded hover:bg-white/10 text-white/30 hover:text-white transition-colors">
+                                                        <FiX className="w-3 h-3" />
+                                                    </button>
+                                                </div>
                                                 {['admin', 'moderator', 'member'].map(r => (
                                                     <button key={r} onClick={() => changeRole(m.user?._id, r)}
                                                         className={`w-full text-left px-3 py-1.5 rounded-lg text-xs transition-colors ${m.role === r ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5 hover:text-white'}`}>
