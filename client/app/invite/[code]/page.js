@@ -53,18 +53,21 @@ export default function InvitePage() {
                 toast.success('Join request sent!');
             } else if (res.data.alreadyMember) {
                 setResult('already');
-                setTimeout(() => router.push('/channels'), 1500);
+                const redirectUrl = deepRoom ? `/channels?room=${deepRoom}` : '/channels';
+                setTimeout(() => router.push(redirectUrl), 1500);
             } else {
                 setResult('joined');
                 toast.success(`Joined ${server?.name || 'server'}!`);
-                setTimeout(() => router.push('/channels'), 1500);
+                const redirectUrl = deepRoom ? `/channels?room=${deepRoom}` : '/channels';
+                setTimeout(() => router.push(redirectUrl), 1500);
             }
         } catch (err) {
             const msg = err.response?.data?.message || 'Failed to join';
             if (err.response?.data?.alreadyMember) {
                 setResult('already');
                 toast('You\'re already a member!', { icon: '✅' });
-                setTimeout(() => router.push('/channels'), 1500);
+                const redirectUrl = deepRoom ? `/channels?room=${deepRoom}` : '/channels';
+                setTimeout(() => router.push(redirectUrl), 1500);
             } else {
                 toast.error(msg);
             }

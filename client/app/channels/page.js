@@ -162,6 +162,24 @@ export default function ChannelsPage() {
         }
     }, [isVideoOn, isScreenSharing, connectedVoice]);
 
+    // Auto-open music room or game launcher from invite deep link (?room=music or ?room=games)
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        const room = params.get('room');
+        if (room && currentServer) {
+            if (room === 'music') {
+                setShowMusicRoom(true);
+            } else if (room === 'games') {
+                setShowGameLauncher(true);
+            }
+            // Clean up URL param so it doesn't re-trigger
+            const url = new URL(window.location.href);
+            url.searchParams.delete('room');
+            window.history.replaceState({}, '', url.toString());
+        }
+    }, [currentServer?._id]);
+
     // Callback refs to bind VoiceProvider video/screen streams to video elements
     const localVideoCallbackRef = useCallback((el) => {
         if (el && localVideoStream) {

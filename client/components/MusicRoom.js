@@ -454,7 +454,7 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                                 </div>
 
                                 {/* ── RIGHT: CHAT PANEL ── */}
-                                <div className={`${mobileTab === 'chat' ? 'flex' : 'hidden'} sm:flex flex-col w-full sm:w-52 sm:border-l border-white/5 flex-shrink-0`}>
+                                <div className={`${mobileTab === 'chat' ? 'flex' : 'hidden'} sm:flex flex-col w-full sm:w-72 sm:border-l border-white/5 flex-shrink-0`}>
                                     <div className="px-3 py-2 flex items-center gap-1.5 border-b border-white/5 flex-shrink-0">
                                         <FiMessageCircle className="w-3 h-3 text-indigo-400" />
                                         <span className="text-[10px] font-semibold text-white/30">Live Chat</span>
@@ -497,20 +497,20 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                                                 </motion.div>
                                             )}
                                         </AnimatePresence>
-                                        <div className="p-2 flex items-center gap-1.5">
+                                        <div className="p-2.5 flex items-center gap-1.5">
                                             <button onClick={() => setShowEmojis(!showEmojis)}
-                                                className={`p-2 rounded-lg transition-colors flex-shrink-0 ${showEmojis ? 'bg-indigo-500/20 text-indigo-400' : 'text-white/20 hover:text-white/50 hover:bg-white/5'}`}>
-                                                <FiSmile className="w-4 h-4" />
+                                                className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${showEmojis ? 'bg-indigo-500/20 text-indigo-400' : 'text-white/20 hover:text-white/50 hover:bg-white/5'}`}>
+                                                <FiSmile className="w-3.5 h-3.5" />
                                             </button>
                                             <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)}
                                                 onKeyDown={(e) => { if (e.key === 'Enter') sendChatMessage(); }}
                                                 placeholder="Type a message..."
-                                                className="flex-1 bg-white/5 rounded-lg px-3 py-2 text-xs outline-none text-white placeholder-white/15 min-w-0" />
+                                                className="flex-1 bg-white/5 rounded-lg px-2.5 py-2 text-xs outline-none text-white placeholder-white/20 min-w-0" />
                                             <button onClick={sendChatMessage}
-                                                className={`p-2.5 rounded-lg transition-all flex-shrink-0 ${chatInput.trim()
+                                                className={`p-2 rounded-lg transition-all flex-shrink-0 ${chatInput.trim()
                                                     ? 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg shadow-indigo-500/25'
                                                     : 'bg-white/5 text-white/10'}`}>
-                                                <FiSend className="w-4 h-4" />
+                                                <FiSend className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
                                     </div>
