@@ -868,12 +868,18 @@ export default function ChannelsPage() {
                         {showStatusPicker && (
                             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="absolute bottom-full left-0 right-0 mb-1 mx-1 bg-dark-800 rounded-xl border border-white/10 shadow-2xl p-3 z-50">
-                                <p className="text-[10px] text-white/30 uppercase font-semibold mb-2 tracking-wider">Set Status</p>
+                                className="absolute bottom-full left-0 right-0 mb-1 mx-1 bg-dark-800 rounded-xl border border-white/10 shadow-2xl p-3 z-50 max-w-[280px] sm:max-w-none">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-[10px] text-white/30 uppercase font-semibold tracking-wider">Set Status</p>
+                                    <button onClick={(e) => { e.stopPropagation(); setShowStatusPicker(false); }}
+                                        className="p-1 rounded-lg hover:bg-white/10 text-white/30 hover:text-white transition-colors">
+                                        <FiX className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
                                 {statusOptions.map(opt => (
                                     <div key={opt.value} onClick={(e) => { e.stopPropagation(); handleStatusChange(opt.value); }}
-                                        className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
-                                        <div className={`w-3 h-3 rounded-full ${opt.color}`} />
+                                        className="flex items-center gap-2.5 px-2 py-2 sm:py-1.5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
+                                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${opt.color}`} />
                                         <span className="text-sm text-white/80">{opt.label}</span>
                                     </div>
                                 ))}
@@ -881,7 +887,7 @@ export default function ChannelsPage() {
                                     <input type="text" value={customStatusText} onChange={e => setCustomStatusText(e.target.value)}
                                         onClick={(e) => e.stopPropagation()}
                                         placeholder="Set custom status..."
-                                        className="w-full bg-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-white/20 outline-none border border-white/5 focus:border-white/20"
+                                        className="w-full bg-white/5 rounded-lg px-2.5 py-2 sm:py-1.5 text-xs text-white placeholder-white/20 outline-none border border-white/5 focus:border-white/20 transition-colors"
                                         onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); handleStatusChange(user?.status || 'online'); } }}
                                     />
                                 </div>
