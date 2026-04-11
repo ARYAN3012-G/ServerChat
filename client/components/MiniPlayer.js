@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiPlay, FiPause, FiSkipForward, FiSkipBack, FiX, FiChevronUp, FiChevronDown } from 'react-icons/fi';
 import { useMusicPlayer } from './MusicPlayerProvider';
 
 export default function MiniPlayer() {
     const pathname = usePathname();
+    const router = useRouter();
     const { currentTrack, isPlaying, progress, duration, togglePlay, playNext, playPrev, seekTo, stopMusic } = useMusicPlayer();
     const [expanded, setExpanded] = useState(false);
 
@@ -43,25 +44,25 @@ export default function MiniPlayer() {
 
                     {/* Main row */}
                     <div className="flex items-center gap-2.5 px-3 py-2.5">
-                        {/* Thumbnail */}
-                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/5 flex-shrink-0 relative">
-                            {(currentTrack.thumbnail || currentTrack.image) ?
-                                <img src={currentTrack.thumbnail || currentTrack.image} alt="" className="w-full h-full object-cover" /> :
-                                <div className="w-full h-full flex items-center justify-center text-sm">🎵</div>}
-                            {isPlaying && (
-                                <div className="absolute bottom-0.5 right-0.5 flex gap-[1px]">
-                                    {[0, 1, 2].map(i => (
-                                        <div key={i} className="w-[2px] bg-pink-400 rounded-full animate-pulse"
-                                            style={{ height: `${6 + Math.random() * 6}px`, animationDelay: `${i * 150}ms` }} />
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Track info */}
-                        <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-white truncate">{currentTrack.title}</p>
-                            <p className="text-[9px] text-white/30 truncate">{currentTrack.artist}</p>
+                        {/* Thumbnail + Track info — click to go to music page */}
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer" onClick={() => router.push('/music')}>
+                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/5 flex-shrink-0 relative">
+                                {(currentTrack.thumbnail || currentTrack.image) ?
+                                    <img src={currentTrack.thumbnail || currentTrack.image} alt="" className="w-full h-full object-cover" /> :
+                                    <div className="w-full h-full flex items-center justify-center text-sm">🎵</div>}
+                                {isPlaying && (
+                                    <div className="absolute bottom-0.5 right-0.5 flex gap-[1px]">
+                                        {[0, 1, 2].map(i => (
+                                            <div key={i} className="w-[2px] bg-pink-400 rounded-full animate-pulse"
+                                                style={{ height: `${6 + Math.random() * 6}px`, animationDelay: `${i * 150}ms` }} />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-xs font-medium text-white truncate">{currentTrack.title}</p>
+                                <p className="text-[9px] text-white/30 truncate">{currentTrack.artist}</p>
+                            </div>
                         </div>
 
                         {/* Controls */}
