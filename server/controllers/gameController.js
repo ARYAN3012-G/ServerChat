@@ -51,6 +51,13 @@ exports.getActiveGames = async (req, res, next) => {
 exports.getServerSessions = async (req, res, next) => {
     try {
         const { serverId } = req.params;
+
+        // Auto-cancel stale waiting sessions older than 30 minutes
+        await GameSession.updateMany(
+            { server: serverId, status: 'waiting', createdAt: { $lt: new Date(Date.now() - 30 * 60 * 1000) } },
+            { $set: { status: 'cancelled' } }
+        );
+
         const sessions = await GameSession.find({
             server: serverId,
             $or: [

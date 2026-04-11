@@ -82,7 +82,7 @@ const messageSchema = new mongoose.Schema({
     },
     gameChallenge: {
         game: String,
-        status: { type: String, enum: ['waiting', 'in_progress', 'finished'], default: 'waiting' },
+        status: { type: String, enum: ['waiting', 'in_progress', 'finished', 'cancelled'], default: 'waiting' },
         players: [{ type: String }],
         winner: String,
     },

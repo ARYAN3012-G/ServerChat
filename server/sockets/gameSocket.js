@@ -415,6 +415,8 @@ module.exports = (io, socket) => {
             io.to(`game:${sessionId}`).emit('game:cancelled', { session: populated });
             if (session.channel) {
                 io.to(`channel:${session.channel.toString()}`).emit('game:updated', { session: populated });
+                // Update or delete the challenge message in chat
+                await updateChallengeMessage(io, session, populated);
             }
 
             logger.debug(`Game ${sessionId} cancelled by host`);
@@ -450,7 +452,10 @@ async function updateChallengeMessage(io, session, populated) {
         const playerNames = populated.players.map(p => p.user?.username || 'Player');
         let content, status;
 
-        if (session.status === 'in_progress') {
+        if (session.status === 'cancelled') {
+            content = `🚫 **${formatGameName(session.game)}** game was cancelled`;
+            status = 'cancelled';
+        } else if (session.status === 'in_progress') {
             content = `🎮 **${playerNames.join(' vs ')}** — **${formatGameName(session.game)}** [In Progress]`;
             status = 'in_progress';
         } else if (session.status === 'finished') {

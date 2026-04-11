@@ -1047,38 +1047,49 @@ export default function ChannelsPage() {
                                                     {/* Game Challenge Card */}
                                                     {msg.gameChallenge?.game && (
                                                         <div className={`mt-2 p-3 rounded-xl border ${
+                                                            msg.gameChallenge.status === 'cancelled' ? 'bg-red-500/5 border-red-500/10 opacity-60' :
                                                             msg.gameChallenge.status === 'waiting' ? 'bg-amber-500/5 border-amber-500/20' :
                                                             msg.gameChallenge.status === 'in_progress' ? 'bg-emerald-500/5 border-emerald-500/20' :
+                                                            msg.gameChallenge.status === 'finished' ? 'bg-indigo-500/5 border-indigo-500/20' :
                                                             'bg-white/[0.02] border-white/10'
                                                         }`}>
                                                             <div className="flex items-center gap-2 flex-wrap">
-                                                                <span className="text-lg">{msg.gameChallenge.status === 'finished' ? '🏆' : '🎮'}</span>
-                                                                <span className="text-xs font-bold">
+                                                                <span className="text-lg">{
+                                                                    msg.gameChallenge.status === 'cancelled' ? '🚫' :
+                                                                    msg.gameChallenge.status === 'finished' ? '🏆' : '🎮'
+                                                                }</span>
+                                                                <span className={`text-xs font-bold ${msg.gameChallenge.status === 'cancelled' ? 'line-through text-white/30' : ''}`}>
                                                                     {msg.gameChallenge.game?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                                                                 </span>
                                                                 <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${
+                                                                    msg.gameChallenge.status === 'cancelled' ? 'bg-red-500/20 text-red-400' :
                                                                     msg.gameChallenge.status === 'waiting' ? 'bg-amber-500/20 text-amber-400' :
                                                                     msg.gameChallenge.status === 'in_progress' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                    msg.gameChallenge.status === 'finished' ? 'bg-indigo-500/20 text-indigo-400' :
                                                                     'bg-white/5 text-white/30'
                                                                 }`}>
-                                                                    {msg.gameChallenge.status === 'waiting' ? 'Open' :
-                                                                     msg.gameChallenge.status === 'in_progress' ? 'Live' : 'Ended'}
+                                                                    {msg.gameChallenge.status === 'cancelled' ? 'Cancelled' :
+                                                                     msg.gameChallenge.status === 'waiting' ? 'Open' :
+                                                                     msg.gameChallenge.status === 'in_progress' ? 'Live' :
+                                                                     msg.gameChallenge.status === 'finished' ? 'Ended' : 'Unknown'}
                                                                 </span>
                                                             </div>
-                                                            <div className="mt-2 flex gap-2 flex-wrap">
-                                                                {msg.gameChallenge.status === 'waiting' && msg.sender?._id !== user?._id && (
-                                                                    <button onClick={() => { const s = getSocket(); s?.emit('game:request-join', { sessionId: msg.gameSessionId }); }}
-                                                                        className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-[10px] font-medium transition-colors">
-                                                                        ⚔️ Join Game
-                                                                    </button>
-                                                                )}
-                                                                {msg.gameChallenge.status === 'in_progress' && (
-                                                                    <button onClick={() => { const s = getSocket(); s?.emit('game:spectate', { sessionId: msg.gameSessionId }); router.push(currentServer ? `/server-games/${currentServer._id}?tab=spectate` : '/games'); }}
-                                                                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white/50 rounded-lg text-[10px] font-medium transition-colors border border-white/10">
-                                                                        👁️ Spectate
-                                                                    </button>
-                                                                )}
-                                                            </div>
+                                                            {msg.gameChallenge.status !== 'cancelled' && (
+                                                                <div className="mt-2 flex gap-2 flex-wrap">
+                                                                    {msg.gameChallenge.status === 'waiting' && msg.sender?._id !== user?._id && (
+                                                                        <button onClick={() => { const s = getSocket(); s?.emit('game:request-join', { sessionId: msg.gameSessionId }); }}
+                                                                            className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-[10px] font-medium transition-colors">
+                                                                            ⚔️ Join Game
+                                                                        </button>
+                                                                    )}
+                                                                    {msg.gameChallenge.status === 'in_progress' && (
+                                                                        <button onClick={() => { const s = getSocket(); s?.emit('game:spectate', { sessionId: msg.gameSessionId }); router.push(currentServer ? `/server-games/${currentServer._id}?tab=spectate` : '/games'); }}
+                                                                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white/50 rounded-lg text-[10px] font-medium transition-colors border border-white/10">
+                                                                            👁️ Spectate
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                     {msg.attachments?.length > 0 && (
