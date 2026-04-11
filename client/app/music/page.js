@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiArrowLeft, FiSearch, FiHeart, FiPlay, FiPause, FiSkipForward, FiSkipBack, FiVolume2, FiVolumeX, FiX, FiMusic, FiTrash2, FiPlus, FiClock, FiUsers, FiRadio } from 'react-icons/fi';
 import { getSocket } from '../../services/socket';
@@ -12,9 +11,8 @@ import toast from 'react-hot-toast';
 export default function MusicPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { currentServer } = useSelector(s => s.server);
     const serverIdParam = searchParams.get('serverId');
-    const serverId = serverIdParam || currentServer?._id;
+    const serverId = serverIdParam || null; // Only use explicit URL param, not Redux
 
     const [tab, setTab] = useState('favorites'); // favorites | sessions | search
     const [favorites, setFavorites] = useState([]);
