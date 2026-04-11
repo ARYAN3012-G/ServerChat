@@ -597,53 +597,53 @@ export default function MusicPage() {
                             </button>
                         </div>
 
-                        {/* Main content — two-column on desktop */}
-                        <div className="relative z-10 flex-1 flex flex-col lg:flex-row overflow-hidden">
+                        {/* Main content — scrollable on mobile, two-column on desktop */}
+                        <div className="relative z-10 flex-1 overflow-y-auto lg:overflow-hidden lg:flex lg:flex-row">
 
-                            {/* Left: Album Art (pinned on desktop) */}
-                            <div className="lg:w-1/2 flex-shrink-0 flex flex-col items-center justify-center px-6 sm:px-10 lg:px-16 py-4 lg:py-0">
+                            {/* Left: Album Art + Track Info */}
+                            <div className="lg:w-1/2 lg:h-full lg:flex lg:flex-col lg:items-center lg:justify-center px-6 sm:px-10 lg:px-16 pt-2 pb-4 lg:py-0">
                                 <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1 }}
-                                    className="w-full max-w-[260px] sm:max-w-[320px] lg:max-w-[380px] aspect-square rounded-2xl overflow-hidden shadow-2xl shadow-black/50 ring-1 ring-white/5">
+                                    className="w-[200px] h-[200px] sm:w-[280px] sm:h-[280px] lg:w-[360px] lg:h-[360px] mx-auto rounded-2xl overflow-hidden shadow-2xl shadow-black/50 ring-1 ring-white/5">
                                     {(currentTrack.thumbnail || currentTrack.image) ?
                                         <img src={currentTrack.thumbnail || currentTrack.image} alt="" className="w-full h-full object-cover" /> :
-                                        <div className="w-full h-full bg-gradient-to-br from-pink-500/20 to-purple-500/20 flex items-center justify-center text-7xl">🎵</div>}
+                                        <div className="w-full h-full bg-gradient-to-br from-pink-500/20 to-purple-500/20 flex items-center justify-center text-6xl lg:text-7xl">🎵</div>}
                                 </motion.div>
 
                                 {/* Track Info */}
                                 <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}
-                                    className="text-center mt-6 w-full max-w-[380px]">
-                                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 truncate px-2">{currentTrack.title}</h2>
-                                    <p className="text-sm sm:text-base text-white/40 truncate">{currentTrack.artist}</p>
+                                    className="text-center mt-4 lg:mt-6 w-full max-w-[380px] mx-auto">
+                                    <h2 className="text-lg sm:text-xl lg:text-3xl font-bold text-white mb-0.5 truncate px-2">{currentTrack.title}</h2>
+                                    <p className="text-xs sm:text-sm lg:text-base text-white/40 truncate">{currentTrack.artist}</p>
                                 </motion.div>
                             </div>
 
-                            {/* Right: Controls + Lyrics (scrollable) */}
-                            <div className="lg:w-1/2 flex flex-col min-h-0">
-                                {/* Controls section (pinned) */}
-                                <div className="flex-shrink-0 px-6 sm:px-10 lg:px-12 pt-4 lg:pt-8 pb-2">
+                            {/* Right: Controls + Lyrics */}
+                            <div className="lg:w-1/2 lg:h-full lg:flex lg:flex-col lg:min-h-0">
+                                {/* Controls section */}
+                                <div className="flex-shrink-0 px-6 sm:px-10 lg:px-12 pt-2 lg:pt-8 pb-2">
                                     {/* Seek Bar */}
-                                    <div className="max-w-[440px] mx-auto mb-4">
+                                    <div className="max-w-[440px] mx-auto mb-3">
                                         <div className="h-1.5 bg-white/5 rounded-full cursor-pointer group relative" onClick={handleSeek}>
                                             <div className="h-full bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all duration-200 relative"
                                                 style={{ width: duration ? `${(progress / duration) * 100}%` : '0%' }}>
                                                 <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
                                             </div>
                                         </div>
-                                        <div className="flex justify-between mt-2 text-[11px] text-white/25 font-mono">
+                                        <div className="flex justify-between mt-1.5 text-[10px] sm:text-[11px] text-white/25 font-mono">
                                             <span>{formatTime(progress)}</span>
                                             <span>{formatTime(duration)}</span>
                                         </div>
                                     </div>
 
                                     {/* Playback Controls */}
-                                    <div className="flex items-center justify-center gap-6 sm:gap-8 mb-4">
-                                        <button onClick={playPrev} className="p-3 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all active:scale-90">
+                                    <div className="flex items-center justify-center gap-5 sm:gap-8 mb-3">
+                                        <button onClick={playPrev} className="p-2.5 sm:p-3 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all active:scale-90">
                                             <FiSkipBack className="w-5 h-5 sm:w-6 sm:h-6" />
                                         </button>
-                                        <button onClick={togglePlay} className="p-4 sm:p-5 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white transition-all shadow-xl shadow-pink-500/25 active:scale-95">
-                                            {isPlaying ? <FiPause className="w-6 h-6 sm:w-7 sm:h-7" /> : <FiPlay className="w-6 h-6 sm:w-7 sm:h-7 ml-0.5" />}
+                                        <button onClick={togglePlay} className="p-3.5 sm:p-5 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white transition-all shadow-xl shadow-pink-500/25 active:scale-95">
+                                            {isPlaying ? <FiPause className="w-5 h-5 sm:w-7 sm:h-7" /> : <FiPlay className="w-5 h-5 sm:w-7 sm:h-7 ml-0.5" />}
                                         </button>
-                                        <button onClick={playNext} className="p-3 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all active:scale-90">
+                                        <button onClick={playNext} className="p-2.5 sm:p-3 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all active:scale-90">
                                             <FiSkipForward className="w-5 h-5 sm:w-6 sm:h-6" />
                                         </button>
                                     </div>
@@ -658,33 +658,32 @@ export default function MusicPage() {
                                     </div>
                                 </div>
 
-                                {/* Lyrics section (scrollable) */}
-                                <div className="flex-1 overflow-y-auto px-6 sm:px-10 lg:px-12 pb-8">
+                                {/* Lyrics section */}
+                                <div className="lg:flex-1 lg:overflow-y-auto px-6 sm:px-10 lg:px-12 pb-8">
                                     <div className="max-w-[440px] mx-auto">
-                                        <div className="flex items-center gap-2 mb-5 pt-4 border-t border-white/5">
+                                        <div className="flex items-center gap-2 mb-4 pt-3 border-t border-white/5">
                                             <div className="w-1 h-4 bg-gradient-to-b from-pink-500 to-purple-500 rounded-full" />
                                             <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Lyrics</span>
                                         </div>
                                         {loadingLyrics && (
-                                            <div className="flex flex-col items-center justify-center py-16 gap-3">
+                                            <div className="flex flex-col items-center justify-center py-12 gap-3">
                                                 <div className="w-8 h-8 border-2 border-pink-500/30 border-t-pink-500 rounded-full animate-spin" />
                                                 <span className="text-xs text-white/20">Loading lyrics…</span>
                                             </div>
                                         )}
                                         {!loadingLyrics && lyrics && (() => {
-                                            // Format lyrics: split by line breaks and double spaces
                                             const lines = lyrics
                                                 .replace(/<br\s*\/?>/gi, '\n')
                                                 .replace(/\s{2,}/g, '\n')
                                                 .split('\n')
                                                 .map(l => l.trim());
                                             return (
-                                                <div className="space-y-1">
+                                                <div className="space-y-0.5">
                                                     {lines.map((line, i) => (
                                                         line === '' ? (
-                                                            <div key={i} className="h-4" />
+                                                            <div key={i} className="h-3" />
                                                         ) : (
-                                                            <p key={i} className="text-[15px] sm:text-base text-white/50 leading-[2] font-light tracking-wide hover:text-white/80 transition-colors">
+                                                            <p key={i} className="text-sm sm:text-[15px] text-white/45 leading-[1.8] sm:leading-[2] font-light tracking-wide hover:text-white/80 transition-colors">
                                                                 {line}
                                                             </p>
                                                         )
@@ -693,12 +692,12 @@ export default function MusicPage() {
                                             );
                                         })()}
                                         {!loadingLyrics && !lyrics && (
-                                            <div className="text-center py-16">
-                                                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/5 flex items-center justify-center">
-                                                    <FiMusic className="w-7 h-7 text-white/10" />
+                                            <div className="text-center py-10 sm:py-16">
+                                                <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-3 rounded-2xl bg-white/5 flex items-center justify-center">
+                                                    <FiMusic className="w-6 h-6 sm:w-7 sm:h-7 text-white/10" />
                                                 </div>
-                                                <p className="text-white/20 text-sm mb-1">No lyrics available</p>
-                                                <p className="text-white/10 text-xs">Lyrics aren't available for every song</p>
+                                                <p className="text-white/20 text-xs sm:text-sm mb-1">No lyrics available</p>
+                                                <p className="text-white/10 text-[10px] sm:text-xs">Lyrics aren't available for every song</p>
                                             </div>
                                         )}
                                     </div>
