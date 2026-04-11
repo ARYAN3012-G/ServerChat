@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiArrowLeft, FiSearch, FiHeart, FiPlay, FiPause, FiSkipForward, FiSkipBack, FiVolume2, FiVolumeX, FiX, FiMusic, FiTrash2, FiPlus, FiClock, FiUsers, FiRadio } from 'react-icons/fi';
 import { getSocket } from '../../services/socket';
+import { useMusicPlayer } from '../../components/MusicPlayerProvider';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -13,18 +14,15 @@ export default function MusicPage() {
     const searchParams = useSearchParams();
     const serverIdParam = searchParams.get('serverId');
     const serverId = serverIdParam || null; // Only use explicit URL param, not Redux
+    const { currentTrack, isPlaying, progress, duration, volume, muted,
+            playSong: globalPlay, togglePlay, playNext, playPrev, seekTo: globalSeek, stopMusic,
+            setVolume, setMuted, setQueue } = useMusicPlayer();
 
-    const [tab, setTab] = useState('favorites'); // favorites | sessions | search
+    const [tab, setTab] = useState('favorites'); // favorites | explore | sessions | search
     const [favorites, setFavorites] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [searching, setSearching] = useState(false);
-    const [currentTrack, setCurrentTrack] = useState(null);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [progress, setProgress] = useState(0);
-    const [duration, setDuration] = useState(0);
-    const [volume, setVolume] = useState(80);
-    const [muted, setMuted] = useState(false);
     const [mounted, setMounted] = useState(false);
 
     // Sessions state
@@ -50,7 +48,6 @@ export default function MusicPage() {
         { id: 'marathi', label: 'Marathi', emoji: '🇮🇳' },
     ];
 
-    const audioRef = useRef(null);
     const searchTimeoutRef = useRef(null);
 
     useEffect(() => {
@@ -156,58 +153,18 @@ export default function MusicPage() {
         }, 400);
     }, []);
 
-    // ── AUDIO ──
+    // ── AUDIO (delegates to global player) ──
     const playSong = (song) => {
-        const url = song.url;
-        if (!url) { toast.error('No playable URL'); return; }
-        setCurrentTrack(song);
-        setIsPlaying(true);
-        if (audioRef.current) {
-            audioRef.current.src = url;
-            audioRef.current.volume = volume / 100;
-            audioRef.current.play().catch(() => {});
-        }
+        if (!song?.url) { toast.error('No playable URL'); return; }
+        // Determine the current list for queue
+        const list = tab === 'favorites' ? favorites : tab === 'explore' ? trendingSongs : searchResults;
+        globalPlay(song, list);
     };
 
-    const togglePlay = () => {
-        if (!audioRef.current || !currentTrack) return;
-        if (isPlaying) audioRef.current.pause();
-        else audioRef.current.play().catch(() => {});
-        setIsPlaying(!isPlaying);
-    };
-
-    const playNext = () => {
-        if (!currentTrack) return;
-        const list = tab === 'favorites' ? favorites : searchResults;
-        const idx = list.findIndex(s => s.url === currentTrack.url);
-        if (idx >= 0 && idx < list.length - 1) playSong(list[idx + 1]);
-    };
-
-    const playPrev = () => {
-        if (!currentTrack) return;
-        const list = tab === 'favorites' ? favorites : searchResults;
-        const idx = list.findIndex(s => s.url === currentTrack.url);
-        if (idx > 0) playSong(list[idx - 1]);
-    };
-
-    useEffect(() => {
-        const audio = audioRef.current;
-        if (!audio) return;
-        const onTime = () => { setProgress(audio.currentTime); setDuration(audio.duration || 0); };
-        const onEnd = () => { setIsPlaying(false); playNext(); };
-        audio.addEventListener('timeupdate', onTime);
-        audio.addEventListener('ended', onEnd);
-        return () => { audio.removeEventListener('timeupdate', onTime); audio.removeEventListener('ended', onEnd); };
-    }, [currentTrack]);
-
-    useEffect(() => {
-        if (audioRef.current) audioRef.current.volume = muted ? 0 : volume / 100;
-    }, [volume, muted]);
-
-    const seekTo = (e) => {
+    const handleSeek = (e) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        if (audioRef.current && duration) audioRef.current.currentTime = pct * duration;
+        globalSeek(pct);
     };
 
     const formatTime = (s) => {
@@ -226,7 +183,6 @@ export default function MusicPage() {
 
     return (
         <div className="flex h-[100dvh] bg-[#0c0e1a] text-white overflow-hidden flex-col">
-            <audio ref={audioRef} preload="auto" />
 
             {/* Header */}
             <div className="flex items-center gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-white/5 bg-gradient-to-r from-pink-500/10 via-purple-500/5 to-indigo-500/10 flex-shrink-0">
@@ -534,7 +490,7 @@ export default function MusicPage() {
                 {currentTrack && (
                     <motion.div initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }}
                         className="fixed bottom-0 left-0 right-0 bg-[#0c0e1a]/95 backdrop-blur-xl border-t border-white/5 z-50">
-                        <div className="h-1 bg-white/5 cursor-pointer" onClick={seekTo}>
+                        <div className="h-1 bg-white/5 cursor-pointer" onClick={handleSeek}>
                             <div className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-200"
                                 style={{ width: duration ? `${(progress / duration) * 100}%` : '0%' }} />
                         </div>
@@ -575,7 +531,7 @@ export default function MusicPage() {
                                 }`}>
                                 <FiHeart className={`w-4 h-4 ${isFavorited(currentTrack.url) ? 'fill-current' : ''}`} />
                             </button>
-                            <button onClick={() => { setCurrentTrack(null); setIsPlaying(false); if(audioRef.current) audioRef.current.pause(); }}
+                            <button onClick={stopMusic}
                                 className="p-1.5 rounded-lg hover:bg-white/10 text-white/20 hover:text-white transition-colors flex-shrink-0">
                                 <FiX className="w-4 h-4" />
                             </button>

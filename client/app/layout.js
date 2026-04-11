@@ -8,6 +8,8 @@ import NotificationProvider from '../components/NotificationProvider';
 import CallProvider from '../components/CallProvider';
 import BackgroundRenderer from '../components/BackgroundRenderer';
 import VoiceProvider from '../components/VoiceProvider';
+import MusicPlayerProvider from '../components/MusicPlayerProvider';
+import MiniPlayer from '../components/MiniPlayer';
 import './globals.css';
 
 export default function RootLayout({ children }) {
@@ -61,9 +63,12 @@ export default function RootLayout({ children }) {
                 <Provider store={store}>
                     <CallProvider>
                         <VoiceProvider>
-                            <BackgroundRenderer />
-                            <NotificationProvider />
-                            {children}
+                            <MusicPlayerProvider>
+                                <BackgroundRenderer />
+                                <NotificationProvider />
+                                {children}
+                                <MiniPlayer />
+                            </MusicPlayerProvider>
                         </VoiceProvider>
                     </CallProvider>
                     <Toaster
