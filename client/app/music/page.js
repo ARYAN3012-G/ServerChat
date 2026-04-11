@@ -171,65 +171,17 @@ export default function MusicPage() {
         globalSeek(pct);
     };
 
-    const [syncedLines, setSyncedLines] = useState([]); // [{time: seconds, text: string}]
-
-    // Parse LRC format: "[mm:ss.xx] text" → {time, text}
-    const parseLRC = (lrc) => {
-        if (!lrc) return [];
-        return lrc.split('\n').map(line => {
-            const match = line.match(/\[(\d+):(\d+)\.(\d+)\]\s*(.*)/);
-            if (!match) return null;
-            const time = parseInt(match[1]) * 60 + parseInt(match[2]) + parseInt(match[3]) / 100;
-            return { time, text: match[4].trim() };
-        }).filter(l => l && l.text);
-    };
-
     const fetchLyrics = async () => {
         if (!currentTrack) return;
         setLoadingLyrics(true);
         setLyrics(null);
-        setSyncedLines([]);
 
         try {
-            // Step 1: Try LRCLIB for synced lyrics (uses track name + artist)
-            // Clean title: remove "(From XYZ)" or similar suffixes JioSaavn adds
-            const cleanTitle = currentTrack.title.replace(/\s*\(.*?\)\s*/g, '').trim();
-            // Use first artist only (JioSaavn sends "Mithoon, Arijit Singh")
-            const cleanArtist = currentTrack.artist?.split(',')[0].trim();
-            
-            const params = new URLSearchParams({ track: cleanTitle });
-            if (cleanArtist) params.append('artist', cleanArtist);
-
-            console.log('[Lyrics] Trying LRCLIB:', cleanTitle, 'by', cleanArtist);
-            const { data: lrcData } = await api.get(`/music/lyrics/synced?${params.toString()}`);
-            console.log('[Lyrics] LRCLIB response:', !!lrcData.syncedLyrics, !!lrcData.plainLyrics);
-            
-            if (lrcData.syncedLyrics) {
-                const parsed = parseLRC(lrcData.syncedLyrics);
-                console.log('[Lyrics] Parsed', parsed.length, 'synced lines');
-                if (parsed.length > 0) {
-                    setSyncedLines(parsed);
-                    setLoadingLyrics(false);
-                    return;
-                }
-            }
-            // If LRCLIB returned plain but no synced
-            if (lrcData.plainLyrics) {
-                setLyrics(lrcData.plainLyrics);
-                setLoadingLyrics(false);
-                return;
-            }
-        } catch (e) {
-            console.log('[Lyrics] LRCLIB failed:', e.message, '- trying JioSaavn fallback');
-        }
-
-        try {
-            // Step 2: Fall back to JioSaavn plain lyrics
             if (currentTrack.id) {
                 const { data } = await api.get(`/music/lyrics/${currentTrack.id}`);
                 setLyrics(data.lyrics || null);
             } else {
-                // Search for song ID first
+                // Song has no id (e.g. from favorites) — search for it
                 const q = `${currentTrack.title} ${currentTrack.artist || ''}`.trim();
                 const { data: searchData } = await api.get(`/music/search?query=${encodeURIComponent(q)}&limit=5`);
                 const match = searchData.songs?.find(s =>
@@ -241,7 +193,7 @@ export default function MusicPage() {
                 }
             }
         } catch (e) {
-            console.error('All lyrics sources failed');
+            console.error('Lyrics fetch failed');
         }
         setLoadingLyrics(false);
     };
@@ -250,13 +202,6 @@ export default function MusicPage() {
         setShowExpanded(true);
         fetchLyrics();
     };
-
-    // Auto-scroll to active lyric line
-    useEffect(() => {
-        if (syncedLines.length === 0 || !showExpanded) return;
-        const el = document.getElementById('active-lyric');
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, [Math.floor(progress)]);
 
     const formatTime = (s) => {
         if (!s || isNaN(s)) return '0:00';
@@ -748,39 +693,7 @@ export default function MusicPage() {
                                             </div>
                                         )}
 
-                                        {/* SYNCED LYRICS — real timestamp-based highlighting */}
-                                        {!loadingLyrics && syncedLines.length > 0 && (() => {
-                                            // Find current active line based on actual playback time
-                                            let activeIdx = -1;
-                                            for (let i = syncedLines.length - 1; i >= 0; i--) {
-                                                if (progress >= syncedLines[i].time) { activeIdx = i; break; }
-                                            }
-                                            return (
-                                                <div className="space-y-1">
-                                                    {syncedLines.map((line, i) => {
-                                                        const isActive = i === activeIdx;
-                                                        const isPast = i < activeIdx;
-                                                        return (
-                                                            <p key={i}
-                                                                id={isActive ? 'active-lyric' : undefined}
-                                                                className={`text-sm sm:text-base leading-[2] tracking-wide transition-all duration-300 cursor-default py-0.5 ${
-                                                                    isActive
-                                                                        ? 'text-white font-semibold text-base sm:text-lg scale-[1.02] origin-left'
-                                                                        : isPast
-                                                                            ? 'text-white/25 font-light'
-                                                                            : 'text-white/50 font-light hover:text-white/70'
-                                                                }`}>
-                                                                {isActive && <span className="inline-block w-2 h-2 bg-pink-500 rounded-full mr-2.5 animate-pulse align-middle shadow-lg shadow-pink-500/50" />}
-                                                                {line.text}
-                                                            </p>
-                                                        );
-                                                    })}
-                                                </div>
-                                            );
-                                        })()}
-
-                                        {/* PLAIN LYRICS fallback — no fake highlighting */}
-                                        {!loadingLyrics && syncedLines.length === 0 && lyrics && (() => {
+                                        {!loadingLyrics && lyrics && (() => {
                                             const lines = lyrics
                                                 .replace(/<br\s*\/?>/gi, '\n')
                                                 .replace(/\s{2,}/g, '\n')
@@ -801,8 +714,7 @@ export default function MusicPage() {
                                             );
                                         })()}
 
-                                        {/* No lyrics at all */}
-                                        {!loadingLyrics && syncedLines.length === 0 && !lyrics && (
+                                        {!loadingLyrics && !lyrics && (
                                             <div className="text-center py-10 sm:py-16">
                                                 <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-3 rounded-2xl bg-white/5 flex items-center justify-center">
                                                     <FiMusic className="w-6 h-6 sm:w-7 sm:h-7 text-white/10" />
