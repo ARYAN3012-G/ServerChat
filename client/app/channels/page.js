@@ -595,27 +595,6 @@ export default function ChannelsPage() {
                     </motion.div>
                     )}
 
-                    {/* Status Picker */}
-                    <div className="relative">
-                        <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => setShowStatusPicker(!showStatusPicker)}
-                            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-white/10" title={`Status: ${user?.status || 'offline'}`}>
-                            <div className={`w-3.5 h-3.5 rounded-full border-2 border-dark-950 ${user?.status === 'online' ? 'bg-emerald-400' : user?.status === 'idle' ? 'bg-amber-400' : user?.status === 'dnd' ? 'bg-red-500' : 'bg-gray-400'}`} />
-                        </motion.div>
-                        <AnimatePresence>
-                            {showStatusPicker && (
-                                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}
-                                    className="absolute left-16 bottom-0 w-52 bg-dark-800 border border-white/10 rounded-xl shadow-2xl z-[60] p-2 space-y-1">
-                                    {statusOptions.map(opt => (
-                                        <button key={opt.value} onClick={() => { handleStatusChange(opt.value); setShowStatusPicker(false); }}
-                                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${user?.status === opt.value ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5 hover:text-white'}`}>
-                                            <div className={`w-3 h-3 rounded-full ${opt.color}`} />
-                                            <span>{opt.label}</span>
-                                        </button>
-                                    ))}
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
 
                     {/* Settings */}
                     <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/settings')}
@@ -917,7 +896,7 @@ export default function ChannelsPage() {
                         </div>
                         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push('/settings')}>
                             <p className="text-sm font-medium truncate">{user?.username || 'User'}</p>
-                            <p className={`text-[10px] ${user?.status === 'dnd' ? 'text-red-400' : user?.status === 'idle' ? 'text-amber-400' : user?.status === 'invisible' ? 'text-gray-400' : 'text-emerald-400'}`}>
+                            <p className={`text-[10px] ${user?.customStatus?.text ? 'text-violet-400' : user?.status === 'dnd' ? 'text-red-400' : user?.status === 'idle' ? 'text-amber-400' : user?.status === 'invisible' ? 'text-gray-400' : 'text-emerald-400'}`}>
                                 {user?.customStatus?.text || (user?.status === 'dnd' ? 'Do Not Disturb' : user?.status === 'idle' ? 'Idle' : user?.status === 'invisible' ? 'Invisible' : 'Online')}
                             </p>
                         </div>
