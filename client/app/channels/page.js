@@ -592,7 +592,7 @@ export default function ChannelsPage() {
 
                     {/* Music */}
                     <motion.div whileHover={{ borderRadius: '35%' }}
-                        onClick={() => currentServer ? setShowMusicRoom(true) : router.push('/music')}
+                        onClick={() => router.push(currentServer ? `/music?serverId=${currentServer._id}` : '/music')}
                         className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-pink-500 cursor-pointer transition-all duration-200" title={currentServer ? 'Server Music' : 'My Music'}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                     </motion.div>

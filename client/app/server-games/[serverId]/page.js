@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUsers, FiEye, FiCheck, FiX, FiClock, FiPlay, FiRefreshCw, FiMenu, FiSearch } from 'react-icons/fi';
+import { FiArrowLeft, FiUsers, FiEye, FiCheck, FiX, FiClock, FiPlay, FiRefreshCw, FiPlus, FiChevronDown } from 'react-icons/fi';
 import { IoGameControllerOutline } from 'react-icons/io5';
 import { useAuth } from '../../../hooks/useAuth';
 import { getSocket } from '../../../services/socket';
@@ -13,15 +13,15 @@ import { setGameSession, setServerSessions, updateServerSession, setSpectatingSe
 import toast from 'react-hot-toast';
 
 const MULTIPLAYER_GAMES = [
-    { id: 'tic-tac-toe', name: 'Tic-Tac-Toe', emoji: '❌⭕', desc: 'Classic 3×3 grid — first to 3 in a row wins', players: '2', color: '#6366f1', gradient: 'from-violet-600 to-indigo-600' },
-    { id: 'rock-paper-scissors', name: 'Rock Paper Scissors', emoji: '✊✋', desc: 'Pick rock, paper, or scissors', players: '2', color: '#ec4899', gradient: 'from-pink-600 to-rose-600' },
-    { id: 'connect4', name: 'Connect 4', emoji: '🔴🟡', desc: 'Drop discs — 4 in a row wins!', players: '2', color: '#ef4444', gradient: 'from-red-600 to-orange-600' },
-    { id: 'chess', name: 'Chess', emoji: '♟️👑', desc: 'The ultimate strategy game', players: '2', color: '#64748b', gradient: 'from-slate-600 to-zinc-600' },
-    { id: 'checkers', name: 'Checkers', emoji: '🏁⚫', desc: 'Jump and capture all pieces', players: '2', color: '#f97316', gradient: 'from-orange-600 to-amber-600' },
-    { id: 'battleship', name: 'Battleship', emoji: '🚢💥', desc: 'Sink the enemy fleet', players: '2', color: '#3b82f6', gradient: 'from-blue-600 to-indigo-600' },
-    { id: 'pong', name: 'Ping Pong', emoji: '🏓🏓', desc: 'Classic paddle game', players: '2', color: '#06b6d4', gradient: 'from-cyan-600 to-blue-600' },
-    { id: 'ludo', name: 'Ludo', emoji: '🎲🎲', desc: 'Race to the finish!', players: '2-4', color: '#eab308', gradient: 'from-yellow-600 to-amber-600' },
-    { id: 'quiz', name: 'Quiz Battle', emoji: '🧠❓', desc: 'Test your knowledge', players: '2+', color: '#8b5cf6', gradient: 'from-purple-600 to-violet-600' },
+    { id: 'tic-tac-toe', name: 'Tic-Tac-Toe', emoji: '❌⭕', players: '2' },
+    { id: 'rock-paper-scissors', name: 'Rock Paper Scissors', emoji: '✊✋', players: '2' },
+    { id: 'connect4', name: 'Connect 4', emoji: '🔴🟡', players: '2' },
+    { id: 'chess', name: 'Chess', emoji: '♟️👑', players: '2' },
+    { id: 'checkers', name: 'Checkers', emoji: '🏁⚫', players: '2' },
+    { id: 'battleship', name: 'Battleship', emoji: '🚢💥', players: '2' },
+    { id: 'pong', name: 'Ping Pong', emoji: '🏓🏓', players: '2' },
+    { id: 'ludo', name: 'Ludo', emoji: '🎲🎲', players: '2-4' },
+    { id: 'quiz', name: 'Quiz Battle', emoji: '🧠❓', players: '2+' },
 ];
 
 export default function ServerGamesPage({ params }) {
@@ -32,18 +32,10 @@ export default function ServerGamesPage({ params }) {
     const { serverSessions, session: activeSession, spectatingSessionId } = useSelector(s => s.game);
     const { currentServer } = useSelector(s => s.server);
 
-    const [tab, setTab] = useState('library'); // library | sessions | spectate
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [showCreateMenu, setShowCreateMenu] = useState(false);
     const serverId = params?.serverId || currentServer?._id;
 
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
-
-    // Auto-open tab from URL param
-    useEffect(() => {
-        const t = searchParams.get('tab');
-        if (t && ['library', 'sessions', 'spectate'].includes(t)) setTab(t);
-    }, [searchParams]);
 
     // Fetch server sessions
     const fetchSessions = useCallback(async () => {
@@ -61,36 +53,19 @@ export default function ServerGamesPage({ params }) {
         const socket = getSocket();
         if (!socket) return;
 
-        const handleUpdated = ({ session }) => {
-            dispatch(updateServerSession(session));
-        };
-        const handleCreated = ({ session }) => {
-            dispatch(updateServerSession(session));
-        };
-        const handleRequestSent = () => {
-            toast.success('Join request sent! Waiting for host...');
-        };
-        const handleRequestDeclined = () => {
-            toast.error('Your join request was declined');
-        };
+        const handleUpdated = ({ session }) => dispatch(updateServerSession(session));
+        const handleCreated = ({ session }) => dispatch(updateServerSession(session));
+        const handleRequestSent = () => toast.success('Join request sent! Waiting for host…');
+        const handleRequestDeclined = () => toast.error('Your join request was declined');
         const handlePlayerAccepted = ({ session }) => {
             dispatch(setGameSession(session));
-            if (session.status === 'in_progress') {
-                toast.success('Game started!');
-            }
+            if (session.status === 'in_progress') toast.success('Game started!');
         };
-        const handleRematch = ({ session }) => {
-            dispatch(setGameSession(session));
-            dispatch(updateServerSession(session));
-        };
-        const handleCancelled = () => {
-            dispatch(clearGame());
-            toast('Game was cancelled', { icon: '🚫' });
-        };
+        const handleRematch = ({ session }) => { dispatch(setGameSession(session)); dispatch(updateServerSession(session)); };
+        const handleCancelled = () => { dispatch(clearGame()); toast('Game was cancelled', { icon: '🚫' }); };
         const handleSpectating = ({ session }) => {
             dispatch(setGameSession(session));
             dispatch(setSpectatingSessionId(session._id));
-            setTab('spectate');
             toast.success('Now spectating!');
         };
 
@@ -119,64 +94,20 @@ export default function ServerGamesPage({ params }) {
         const socket = getSocket();
         if (!socket || !serverId) return;
         socket.emit('game:create', { game: gameId, serverId, channelId: currentServer?.channels?.[0] });
-        setTab('sessions');
-        toast.success('Game created! Waiting for challengers...');
+        setShowCreateMenu(false);
+        toast.success('Game created! Waiting for challengers…');
     };
 
-    const requestJoin = (sessionId) => {
-        const socket = getSocket();
-        if (!socket) return;
-        socket.emit('game:request-join', { sessionId });
-    };
-
-    const acceptJoin = (sessionId, userId) => {
-        const socket = getSocket();
-        if (!socket) return;
-        socket.emit('game:accept-join', { sessionId, userId });
-    };
-
-    const declineJoin = (sessionId, userId) => {
-        const socket = getSocket();
-        if (!socket) return;
-        socket.emit('game:decline-join', { sessionId, userId });
-    };
-
-    const spectateGame = (sessionId) => {
-        const socket = getSocket();
-        if (!socket) return;
-        socket.emit('game:spectate', { sessionId });
-    };
-
+    const requestJoin = (sessionId) => { const s = getSocket(); s?.emit('game:request-join', { sessionId }); };
+    const acceptJoin = (sessionId, userId) => { const s = getSocket(); s?.emit('game:accept-join', { sessionId, userId }); };
+    const declineJoin = (sessionId, userId) => { const s = getSocket(); s?.emit('game:decline-join', { sessionId, userId }); };
+    const spectateGame = (sessionId) => { const s = getSocket(); s?.emit('game:spectate', { sessionId }); };
     const leaveSpectate = (sessionId) => {
-        const socket = getSocket();
-        if (!socket) return;
-        socket.emit('game:leave-spectate', { sessionId });
-        dispatch(setSpectatingSessionId(null));
-        dispatch(setGameSession(null));
-        setTab('sessions');
+        const s = getSocket(); s?.emit('game:leave-spectate', { sessionId });
+        dispatch(setSpectatingSessionId(null)); dispatch(setGameSession(null));
     };
-
-    const makeMove = (sessionId, move) => {
-        const socket = getSocket();
-        if (!socket) return;
-        socket.emit('game:move', { sessionId, move });
-    };
-
-    const requestRematch = (sessionId) => {
-        const socket = getSocket();
-        if (!socket) return;
-        socket.emit('game:rematch', { sessionId });
-    };
-
-    const cancelGame = (sessionId) => {
-        const socket = getSocket();
-        if (!socket) return;
-        socket.emit('game:cancel', { sessionId });
-    };
-
-    const filteredGames = MULTIPLAYER_GAMES.filter(g =>
-        !searchQuery || g.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const requestRematch = (sessionId) => { const s = getSocket(); s?.emit('game:rematch', { sessionId }); };
+    const cancelGame = (sessionId) => { const s = getSocket(); s?.emit('game:cancel', { sessionId }); };
 
     const waitingSessions = serverSessions.filter(s => s.status === 'waiting');
     const activeSessions = serverSessions.filter(s => s.status === 'in_progress');
@@ -186,272 +117,187 @@ export default function ServerGamesPage({ params }) {
         s.players?.some(p => (p.user?._id || p.user)?.toString() === user?._id?.toString())
     );
 
-    const isMyTurn = activeSession?.currentTurn?.toString() === user?._id?.toString() ||
-                     activeSession?.currentTurn?._id?.toString() === user?._id?.toString();
-    const myPlayerIndex = activeSession?.players?.findIndex(p => (p.user?._id || p.user)?.toString() === user?._id?.toString());
-
-    const tabs = [
-        { id: 'library', label: '🎮 Game Library', count: MULTIPLAYER_GAMES.length },
-        { id: 'sessions', label: '⚔️ Active Sessions', count: waitingSessions.length + activeSessions.length },
-        { id: 'spectate', label: '👁️ Spectate', count: spectatingSessionId ? 1 : 0 },
-    ];
-
     return (
-        <div className="flex h-[100dvh] bg-[#0c0e1a] text-white overflow-hidden">
-            {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 sm:hidden" onClick={() => setSidebarOpen(false)} />}
+        <div className="flex h-[100dvh] bg-[#0c0e1a] text-white overflow-hidden flex-col">
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-white/5 bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 flex-shrink-0">
+                <button onClick={() => router.push('/channels')} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors">
+                    <FiArrowLeft className="w-5 h-5" />
+                </button>
+                <IoGameControllerOutline className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                    <h1 className="text-sm sm:text-lg font-bold truncate">Server Games</h1>
+                    <p className="text-[10px] sm:text-xs text-white/30 truncate">{currentServer?.name || 'Multiplayer'} — {activeSessions.length + waitingSessions.length} active</p>
+                </div>
 
-            {/* Left sidebar — back nav */}
-            <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} sm:translate-x-0 fixed sm:static z-40 w-[72px] bg-[#080a14] flex flex-col items-center py-3 gap-2 border-r border-white/5 h-full transition-transform duration-200`}>
-                <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/channels')}
-                    className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-indigo-400 hover:text-white hover:bg-indigo-500 cursor-pointer transition-all" title="Back to Chat">
-                    <FiArrowLeft className="w-6 h-6" />
-                </motion.div>
-                <div className="w-8 h-0.5 bg-white/10 rounded-full mx-auto" />
-                <div className="flex-1 overflow-y-auto space-y-2 scrollbar-hide px-2">
-                    {MULTIPLAYER_GAMES.map(g => (
-                        <motion.div key={g.id} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
-                            onClick={() => { createGame(g.id); setSidebarOpen(false); }}
-                            className="w-12 h-12 rounded-2xl flex items-center justify-center cursor-pointer transition-all text-lg bg-white/5 hover:bg-white/10 flex-shrink-0"
-                            title={`Create ${g.name}`}>
-                            {g.emoji.slice(0, 2)}
-                        </motion.div>
-                    ))}
+                {/* Create Game Button */}
+                <div className="relative flex-shrink-0">
+                    <button onClick={() => setShowCreateMenu(!showCreateMenu)}
+                        className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-xs sm:text-sm font-medium transition-colors">
+                        <FiPlus className="w-4 h-4" />
+                        <span className="hidden sm:inline">Create Game</span>
+                    </button>
+
+                    {/* Dropdown */}
+                    <AnimatePresence>
+                        {showCreateMenu && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setShowCreateMenu(false)} />
+                                <motion.div initial={{ opacity: 0, y: -5, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -5, scale: 0.95 }}
+                                    className="absolute right-0 top-full mt-2 w-64 bg-[#1a1d2e] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
+                                    <div className="p-2 border-b border-white/5">
+                                        <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider px-2 py-1">Pick a game to start</p>
+                                    </div>
+                                    <div className="max-h-[320px] overflow-y-auto p-1.5" style={{ scrollbarWidth: 'thin' }}>
+                                        {MULTIPLAYER_GAMES.map(g => (
+                                            <button key={g.id} onClick={() => createGame(g.id)}
+                                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 text-left transition-colors group">
+                                                <span className="text-xl flex-shrink-0">{g.emoji.slice(0, 2)}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium text-white/80 group-hover:text-white truncate">{g.name}</p>
+                                                    <p className="text-[10px] text-white/25">{g.players} players</p>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            </>
+                        )}
+                    </AnimatePresence>
                 </div>
             </div>
 
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col overflow-hidden">
-                {/* Header */}
-                <div className="flex items-center gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-white/5 bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 flex-shrink-0">
-                    <button onClick={() => setSidebarOpen(true)} className="sm:hidden p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors">
-                        <FiMenu className="w-5 h-5" />
-                    </button>
-                    <IoGameControllerOutline className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                        <h1 className="text-sm sm:text-lg font-bold truncate">Server Games</h1>
-                        <p className="text-[10px] sm:text-xs text-white/30 truncate">{currentServer?.name || 'Multiplayer'} — {activeSessions.length + waitingSessions.length} active</p>
-                    </div>
-                    <button onClick={() => router.push('/channels')} className="p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-white transition-colors flex-shrink-0">
-                        <FiX className="w-5 h-5" />
-                    </button>
-                </div>
+            {/* Content — All sessions */}
+            <div className="flex-1 overflow-y-auto">
+                <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-5">
 
-                {/* Tabs */}
-                <div className="flex border-b border-white/5 px-2 sm:px-4 bg-[#0c0e1a] flex-shrink-0 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-                    {tabs.map(t => (
-                        <button key={t.id} onClick={() => setTab(t.id)}
-                            className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 ${
-                                tab === t.id ? 'text-indigo-400 border-indigo-400' : 'text-white/30 border-transparent hover:text-white/60'
-                            }`}>
-                            {t.label}
-                            {t.count > 0 && <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${tab === t.id ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-white/20'}`}>{t.count}</span>}
-                        </button>
-                    ))}
-                </div>
+                    {/* My active session banner */}
+                    {myActiveSession && (
+                        <div className="p-3 sm:p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse flex-shrink-0" />
+                                <p className="text-sm text-emerald-400 font-medium truncate">
+                                    You're in a {myActiveSession.game?.replace(/-/g, ' ')} game ({myActiveSession.status === 'waiting' ? 'waiting for players' : 'in progress'})
+                                </p>
+                            </div>
+                            <button onClick={() => dispatch(setGameSession(myActiveSession))}
+                                className="px-4 py-1.5 bg-emerald-500 text-white rounded-lg text-xs font-medium hover:bg-emerald-600 transition-colors flex-shrink-0">
+                                Rejoin
+                            </button>
+                        </div>
+                    )}
 
-                {/* Tab Content */}
-                <div className="flex-1 overflow-y-auto">
-                    <AnimatePresence mode="wait">
-                        {tab === 'library' && (
-                            <motion.div key="library" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                                className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-
-                                {/* My active session banner */}
-                                {myActiveSession && (
-                                    <div className="mb-4 p-3 sm:p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
-                                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                                            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse flex-shrink-0" />
-                                            <p className="text-sm text-emerald-400 font-medium truncate">
-                                                You're in a {myActiveSession.game?.replace(/-/g, ' ')} game ({myActiveSession.status})
-                                            </p>
-                                        </div>
-                                        <button onClick={() => { dispatch(setGameSession(myActiveSession)); setTab('sessions'); }}
-                                            className="px-4 py-1.5 bg-emerald-500 text-white rounded-lg text-xs font-medium hover:bg-emerald-600 transition-colors flex-shrink-0">
-                                            Rejoin
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* Search */}
-                                <div className="flex items-center gap-2 bg-white/5 rounded-xl px-4 py-2.5 border border-white/5 mb-4 sm:mb-6">
-                                    <FiSearch className="w-4 h-4 text-white/20 flex-shrink-0" />
-                                    <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                                        placeholder="Search multiplayer games..." className="flex-1 bg-transparent text-sm outline-none text-white placeholder-white/20 min-w-0" />
+                    {/* Spectating banner */}
+                    {spectatingSessionId && activeSession && (
+                        <div className="bg-white/[0.02] rounded-2xl border border-white/5 p-4 sm:p-6">
+                            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
+                                    <h3 className="text-sm sm:text-base font-bold truncate">
+                                        {activeSession.game?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — LIVE
+                                    </h3>
                                 </div>
-
-                                {/* Game Grid */}
-                                <div className="grid grid-cols-1 min-[440px]:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                                    {filteredGames.map((g, i) => (
-                                        <motion.div key={g.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-                                            whileHover={{ y: -3, scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => createGame(g.id)}
-                                            className="relative rounded-2xl cursor-pointer overflow-hidden shadow-xl group">
-                                            <div className={`absolute inset-0 bg-gradient-to-br ${g.gradient} opacity-90`} />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-                                            <div className="absolute -right-2 -top-2 text-[60px] sm:text-[70px] opacity-10 group-hover:opacity-20 transition-opacity rotate-12">{g.emoji.slice(0, 2)}</div>
-                                            <div className="relative p-4 sm:p-5 min-h-[120px] sm:min-h-[140px] flex flex-col justify-end">
-                                                <div className="text-2xl sm:text-3xl mb-1.5 drop-shadow-lg">{g.emoji.slice(0, 2)}</div>
-                                                <h3 className="text-sm sm:text-base font-extrabold mb-0.5 tracking-tight">{g.name}</h3>
-                                                <p className="text-white/60 text-[10px] sm:text-xs mb-2">{g.desc}</p>
-                                                <div className="flex items-center gap-1.5">
-                                                    <div className="flex items-center gap-1 bg-black/25 backdrop-blur-sm rounded-full px-2 py-1 text-[9px] font-semibold">
-                                                        <FiUsers className="w-2.5 h-2.5" /> {g.players}P
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </motion.div>
-                                    ))}
-                                </div>
-                                {filteredGames.length === 0 && <p className="text-center text-white/20 py-10">No games found</p>}
-                            </motion.div>
-                        )}
-
-                        {tab === 'sessions' && (
-                            <motion.div key="sessions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                                className="max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4">
-
-                                {(waitingSessions.length + activeSessions.length + finishedSessions.length) === 0 && (
-                                    <div className="text-center py-16">
-                                        <div className="text-5xl mb-4">🎮</div>
-                                        <p className="text-white/40 mb-2">No active game sessions</p>
-                                        <p className="text-xs text-white/20 mb-6">Start a game from the Game Library tab!</p>
-                                        <button onClick={() => setTab('library')} className="px-6 py-2.5 bg-indigo-500 rounded-xl text-sm font-medium hover:bg-indigo-600 transition-colors">
-                                            Browse Games
-                                        </button>
+                                <button onClick={() => leaveSpectate(spectatingSessionId)}
+                                    className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs hover:bg-white/10 transition-colors flex-shrink-0">
+                                    Leave Spectate
+                                </button>
+                            </div>
+                            <div className="flex gap-2 mb-4 flex-wrap">
+                                {activeSession.players?.map((p, i) => (
+                                    <div key={i} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs ${
+                                        (activeSession.currentTurn?.toString() === (p.user?._id || p.user)?.toString() ||
+                                         activeSession.currentTurn?._id?.toString() === (p.user?._id || p.user)?.toString())
+                                            ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                                            : 'bg-white/5 text-white/40'
+                                    }`}>
+                                        <span className="font-bold">{i === 0 ? '🔵' : '🔴'}</span>
+                                        <span className="truncate max-w-[80px]">{p.user?.username || 'Player'}</span>
+                                        <span className="text-white/20">({p.score || 0})</span>
                                     </div>
-                                )}
-
-                                {/* Waiting sessions */}
-                                {waitingSessions.length > 0 && (
-                                    <div>
-                                        <h3 className="text-xs font-bold text-amber-400/60 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <FiClock className="w-3 h-3" /> Waiting for Players ({waitingSessions.length})
-                                        </h3>
-                                        <div className="space-y-2">
-                                            {waitingSessions.map(s => (
-                                                <SessionCard key={s._id} session={s} user={user}
-                                                    onRequestJoin={requestJoin} onAcceptJoin={acceptJoin} onDeclineJoin={declineJoin}
-                                                    onSpectate={spectateGame} onCancel={cancelGame}
-                                                    onRejoin={() => { dispatch(setGameSession(s)); }} />
-                                            ))}
-                                        </div>
+                                ))}
+                            </div>
+                            <SpectatorBoard session={activeSession} />
+                            <div className="mt-4 bg-white/[0.02] rounded-xl border border-white/5 p-3">
+                                <h4 className="text-xs font-bold text-white/30 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                    <FiEye className="w-3 h-3" /> Spectators ({activeSession.spectators?.length || 0})
+                                </h4>
+                                {activeSession.spectators?.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {activeSession.spectators.map((s, i) => (
+                                            <span key={i} className="px-2 py-1 rounded-full bg-white/5 text-[10px] text-white/40">{s.user?.username || '?'}</span>
+                                        ))}
                                     </div>
-                                )}
+                                ) : <p className="text-xs text-white/20">No other spectators</p>}
+                            </div>
+                        </div>
+                    )}
 
-                                {/* Active sessions */}
-                                {activeSessions.length > 0 && (
-                                    <div>
-                                        <h3 className="text-xs font-bold text-emerald-400/60 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <FiPlay className="w-3 h-3" /> In Progress ({activeSessions.length})
-                                        </h3>
-                                        <div className="space-y-2">
-                                            {activeSessions.map(s => (
-                                                <SessionCard key={s._id} session={s} user={user}
-                                                    onSpectate={spectateGame}
-                                                    onRejoin={() => { dispatch(setGameSession(s)); }}
-                                                    onMakeMove={makeMove} onRematch={requestRematch} />
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                    {/* Empty state */}
+                    {(waitingSessions.length + activeSessions.length + finishedSessions.length) === 0 && !spectatingSessionId && (
+                        <div className="text-center py-16">
+                            <div className="text-5xl mb-4">🎮</div>
+                            <p className="text-white/40 mb-2">No active game sessions</p>
+                            <p className="text-xs text-white/20 mb-6">Create a game and challenge your friends!</p>
+                            <button onClick={() => setShowCreateMenu(true)}
+                                className="px-6 py-2.5 bg-indigo-500 rounded-xl text-sm font-medium hover:bg-indigo-600 transition-colors">
+                                <FiPlus className="w-4 h-4 inline mr-1.5" /> Create Game
+                            </button>
+                        </div>
+                    )}
 
-                                {/* Finished sessions */}
-                                {finishedSessions.length > 0 && (
-                                    <div>
-                                        <h3 className="text-xs font-bold text-white/20 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            🏁 Recently Finished ({finishedSessions.length})
-                                        </h3>
-                                        <div className="space-y-2">
-                                            {finishedSessions.slice(0, 10).map(s => (
-                                                <SessionCard key={s._id} session={s} user={user} onRematch={requestRematch} />
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </motion.div>
-                        )}
+                    {/* Waiting sessions */}
+                    {waitingSessions.length > 0 && (
+                        <div>
+                            <h3 className="text-xs font-bold text-amber-400/60 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <FiClock className="w-3 h-3" /> Waiting for Players ({waitingSessions.length})
+                            </h3>
+                            <div className="space-y-2">
+                                {waitingSessions.map(s => (
+                                    <SessionCard key={s._id} session={s} user={user}
+                                        onRequestJoin={requestJoin} onAcceptJoin={acceptJoin} onDeclineJoin={declineJoin}
+                                        onSpectate={spectateGame} onCancel={cancelGame}
+                                        onRejoin={() => dispatch(setGameSession(s))} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
-                        {tab === 'spectate' && (
-                            <motion.div key="spectate" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                                className="max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+                    {/* Active sessions */}
+                    {activeSessions.length > 0 && (
+                        <div>
+                            <h3 className="text-xs font-bold text-emerald-400/60 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <FiPlay className="w-3 h-3" /> In Progress ({activeSessions.length})
+                            </h3>
+                            <div className="space-y-2">
+                                {activeSessions.map(s => (
+                                    <SessionCard key={s._id} session={s} user={user}
+                                        onSpectate={spectateGame}
+                                        onRejoin={() => dispatch(setGameSession(s))} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
-                                {!spectatingSessionId ? (
-                                    <div className="text-center py-16">
-                                        <div className="text-5xl mb-4">👁️</div>
-                                        <p className="text-white/40 mb-2">Not spectating any game</p>
-                                        <p className="text-xs text-white/20 mb-6">Go to Active Sessions and click Spectate on any game</p>
-                                        <button onClick={() => setTab('sessions')} className="px-6 py-2.5 bg-indigo-500 rounded-xl text-sm font-medium hover:bg-indigo-600 transition-colors">
-                                            View Sessions
-                                        </button>
-                                    </div>
-                                ) : activeSession ? (
-                                    <div>
-                                        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
-                                                <h3 className="text-sm sm:text-base font-bold truncate">
-                                                    {activeSession.game?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — LIVE
-                                                </h3>
-                                            </div>
-                                            <button onClick={() => leaveSpectate(spectatingSessionId)}
-                                                className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs hover:bg-white/10 transition-colors flex-shrink-0">
-                                                Leave Spectate
-                                            </button>
-                                        </div>
-
-                                        {/* Players */}
-                                        <div className="flex gap-2 mb-4 flex-wrap">
-                                            {activeSession.players?.map((p, i) => (
-                                                <div key={i} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs ${
-                                                    (activeSession.currentTurn?.toString() === (p.user?._id || p.user)?.toString() ||
-                                                     activeSession.currentTurn?._id?.toString() === (p.user?._id || p.user)?.toString())
-                                                        ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                                                        : 'bg-white/5 text-white/40'
-                                                }`}>
-                                                    <span className="font-bold">{i === 0 ? '🔵' : '🔴'}</span>
-                                                    <span className="truncate max-w-[80px]">{p.user?.username || 'Player'}</span>
-                                                    <span className="text-white/20">({p.score || 0})</span>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        {/* Game Board — read-only view */}
-                                        <div className="bg-white/[0.02] rounded-2xl border border-white/5 p-4 sm:p-6 mb-4">
-                                            <SpectatorBoard session={activeSession} />
-                                        </div>
-
-                                        {/* Spectator List */}
-                                        <div className="bg-white/[0.02] rounded-xl border border-white/5 p-3 sm:p-4">
-                                            <h4 className="text-xs font-bold text-white/30 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                                <FiEye className="w-3 h-3" /> Spectators ({activeSession.spectators?.length || 0})
-                                            </h4>
-                                            {activeSession.spectators?.length > 0 ? (
-                                                <div className="space-y-1.5">
-                                                    {activeSession.spectators.map((s, i) => (
-                                                        <div key={i} className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-white/50">
-                                                            <div className="w-5 h-5 rounded-full bg-indigo-500/30 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
-                                                                {s.user?.username?.[0]?.toUpperCase() || '?'}
-                                                            </div>
-                                                            <span className="truncate">{s.user?.username || 'Unknown'}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-xs text-white/20">No other spectators</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                ) : null}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                    {/* Finished sessions */}
+                    {finishedSessions.length > 0 && (
+                        <div>
+                            <h3 className="text-xs font-bold text-white/20 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                🏁 Recently Finished ({finishedSessions.length})
+                            </h3>
+                            <div className="space-y-2">
+                                {finishedSessions.slice(0, 10).map(s => (
+                                    <SessionCard key={s._id} session={s} user={user} onRematch={requestRematch} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
     );
 }
 
-/* ─── Session Card Component ─── */
+/* ─── Session Card ─── */
 function SessionCard({ session, user, onRequestJoin, onAcceptJoin, onDeclineJoin, onSpectate, onCancel, onRejoin, onRematch }) {
     const isHost = session.players?.[0]?.user?._id?.toString() === user?._id?.toString() ||
                    session.players?.[0]?.user?.toString() === user?._id?.toString();
@@ -462,6 +308,7 @@ function SessionCard({ session, user, onRequestJoin, onAcceptJoin, onDeclineJoin
     const pendingRequests = session.joinRequests?.filter(r => r.status === 'pending') || [];
     const winnerPlayer = session.players?.find(p => (p.user?._id || p.user)?.toString() === session.winner?.toString());
     const elapsed = session.startedAt ? Math.floor((Date.now() - new Date(session.startedAt)) / 60000) : 0;
+    const gameEmoji = MULTIPLAYER_GAMES.find(g => g.id === session.game)?.emoji?.slice(0, 2) || '🎮';
 
     return (
         <div className={`p-3 sm:p-4 rounded-xl border transition-all ${
@@ -474,7 +321,7 @@ function SessionCard({ session, user, onRequestJoin, onAcceptJoin, onDeclineJoin
                     session.status === 'waiting' ? 'bg-amber-500/10' :
                     session.status === 'in_progress' ? 'bg-emerald-500/10' : 'bg-white/5'
                 }`}>
-                    {MULTIPLAYER_GAMES.find(g => g.id === session.game)?.emoji?.slice(0, 2) || '🎮'}
+                    {gameEmoji}
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -517,7 +364,6 @@ function SessionCard({ session, user, onRequestJoin, onAcceptJoin, onDeclineJoin
                         </div>
                     )}
 
-                    {/* Spectator count */}
                     {session.spectators?.length > 0 && (
                         <p className="text-[10px] text-white/20 mt-1 flex items-center gap-1">
                             <FiEye className="w-2.5 h-2.5" /> {session.spectators.length} spectator{session.spectators.length !== 1 ? 's' : ''}
@@ -563,7 +409,7 @@ function SessionCard({ session, user, onRequestJoin, onAcceptJoin, onDeclineJoin
     );
 }
 
-/* ─── Spectator Board — Read-only game display ─── */
+/* ─── Spectator Board ─── */
 function SpectatorBoard({ session }) {
     if (!session) return <p className="text-white/20 text-center">No game data</p>;
 
@@ -575,11 +421,9 @@ function SpectatorBoard({ session }) {
     return (
         <div className="flex flex-col items-center">
             <p className={`text-sm font-medium mb-4 ${session.status === 'finished' ? 'text-amber-400' : 'text-white/40'}`}>{statusText}</p>
-
             {gameName === 'tic-tac-toe' && <TicTacToeSpectator state={session.state} />}
             {gameName === 'connect4' && <Connect4Spectator state={session.state} />}
             {gameName === 'rock-paper-scissors' && <RPSSpectator state={session.state} session={session} />}
-
             {!['tic-tac-toe', 'connect4', 'rock-paper-scissors'].includes(gameName) && (
                 <div className="text-center py-8">
                     <p className="text-3xl mb-2">{MULTIPLAYER_GAMES.find(g => g.id === gameName)?.emoji?.slice(0, 2) || '🎮'}</p>
