@@ -583,17 +583,17 @@ export default function ChannelsPage() {
 
                     <div className="w-8 h-0.5 bg-white/10 rounded-full" />
 
-                    {/* Games — solo or server */}
+                    {/* Games — account/solo games only */}
                     <motion.div whileHover={{ borderRadius: '35%' }}
-                        onClick={() => router.push(currentServer ? `/server-games/${currentServer._id}` : '/games')}
-                        className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-indigo-500 cursor-pointer transition-all duration-200" title={currentServer ? 'Server Games' : 'Solo Games'}>
+                        onClick={() => router.push('/games')}
+                        className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-indigo-500 cursor-pointer transition-all duration-200" title="Solo Games">
                         <IoGameControllerOutline className="w-5 h-5" />
                     </motion.div>
 
-                    {/* Music */}
+                    {/* Music — account/personal music only */}
                     <motion.div whileHover={{ borderRadius: '35%' }}
-                        onClick={() => router.push(currentServer ? `/music?serverId=${currentServer._id}` : '/music')}
-                        className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-pink-500 cursor-pointer transition-all duration-200" title={currentServer ? 'Server Music' : 'My Music'}>
+                        onClick={() => router.push('/music')}
+                        className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-pink-500 cursor-pointer transition-all duration-200" title="My Music">
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                     </motion.div>
 
@@ -772,12 +772,12 @@ export default function ChannelsPage() {
                                 </div>
                                 {!collapsedCats['activities'] && (
                                     <>
-                                        <div onClick={() => setShowGameLauncher(true)}
+                                        <div onClick={() => router.push(`/server-games/${currentServer?._id}`)}
                                             className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-white/40 hover:text-white/70 hover:bg-white/5 transition-all duration-150">
                                             <IoGameControllerOutline className="w-4 h-4 text-indigo-400/50" />
                                             <span className="text-sm">Play Games</span>
                                         </div>
-                                        <div onClick={() => setShowMusicRoom(true)}
+                                        <div onClick={() => router.push(`/music?serverId=${currentServer?._id}`)}
                                             className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-white/40 hover:text-white/70 hover:bg-white/5 transition-all duration-150">
                                             <FiVolume2 className="w-4 h-4 text-pink-400/50" />
                                             <span className="text-sm">Listen Together</span>
