@@ -1045,7 +1045,7 @@ export default function ChannelsPage() {
                                                         )}
                                                     </p>
                                                     {/* Game Challenge Card */}
-                                                    {msg.gameChallenge && (
+                                                    {msg.gameChallenge?.game && (
                                                         <div className={`mt-2 p-3 rounded-xl border ${
                                                             msg.gameChallenge.status === 'waiting' ? 'bg-amber-500/5 border-amber-500/20' :
                                                             msg.gameChallenge.status === 'in_progress' ? 'bg-emerald-500/5 border-emerald-500/20' :
