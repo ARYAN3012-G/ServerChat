@@ -175,6 +175,262 @@ export default function ServerGamesPage({ params }) {
         s.players?.some(p => (p.user?._id || p.user)?.toString() === user?._id?.toString())
     );
 
+    // Check if user is actively in a game session
+    const isInGame = activeSession &&
+        activeSession.players?.some(p => (p.user?._id || p.user)?.toString() === user?._id?.toString()) &&
+        !spectatingSessionId;
+
+    const makeMove = (move) => {
+        const socket = getSocket();
+        if (!socket || !activeSession) return;
+        socket.emit('game:move', { sessionId: activeSession._id, move });
+    };
+
+    // ── GAME PLAY OVERLAY ──
+    // When user has an active session and is a player, show the game interface
+    if (isInGame) {
+        const session = activeSession;
+        const gameName = session.game?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const gameEmoji = MULTIPLAYER_GAMES.find(g => g.id === session.game)?.emoji?.slice(0, 2) || '🎮';
+        const myIndex = session.players?.findIndex(p => (p.user?._id || p.user)?.toString() === user?._id?.toString());
+        const opponentPlayer = session.players?.find((p, i) => i !== myIndex);
+        const isMyTurn = (session.currentTurn?._id || session.currentTurn)?.toString() === user?._id?.toString();
+        const isFinished = session.status === 'finished';
+        const isWaiting = session.status === 'waiting';
+        const iWon = session.winner?.toString() === user?._id?.toString() || session.winner?._id?.toString() === user?._id?.toString();
+        const isDraw = isFinished && !session.winner;
+
+        return (
+            <div className="flex h-[100dvh] bg-[#0c0e1a] text-white overflow-hidden flex-col">
+                {/* Game Header */}
+                <div className="flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-white/5 bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 flex-shrink-0">
+                    <button onClick={() => dispatch(clearGame())}
+                        className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors">
+                        <FiArrowLeft className="w-5 h-5" />
+                    </button>
+                    <span className="text-xl">{gameEmoji}</span>
+                    <div className="min-w-0 flex-1">
+                        <h1 className="text-sm sm:text-lg font-bold truncate">{gameName}</h1>
+                        <p className="text-[10px] sm:text-xs text-white/30 truncate">
+                            {isWaiting ? 'Waiting for opponent…' :
+                             isFinished ? (iWon ? '🎉 You won!' : isDraw ? '🤝 Draw!' : '😔 You lost') :
+                             isMyTurn ? "Your turn" : "Opponent's turn"}
+                        </p>
+                    </div>
+                    {!isFinished && (
+                        <button onClick={() => session.status === 'in_progress' ? forfeitGame(session._id) : cancelGame(session._id)}
+                            className="px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-[10px] sm:text-xs font-medium hover:bg-red-500/20 transition-colors">
+                            {session.status === 'in_progress' ? '🏳️ Forfeit' : '✕ Cancel'}
+                        </button>
+                    )}
+                    {isFinished && (
+                        <div className="flex gap-2">
+                            <button onClick={() => requestRematch(session._id)}
+                                className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-[10px] sm:text-xs font-medium transition-colors">
+                                <FiRefreshCw className="w-3 h-3 inline mr-1" /> Rematch
+                            </button>
+                            <button onClick={() => dispatch(clearGame())}
+                                className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white/50 rounded-lg text-[10px] sm:text-xs font-medium transition-colors border border-white/10">
+                                Back
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Players bar */}
+                <div className="flex items-center justify-center gap-4 sm:gap-8 px-4 py-3 bg-[#0e1020] border-b border-white/5 flex-shrink-0">
+                    {session.players?.map((p, i) => {
+                        const isMe = (p.user?._id || p.user)?.toString() === user?._id?.toString();
+                        const isTurn = (session.currentTurn?._id || session.currentTurn)?.toString() === (p.user?._id || p.user)?.toString();
+                        return (
+                            <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all ${
+                                isTurn && !isFinished
+                                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shadow-lg shadow-indigo-500/10'
+                                    : 'bg-white/5 text-white/40'
+                            }`}>
+                                <span className="font-bold">{i === 0 ? '🔵' : '🔴'}</span>
+                                <span className="font-medium truncate max-w-[80px]">{isMe ? 'You' : (p.user?.username || 'Player')}</span>
+                                {isTurn && !isFinished && <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse" />}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Game board */}
+                <div className="flex-1 overflow-y-auto flex items-center justify-center p-4">
+                    {isWaiting ? (
+                        <div className="text-center">
+                            <div className="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-6" />
+                            <p className="text-white/60 text-lg font-medium mb-2">Waiting for opponent…</p>
+                            <p className="text-white/20 text-sm">Share the Live Sessions tab with friends</p>
+                            {/* Show join requests if host */}
+                            {session.joinRequests?.filter(r => r.status === 'pending').length > 0 && (
+                                <div className="mt-6 space-y-2 max-w-xs mx-auto">
+                                    <p className="text-amber-400/70 text-xs font-bold">Join Requests:</p>
+                                    {session.joinRequests.filter(r => r.status === 'pending').map((req, i) => (
+                                        <div key={i} className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2">
+                                            <span className="text-xs text-white/60 flex-1">{req.user?.username || 'Player'}</span>
+                                            <button onClick={() => acceptJoin(session._id, req.user?._id || req.user)}
+                                                className="px-3 py-1 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-medium">
+                                                Accept
+                                            </button>
+                                            <button onClick={() => declineJoin(session._id, req.user?._id || req.user)}
+                                                className="px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs">
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="w-full max-w-md mx-auto">
+                            {/* Result banner */}
+                            {isFinished && (
+                                <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                                    className={`text-center mb-6 p-4 rounded-2xl font-bold text-lg ${
+                                        iWon ? 'bg-emerald-500/15 text-emerald-400' :
+                                        isDraw ? 'bg-amber-500/15 text-amber-300' :
+                                        'bg-red-500/15 text-red-400'
+                                    }`}>
+                                    {iWon ? '🎉 You Won!' : isDraw ? '🤝 Draw!' : '😔 You Lost'}
+                                </motion.div>
+                            )}
+
+                            {/* Tic-Tac-Toe Board */}
+                            {session.game === 'tic-tac-toe' && (() => {
+                                const board = session.state?.board || Array(9).fill(null);
+                                const mySymbol = myIndex === 0 ? 'X' : 'O';
+                                return (
+                                    <div>
+                                        {!isFinished && <p className="text-center text-white/30 mb-4 text-sm">You are <span className="font-bold text-indigo-400">{mySymbol}</span></p>}
+                                        <div className="grid grid-cols-3 gap-2.5 max-w-[280px] mx-auto">
+                                            {board.map((cell, i) => (
+                                                <motion.button key={i}
+                                                    whileHover={!cell && isMyTurn && !isFinished ? { scale: 1.08 } : {}}
+                                                    whileTap={!cell && isMyTurn && !isFinished ? { scale: 0.95 } : {}}
+                                                    onClick={() => { if (!cell && isMyTurn && !isFinished) makeMove({ position: i }); }}
+                                                    className={`aspect-square rounded-xl text-3xl sm:text-4xl font-black flex items-center justify-center transition-all border ${
+                                                        cell === 'X' ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' :
+                                                        cell === 'O' ? 'bg-pink-500/20 text-pink-400 border-pink-500/30' :
+                                                        isMyTurn && !isFinished ? 'bg-white/[0.03] border-white/10 hover:bg-white/10 cursor-pointer' :
+                                                        'bg-white/[0.02] border-white/5'
+                                                    }`}>
+                                                    {cell && <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }}>{cell}</motion.span>}
+                                                </motion.button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Rock Paper Scissors */}
+                            {session.game === 'rock-paper-scissors' && (() => {
+                                const choices = session.state?.choices || {};
+                                const myChoice = choices[user?._id];
+                                const allChosen = Object.keys(choices).length >= 2;
+                                const options = [
+                                    { id: 'rock', emoji: '🪨', label: 'Rock' },
+                                    { id: 'paper', emoji: '📄', label: 'Paper' },
+                                    { id: 'scissors', emoji: '✂️', label: 'Scissors' },
+                                ];
+                                return (
+                                    <div className="text-center">
+                                        {!myChoice && !isFinished ? (
+                                            <>
+                                                <p className="text-white/30 mb-6">Pick your weapon!</p>
+                                                <div className="flex justify-center gap-4">
+                                                    {options.map(o => (
+                                                        <motion.button key={o.id} whileHover={{ scale: 1.15, y: -8 }} whileTap={{ scale: 0.9 }}
+                                                            onClick={() => makeMove({ choice: o.id })}
+                                                            className="w-24 h-24 rounded-2xl bg-white/5 border border-white/10 hover:border-indigo-500/50 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all">
+                                                            <span className="text-4xl">{o.emoji}</span>
+                                                            <span className="text-[9px] text-white/40 uppercase font-bold">{o.label}</span>
+                                                        </motion.button>
+                                                    ))}
+                                                </div>
+                                            </>
+                                        ) : myChoice && !allChosen && !isFinished ? (
+                                            <div>
+                                                <p className="text-white/30 mb-4">You chose</p>
+                                                <div className="w-24 h-24 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-5xl mx-auto mb-4">
+                                                    {options.find(o => o.id === myChoice)?.emoji}
+                                                </div>
+                                                <p className="text-white/20 text-sm animate-pulse">Waiting for opponent…</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center justify-center gap-8">
+                                                {session.players?.map((p, i) => {
+                                                    const pId = (p.user?._id || p.user)?.toString();
+                                                    const choice = choices[pId];
+                                                    return (
+                                                        <div key={i} className="text-center">
+                                                            <div className="w-20 h-20 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-4xl mb-2">
+                                                                {choice ? (options.find(o => o.id === choice)?.emoji || '❓') : '⏳'}
+                                                            </div>
+                                                            <p className="text-xs text-white/40">{pId === user?._id ? 'You' : (p.user?.username || 'Opponent')}</p>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Connect 4 */}
+                            {session.game === 'connect4' && (() => {
+                                const board = session.state?.board || Array(6).fill(null).map(() => Array(7).fill(null));
+                                const myColor = myIndex === 0 ? 'R' : 'Y';
+                                return (
+                                    <div>
+                                        {!isFinished && <p className="text-center text-white/30 mb-4 text-sm">You are <span className={`font-bold ${myColor === 'R' ? 'text-red-400' : 'text-yellow-400'}`}>{myColor === 'R' ? '🔴 Red' : '🟡 Yellow'}</span></p>}
+                                        <div className="bg-indigo-900/30 rounded-xl p-2 sm:p-3 border border-indigo-500/20 inline-block mx-auto">
+                                            {/* Column buttons */}
+                                            {isMyTurn && !isFinished && (
+                                                <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-2">
+                                                    {Array(7).fill(null).map((_, col) => (
+                                                        <button key={col} onClick={() => makeMove({ column: col })}
+                                                            disabled={board[0][col] !== null}
+                                                            className="h-6 rounded bg-white/5 hover:bg-indigo-500/20 transition-colors text-[10px] text-white/20 hover:text-indigo-400 disabled:opacity-20 disabled:cursor-not-allowed">
+                                                            ▼
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {board.map((row, ri) => (
+                                                <div key={ri} className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1 last:mb-0">
+                                                    {row.map((cell, ci) => (
+                                                        <div key={ci} onClick={() => { if (isMyTurn && !isFinished && !board[0][ci]) makeMove({ column: ci }); }}
+                                                            className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border-2 transition-all ${
+                                                                cell === 'R' ? 'bg-red-500 border-red-400 shadow-lg shadow-red-500/30' :
+                                                                cell === 'Y' ? 'bg-yellow-400 border-yellow-300 shadow-lg shadow-yellow-400/30' :
+                                                                isMyTurn && !isFinished ? 'bg-indigo-950/50 border-indigo-800/30 cursor-pointer hover:border-indigo-500/50' :
+                                                                'bg-indigo-950/50 border-indigo-800/30'
+                                                            }`} />
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Fallback for unsupported games */}
+                            {!['tic-tac-toe', 'rock-paper-scissors', 'connect4'].includes(session.game) && (
+                                <div className="text-center py-8">
+                                    <p className="text-5xl mb-4">{gameEmoji}</p>
+                                    <p className="text-white/40 mb-2">Multiplayer board coming soon for {gameName}</p>
+                                    <p className="text-white/20 text-sm">Use spectator view for now</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex h-[100dvh] bg-[#0c0e1a] text-white overflow-hidden flex-col">
             {/* Header */}

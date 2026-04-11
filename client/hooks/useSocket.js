@@ -29,9 +29,9 @@ export function useSocket() {
         const handleReactedMessage = ({ messageId, reactions }) => dispatch(updateReactions({ messageId, reactions }));
         const handlePresenceOnline = ({ userId }) => dispatch(addOnlineUser(userId));
         const handlePresenceOffline = ({ userId }) => dispatch(removeOnlineUser(userId));
-        const handleGameUpdated = ({ session }) => { dispatch(setGameSession(session)); dispatch(updateServerSession(session)); };
-        const handleGameCreated = ({ session }) => { dispatch(setGameSession(session)); dispatch(updateServerSession(session)); };
-        const handleGameRematch = ({ session }) => { dispatch(setGameSession(session)); dispatch(updateServerSession(session)); };
+        const handleGameUpdated = ({ session }) => { dispatch(updateServerSession(session)); };
+        const handleGameCreated = ({ session }) => { dispatch(updateServerSession(session)); };
+        const handleGameRematch = ({ session }) => { dispatch(updateServerSession(session)); };
         const handleVoiceJoined = ({ channelId, userId, username }) => setVoiceUsers(prev => ({ ...prev, [channelId]: [...(prev[channelId] || []).filter(u => u.userId !== userId), { userId, username }] }));
         const handleVoiceLeft = ({ channelId, userId }) => setVoiceUsers(prev => ({ ...prev, [channelId]: (prev[channelId] || []).filter(u => u.userId !== userId) }));
         const handleMusicSync = (data) => setMusicRoom(prev => ({ ...prev, ...data }));
