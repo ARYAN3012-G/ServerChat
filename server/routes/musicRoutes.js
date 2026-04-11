@@ -101,4 +101,74 @@ router.get('/trending', auth, async (req, res) => {
     }
 });
 
+// ─── FAVORITES ───
+const User = require('../models/User');
+
+router.get('/favorites', auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        res.json({ favorites: user.favoriteSongs || [] });
+    } catch (error) { res.status(500).json({ message: 'Failed to fetch favorites' }); }
+});
+
+router.post('/favorites', auth, async (req, res) => {
+    try {
+        const { title, artist, url, thumbnail, duration } = req.body;
+        if (!title || !url) return res.status(400).json({ message: 'Title and URL required' });
+        const user = await User.findById(req.user._id);
+        const exists = user.favoriteSongs?.some(s => s.url === url);
+        if (exists) return res.status(400).json({ message: 'Already in favorites' });
+        user.favoriteSongs.push({ title, artist, url, thumbnail, duration });
+        await user.save();
+        res.status(201).json({ favorites: user.favoriteSongs });
+    } catch (error) { res.status(500).json({ message: 'Failed to add favorite' }); }
+});
+
+router.delete('/favorites/:songId', auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        user.favoriteSongs = user.favoriteSongs.filter(s => s._id.toString() !== req.params.songId);
+        await user.save();
+        res.json({ favorites: user.favoriteSongs });
+    } catch (error) { res.status(500).json({ message: 'Failed to remove favorite' }); }
+});
+
+// ─── MUSIC SESSIONS ───
+const MusicSession = require('../models/MusicSession');
+
+router.get('/sessions/server/:serverId', auth, async (req, res) => {
+    try {
+        const sessions = await MusicSession.find({ server: req.params.serverId, status: 'active' })
+            .populate('host', 'username avatar')
+            .populate('listeners.user', 'username avatar')
+            .populate('queue.requestedBy', 'username avatar')
+            .sort({ createdAt: -1 });
+        res.json({ sessions });
+    } catch (error) { res.status(500).json({ message: 'Failed to fetch sessions' }); }
+});
+
+router.post('/sessions', auth, async (req, res) => {
+    try {
+        const { name, serverId } = req.body;
+        if (!name || !serverId) return res.status(400).json({ message: 'Name and server required' });
+        const session = await MusicSession.create({
+            name, server: serverId, host: req.user._id,
+            listeners: [{ user: req.user._id }],
+        });
+        const populated = await session.populate(['host', 'listeners.user']);
+        res.status(201).json({ session: populated });
+    } catch (error) { res.status(500).json({ message: 'Failed to create session' }); }
+});
+
+router.put('/sessions/:sessionId/end', auth, async (req, res) => {
+    try {
+        const session = await MusicSession.findById(req.params.sessionId);
+        if (!session) return res.status(404).json({ message: 'Session not found' });
+        if (session.host.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'Only host can end' });
+        session.status = 'ended';
+        await session.save();
+        res.json({ session });
+    } catch (error) { res.status(500).json({ message: 'Failed to end session' }); }
+});
+
 module.exports = router;

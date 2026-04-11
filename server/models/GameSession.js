@@ -58,6 +58,15 @@ const gameSessionSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.Mixed,
         default: {},
     },
+    joinRequests: [{
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
+        requestedAt: { type: Date, default: Date.now },
+    }],
+    spectators: [{
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    }],
+    chatMessageId: { type: mongoose.Schema.Types.ObjectId, ref: 'Message' },
     startedAt: Date,
     finishedAt: Date,
 }, { timestamps: true });

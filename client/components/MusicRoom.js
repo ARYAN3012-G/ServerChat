@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiX, FiPlay, FiPause, FiSkipForward, FiSkipBack, FiVolume2, FiUsers, FiMusic, FiSearch, FiSend, FiMessageCircle, FiLock, FiStar, FiSmile, FiMinimize2, FiMaximize2, FiVolumeX, FiLink, FiCopy } from 'react-icons/fi';
+import { FiX, FiPlay, FiPause, FiSkipForward, FiSkipBack, FiVolume2, FiUsers, FiMusic, FiSearch, FiSend, FiMessageCircle, FiLock, FiStar, FiSmile, FiMinimize2, FiMaximize2, FiVolumeX, FiLink, FiCopy, FiClock, FiCheck, FiPlus } from 'react-icons/fi';
 import { getSocket } from '../services/socket';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -42,10 +42,13 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
     const [searching, setSearching] = useState(false);
     const [activeLanguage, setActiveLanguage] = useState('all');
     const [showFallback, setShowFallback] = useState(false);
-    const [mobileTab, setMobileTab] = useState('tracks'); // 'tracks' | 'chat' | 'users'
+    const [mobileTab, setMobileTab] = useState('tracks'); // 'tracks' | 'chat' | 'users' | 'queue'
     const [showEmojis, setShowEmojis] = useState(false);
     const [minimized, setMinimized] = useState(false);
     const [needsInteraction, setNeedsInteraction] = useState(false);
+    const [queue, setQueue] = useState([]);
+    const [skipVotes, setSkipVotes] = useState(0);
+    const [skipNeeded, setSkipNeeded] = useState(0);
     const audioRef = useRef(null);
     const playPromiseRef = useRef(null);
     const searchTimeoutRef = useRef(null);
@@ -62,9 +65,13 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
         const socket = getSocket();
         const handleChat = (msg) => setChatMessages(prev => [...prev.slice(-100), msg]);
         const handleError = (err) => toast.error(err.message);
+        const handleQueueUpdate = (data) => { setQueue(data.queue || []); if (data.action === 'request') toast(`🎵 Song requested: ${data.track?.title}`, { icon: '🎶' }); };
+        const handleSkipVote = (data) => { setSkipVotes(data.votes); setSkipNeeded(data.needed); if (data.passed) toast('⏭️ Skipped by vote!'); };
         if (socket) {
             socket.on('stream:chat', handleChat);
             socket.on('music:error', handleError);
+            socket.on('music:queue-updated', handleQueueUpdate);
+            socket.on('music:skip-vote', handleSkipVote);
         }
         loadTrending('all');
         return () => {
@@ -72,9 +79,17 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
             if (socket) {
                 socket.off('stream:chat', handleChat);
                 socket.off('music:error', handleError);
+                socket.off('music:queue-updated', handleQueueUpdate);
+                socket.off('music:skip-vote', handleSkipVote);
             }
         };
     }, [serverId]);
+
+    // Sync queue from music:sync data
+    useEffect(() => {
+        if (musicRoom?.queue) setQueue(musicRoom.queue);
+        if (musicRoom?.skipVotes !== undefined) setSkipVotes(musicRoom.skipVotes);
+    }, [musicRoom?.queue, musicRoom?.skipVotes]);
 
     useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
     useEffect(() => { if (audioRef.current) audioRef.current.volume = volume / 100; }, [volume]);
@@ -105,6 +120,27 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
             setSearching(false);
         }, 400);
     }, [activeLanguage]);
+
+    // ── Queue & Skip ──
+    const requestSongToQueue = (track) => {
+        const socket = getSocket();
+        if (socket) socket.emit('music:queue-request', { roomId: serverId, track });
+    };
+
+    const handleQueueAction = (trackId, action) => {
+        const socket = getSocket();
+        if (socket) socket.emit('music:queue-action', { roomId: serverId, trackId, action });
+    };
+
+    const playNextFromQueue = () => {
+        const socket = getSocket();
+        if (socket) socket.emit('music:play-next', { roomId: serverId });
+    };
+
+    const voteToSkip = () => {
+        const socket = getSocket();
+        if (socket) socket.emit('music:vote-skip', { roomId: serverId });
+    };
 
     // ── Chat ──
     const sendChatMessage = () => {
@@ -339,6 +375,18 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                                                 {isPlaying ? <FiPause className="w-4 h-4" /> : <FiPlay className="w-4 h-4 ml-0.5" />}
                                             </button>
                                             <button onClick={handleNext} disabled={!amHost} className={`p-1.5 rounded-full ${amHost ? 'text-white/30 hover:text-white hover:bg-white/10' : 'text-white/10'} transition-colors`}><FiSkipForward className="w-3.5 h-3.5" /></button>
+                                            {/* Vote to Skip */}
+                                            {!amHost && currentTrack && (
+                                                <button onClick={voteToSkip} className="px-2 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[9px] font-semibold hover:bg-orange-500/20 transition-colors ml-1 whitespace-nowrap"
+                                                    title={`Vote to skip (${skipVotes}/${skipNeeded || '?'})`}>
+                                                    ⏭ Skip {skipVotes > 0 ? `(${skipVotes}/${skipNeeded})` : ''}
+                                                </button>
+                                            )}
+                                            {amHost && queue.filter(q => q.status === 'approved').length > 0 && (
+                                                <button onClick={playNextFromQueue} className="px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-semibold hover:bg-emerald-500/20 transition-colors ml-1 whitespace-nowrap">
+                                                    ▶ Next in Queue
+                                                </button>
+                                            )}
                                             <div className="hidden sm:flex items-center gap-1 ml-2 pl-2 border-l border-white/5">
                                                 <button onClick={() => setVolume(v => v > 0 ? 0 : 80)} className="text-white/25 hover:text-white/60 transition-colors">
                                                     {volume === 0 ? <FiVolumeX className="w-3 h-3" /> : <FiVolume2 className="w-3 h-3" />}
@@ -362,7 +410,7 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
 
                             {/* ── MOBILE TABS ── */}
                             <div className="flex border-b border-white/5 sm:hidden flex-shrink-0">
-                                {[{ id: 'tracks', icon: FiMusic, label: 'Tracks' }, { id: 'users', icon: FiUsers, label: `${roomUsers.length || 1}` }, { id: 'chat', icon: FiMessageCircle, label: 'Chat' }].map(t => (
+                                {[{ id: 'tracks', icon: FiMusic, label: 'Tracks' }, { id: 'queue', icon: FiClock, label: `Queue${queue.length ? ` (${queue.length})` : ''}` }, { id: 'users', icon: FiUsers, label: `${roomUsers.length || 1}` }, { id: 'chat', icon: FiMessageCircle, label: 'Chat' }].map(t => (
                                     <button key={t.id} onClick={() => setMobileTab(t.id)}
                                         className={`flex-1 py-2 text-[11px] font-medium text-center transition-colors flex items-center justify-center gap-1 ${mobileTab === t.id ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-white/25'}`}>
                                         <t.icon className="w-3 h-3" />{t.label}
@@ -402,6 +450,49 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                                     </div>
                                 </div>
 
+                                {/* ── QUEUE PANEL ── */}
+                                <div className={`${mobileTab === 'queue' ? 'flex' : 'hidden'} sm:flex flex-col w-full sm:w-48 sm:border-r border-white/5 flex-shrink-0`}>
+                                    <div className="px-3 py-2 flex items-center gap-1.5 border-b border-white/5 flex-shrink-0">
+                                        <FiClock className="w-3 h-3 text-purple-400" />
+                                        <span className="text-[10px] font-semibold text-white/30">Queue — {queue.length}</span>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto px-1.5 py-1" style={{ scrollbarWidth: 'thin' }}>
+                                        {queue.length > 0 ? queue.map((item, i) => (
+                                            <div key={item.id || i} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg mb-0.5 ${item.status === 'pending' ? 'bg-amber-500/5' : 'bg-emerald-500/5'}`}>
+                                                <div className="w-7 h-7 rounded bg-white/5 flex items-center justify-center text-[9px] flex-shrink-0">🎵</div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[10px] font-medium text-white/60 truncate">{item.title}</p>
+                                                    <p className="text-[8px] text-white/20 truncate">{item.requestedBy?.username || 'Unknown'}</p>
+                                                </div>
+                                                {amHost && item.status === 'pending' && (
+                                                    <div className="flex gap-0.5 flex-shrink-0">
+                                                        <button onClick={() => handleQueueAction(item.id, 'approve')}
+                                                            className="p-1 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors">
+                                                            <FiCheck className="w-2.5 h-2.5" />
+                                                        </button>
+                                                        <button onClick={() => handleQueueAction(item.id, 'reject')}
+                                                            className="p-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors">
+                                                            <FiX className="w-2.5 h-2.5" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {item.status === 'approved' && (
+                                                    <span className="text-[8px] text-emerald-400/60 font-bold px-1 flex-shrink-0">✓</span>
+                                                )}
+                                                {!amHost && item.status === 'pending' && (
+                                                    <span className="text-[8px] text-amber-400/60 font-bold px-1 flex-shrink-0">⏳</span>
+                                                )}
+                                            </div>
+                                        )) : (
+                                            <div className="text-center py-6">
+                                                <FiClock className="w-6 h-6 text-white/[0.06] mx-auto mb-1.5" />
+                                                <p className="text-[10px] text-white/15">Queue is empty</p>
+                                                <p className="text-[8px] text-white/10 mt-0.5">Request songs from tracks!</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
                                 {/* ── CENTER: TRACK LIST ── */}
                                 <div className={`${mobileTab === 'tracks' ? 'flex' : 'hidden'} sm:flex flex-col flex-1 min-w-0`}>
                                     {/* Language Tabs */}
@@ -426,8 +517,8 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                                     <div className="flex-1 overflow-y-auto px-1.5 py-0.5">
                                         {showFallback && <p className="text-[10px] text-amber-400/40 text-center py-1">Showing sample tracks (API unavailable)</p>}
                                         {displayTracks.map((track) => (
-                                            <motion.div key={track.id} whileHover={{ x: 2 }} onClick={() => handlePlay(track)}
-                                                className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all ${!amHost ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
+                                            <motion.div key={track.id} whileHover={{ x: 2 }} onClick={() => amHost ? handlePlay(track) : null}
+                                                className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all ${amHost ? 'cursor-pointer' : 'cursor-default'}
                                                     ${currentTrack?.id === track.id ? 'bg-indigo-500/10 border border-indigo-500/20' : 'hover:bg-white/[0.04]'}`}>
                                                 {track.image ? (
                                                     <img src={track.image} alt="" referrerPolicy="no-referrer" crossOrigin="anonymous" className="w-9 h-9 rounded-lg object-cover flex-shrink-0 shadow" />
@@ -447,6 +538,12 @@ export default function MusicRoom({ serverId, serverName, onClose, joinMusicRoom
                                                     <p className="text-[10px] text-white/25 truncate">{track.artist}</p>
                                                 </div>
                                                 <span className="text-[10px] text-white/15 flex-shrink-0">{track.duration}</span>
+                                                {!amHost && (
+                                                    <button onClick={(e) => { e.stopPropagation(); requestSongToQueue(track); }}
+                                                        className="p-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-[9px] font-medium transition-colors flex-shrink-0" title="Request this song">
+                                                        <FiPlus className="w-3 h-3" />
+                                                    </button>
+                                                )}
                                             </motion.div>
                                         ))}
                                         {displayTracks.length === 0 && !searching && <p className="text-xs text-white/10 text-center py-6">No songs found</p>}

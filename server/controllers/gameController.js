@@ -47,6 +47,29 @@ exports.getActiveGames = async (req, res, next) => {
     }
 };
 
+// Get game sessions for a specific server
+exports.getServerSessions = async (req, res, next) => {
+    try {
+        const { serverId } = req.params;
+        const sessions = await GameSession.find({
+            server: serverId,
+            $or: [
+                { status: { $in: ['waiting', 'in_progress'] } },
+                { status: 'finished', finishedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+            ],
+        })
+            .populate('players.user', 'username avatar')
+            .populate('joinRequests.user', 'username avatar')
+            .populate('spectators.user', 'username avatar')
+            .sort({ createdAt: -1 })
+            .limit(50);
+
+        res.json({ sessions });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Get game session
 exports.getGameSession = async (req, res, next) => {
     try {

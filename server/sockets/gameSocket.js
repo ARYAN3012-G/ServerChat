@@ -1,31 +1,53 @@
 const GameSession = require('../models/GameSession');
+const Message = require('../models/Message');
 const { logger } = require('../config/logger');
 
 module.exports = (io, socket) => {
-    // Create a game
+    // Create a game (and post challenge message in chat)
     socket.on('game:create', async (data) => {
         try {
-            const { game, channelId, settings = {} } = data;
+            const { game, channelId, serverId, settings = {} } = data;
 
             const session = await GameSession.create({
                 game,
                 channel: channelId,
+                server: serverId,
                 players: [{ user: socket.userId, isReady: true }],
                 settings,
                 state: getInitialState(game),
             });
 
-            // Creator joins the game socket room
             socket.join(`game:${session._id}`);
 
             const populated = await session.populate('players.user', 'username avatar');
 
-            // Notify the channel so other players can join
-            io.to(`channel:${channelId}`).emit('game:created', {
-                session: populated,
-            });
+            // Post a challenge message in chat
+            if (channelId) {
+                const challengeMsg = await Message.create({
+                    content: `🎮 **Game Challenge!** I want to play **${formatGameName(game)}**! Click to join.`,
+                    sender: socket.userId,
+                    channel: channelId,
+                    type: 'text',
+                    gameSessionId: session._id,
+                    gameChallenge: {
+                        game,
+                        status: 'waiting',
+                        players: [socket.username || 'Player'],
+                    },
+                });
 
-            // Also send to the creator directly (in case they're not in the channel room)
+                // Save reference back to the session
+                session.chatMessageId = challengeMsg._id;
+                await session.save();
+
+                const populatedMsg = await challengeMsg.populate('sender', 'username avatar');
+                io.to(`channel:${channelId}`).emit('message:new', populatedMsg);
+            }
+
+            // Notify channel
+            if (channelId) {
+                io.to(`channel:${channelId}`).emit('game:created', { session: populated });
+            }
             socket.emit('game:updated', { session: populated });
 
             logger.debug(`${socket.username} created game ${game} in channel ${channelId}`);
@@ -35,7 +57,154 @@ module.exports = (io, socket) => {
         }
     });
 
-    // Join a game
+    // Request to join a game (doesn't auto-join — host must accept)
+    socket.on('game:request-join', async (data) => {
+        try {
+            const { sessionId } = data;
+            const session = await GameSession.findById(sessionId);
+
+            if (!session || session.status !== 'waiting') {
+                return socket.emit('error', { message: 'Game not available' });
+            }
+
+            // Check if already a player
+            const alreadyPlayer = session.players.some(p => p.user.toString() === socket.userId);
+            if (alreadyPlayer) {
+                return socket.emit('error', { message: 'You are already in this game' });
+            }
+
+            // Check if already requested
+            const existingRequest = session.joinRequests.find(r => r.user.toString() === socket.userId);
+            if (existingRequest) {
+                if (existingRequest.status === 'pending') {
+                    return socket.emit('error', { message: 'Join request already pending' });
+                }
+                if (existingRequest.status === 'declined') {
+                    return socket.emit('error', { message: 'Your request was declined' });
+                }
+            }
+
+            session.joinRequests.push({ user: socket.userId, status: 'pending' });
+            await session.save();
+
+            const populated = await session.populate(['players.user', 'joinRequests.user']);
+
+            // Notify host (first player)
+            io.to(`game:${sessionId}`).emit('game:join-request', {
+                session: populated,
+                requester: { _id: socket.userId, username: socket.username },
+            });
+
+            socket.emit('game:request-sent', { sessionId });
+
+            logger.debug(`${socket.username} requested to join game ${sessionId}`);
+        } catch (error) {
+            logger.error(`Game request-join error: ${error.message}`);
+            socket.emit('error', { message: 'Failed to request join' });
+        }
+    });
+
+    // Host accepts a join request
+    socket.on('game:accept-join', async (data) => {
+        try {
+            const { sessionId, userId } = data;
+            const session = await GameSession.findById(sessionId);
+
+            if (!session || session.status !== 'waiting') {
+                return socket.emit('error', { message: 'Game not available' });
+            }
+
+            // Verify the requester is the host (first player)
+            if (session.players[0]?.user.toString() !== socket.userId) {
+                return socket.emit('error', { message: 'Only the host can accept requests' });
+            }
+
+            // Update the request status
+            const request = session.joinRequests.find(r => r.user.toString() === userId);
+            if (!request || request.status !== 'pending') {
+                return socket.emit('error', { message: 'No pending request from this user' });
+            }
+            request.status = 'accepted';
+
+            // Add the player
+            session.players.push({ user: userId, isReady: true });
+
+            // Auto-start when enough players
+            const minPlayers = getMinPlayers(session.game);
+            if (session.players.length >= minPlayers) {
+                session.status = 'in_progress';
+                session.startedAt = new Date();
+                session.currentTurn = session.players[0].user;
+
+                // Decline all remaining pending requests
+                session.joinRequests.forEach(r => {
+                    if (r.status === 'pending') r.status = 'declined';
+                });
+            }
+
+            await session.save();
+
+            const populated = await session.populate(['players.user', 'joinRequests.user', 'spectators.user']);
+
+            // Make the accepted player join the game socket room
+            const acceptedSockets = await io.fetchSockets();
+            const targetSocket = acceptedSockets.find(s => s.userId === userId);
+            if (targetSocket) targetSocket.join(`game:${sessionId}`);
+
+            // Broadcast to all in game room + channel
+            io.to(`game:${sessionId}`).emit('game:updated', { session: populated });
+            if (session.channel) {
+                io.to(`channel:${session.channel.toString()}`).emit('game:updated', { session: populated });
+
+                // Update the challenge message in chat
+                await updateChallengeMessage(io, session, populated);
+            }
+
+            // Notify the accepted player
+            io.to(`game:${sessionId}`).emit('game:player-accepted', { userId, session: populated });
+
+            logger.debug(`Host accepted ${userId} to game ${sessionId}`);
+        } catch (error) {
+            logger.error(`Game accept-join error: ${error.message}`);
+            socket.emit('error', { message: 'Failed to accept join request' });
+        }
+    });
+
+    // Host declines a join request
+    socket.on('game:decline-join', async (data) => {
+        try {
+            const { sessionId, userId } = data;
+            const session = await GameSession.findById(sessionId);
+
+            if (!session) return;
+
+            // Verify host
+            if (session.players[0]?.user.toString() !== socket.userId) {
+                return socket.emit('error', { message: 'Only the host can decline requests' });
+            }
+
+            const request = session.joinRequests.find(r => r.user.toString() === userId);
+            if (request) request.status = 'declined';
+            await session.save();
+
+            const populated = await session.populate(['players.user', 'joinRequests.user']);
+
+            io.to(`game:${sessionId}`).emit('game:updated', { session: populated });
+
+            // Notify declined user
+            const allSockets = await io.fetchSockets();
+            const targetSocket = allSockets.find(s => s.userId === userId);
+            if (targetSocket) {
+                targetSocket.emit('game:request-declined', { sessionId });
+            }
+
+            logger.debug(`Host declined ${userId} from game ${sessionId}`);
+        } catch (error) {
+            logger.error(`Game decline-join error: ${error.message}`);
+        }
+    });
+
+    // Legacy: direct join (for backwards compat)
     socket.on('game:join', async (data) => {
         try {
             const { sessionId } = data;
@@ -45,13 +214,11 @@ module.exports = (io, socket) => {
                 return socket.emit('error', { message: 'Game not available' });
             }
 
-            // Check if already joined
             const alreadyJoined = session.players.some(p => p.user.toString() === socket.userId);
             if (!alreadyJoined) {
                 session.players.push({ user: socket.userId, isReady: true });
             }
 
-            // Auto-start when enough players
             const minPlayers = getMinPlayers(session.game);
             if (session.players.length >= minPlayers) {
                 session.status = 'in_progress';
@@ -64,16 +231,67 @@ module.exports = (io, socket) => {
 
             const populated = await session.populate('players.user', 'username avatar');
 
-            // Broadcast to all players in the game room AND the channel
             io.to(`game:${sessionId}`).emit('game:updated', { session: populated });
             if (session.channel) {
                 io.to(`channel:${session.channel.toString()}`).emit('game:updated', { session: populated });
+                await updateChallengeMessage(io, session, populated);
             }
 
             logger.debug(`${socket.username} joined game ${sessionId}`);
         } catch (error) {
             logger.error(`Game join error: ${error.message}`);
             socket.emit('error', { message: 'Failed to join game' });
+        }
+    });
+
+    // Spectate a game
+    socket.on('game:spectate', async (data) => {
+        try {
+            const { sessionId } = data;
+            const session = await GameSession.findById(sessionId);
+
+            if (!session) {
+                return socket.emit('error', { message: 'Game not found' });
+            }
+
+            // Check if already spectating
+            const already = session.spectators.some(s => s.user.toString() === socket.userId);
+            if (!already) {
+                session.spectators.push({ user: socket.userId });
+                await session.save();
+            }
+
+            socket.join(`game:${sessionId}`);
+
+            const populated = await session.populate(['players.user', 'spectators.user']);
+
+            // Notify game room about new spectator
+            io.to(`game:${sessionId}`).emit('game:updated', { session: populated });
+            socket.emit('game:spectating', { session: populated });
+
+            logger.debug(`${socket.username} is spectating game ${sessionId}`);
+        } catch (error) {
+            logger.error(`Game spectate error: ${error.message}`);
+        }
+    });
+
+    // Leave spectating
+    socket.on('game:leave-spectate', async (data) => {
+        try {
+            const { sessionId } = data;
+            const session = await GameSession.findById(sessionId);
+            if (!session) return;
+
+            session.spectators = session.spectators.filter(s => s.user.toString() !== socket.userId);
+            await session.save();
+            socket.leave(`game:${sessionId}`);
+
+            const populated = await session.populate(['players.user', 'spectators.user']);
+            io.to(`game:${sessionId}`).emit('game:updated', { session: populated });
+
+            logger.debug(`${socket.username} stopped spectating game ${sessionId}`);
+        } catch (error) {
+            logger.error(`Game leave-spectate error: ${error.message}`);
         }
     });
 
@@ -88,7 +306,7 @@ module.exports = (io, socket) => {
             }
 
             // Verify it's the player's turn (for turn-based games)
-            if (session.game === 'tic-tac-toe') {
+            if (session.game === 'tic-tac-toe' || session.game === 'connect4') {
                 if (session.currentTurn?.toString() !== socket.userId) {
                     return socket.emit('error', { message: 'Not your turn' });
                 }
@@ -105,7 +323,6 @@ module.exports = (io, socket) => {
                 session.status = 'finished';
                 session.finishedAt = new Date();
 
-                // Update scores
                 const winnerPlayer = session.players.find(p => p.user.toString() === result.winner.toString());
                 if (winnerPlayer) winnerPlayer.score += 1;
             }
@@ -117,12 +334,14 @@ module.exports = (io, socket) => {
 
             await session.save();
 
-            const populated = await session.populate('players.user', 'username avatar');
+            const populated = await session.populate(['players.user', 'spectators.user']);
 
-            // Broadcast to all players in game room AND channel
             io.to(`game:${sessionId}`).emit('game:updated', { session: populated });
             if (session.channel) {
                 io.to(`channel:${session.channel.toString()}`).emit('game:updated', { session: populated });
+                if (session.status === 'finished') {
+                    await updateChallengeMessage(io, session, populated);
+                }
             }
         } catch (error) {
             logger.error(`Game move error: ${error.message}`);
@@ -137,17 +356,17 @@ module.exports = (io, socket) => {
 
             if (!oldSession) return;
 
-            // Create new session with players ready and auto-started
             const newSession = await GameSession.create({
                 game: oldSession.game,
                 channel: oldSession.channel,
+                server: oldSession.server,
                 players: oldSession.players.map(p => ({
                     user: p.user,
                     score: p.score,
                     isReady: true,
                 })),
                 state: getInitialState(oldSession.game),
-                status: 'in_progress', // Auto-start rematch
+                status: 'in_progress',
                 currentTurn: oldSession.players[0].user,
                 startedAt: new Date(),
                 round: oldSession.round + 1,
@@ -155,11 +374,9 @@ module.exports = (io, socket) => {
                 settings: oldSession.settings,
             });
 
-            // Move all players from old game room to new game room
             const oldRoomId = `game:${sessionId}`;
             const newRoomId = `game:${newSession._id}`;
 
-            // Get all sockets in old room and move them
             const socketsInRoom = await io.in(oldRoomId).fetchSockets();
             for (const s of socketsInRoom) {
                 s.leave(oldRoomId);
@@ -168,7 +385,6 @@ module.exports = (io, socket) => {
 
             const populated = await newSession.populate('players.user', 'username avatar');
 
-            // Broadcast new session to both old room sockets (now in new room) and channel
             io.to(newRoomId).emit('game:rematch', { session: populated });
             io.to(newRoomId).emit('game:updated', { session: populated });
             if (oldSession.channel) {
@@ -180,9 +396,94 @@ module.exports = (io, socket) => {
             logger.error(`Game rematch error: ${error.message}`);
         }
     });
+
+    // Cancel a game (host only)
+    socket.on('game:cancel', async (data) => {
+        try {
+            const { sessionId } = data;
+            const session = await GameSession.findById(sessionId);
+            if (!session) return;
+
+            if (session.players[0]?.user.toString() !== socket.userId) {
+                return socket.emit('error', { message: 'Only the host can cancel' });
+            }
+
+            session.status = 'cancelled';
+            await session.save();
+
+            const populated = await session.populate('players.user', 'username avatar');
+            io.to(`game:${sessionId}`).emit('game:cancelled', { session: populated });
+            if (session.channel) {
+                io.to(`channel:${session.channel.toString()}`).emit('game:updated', { session: populated });
+            }
+
+            logger.debug(`Game ${sessionId} cancelled by host`);
+        } catch (error) {
+            logger.error(`Game cancel error: ${error.message}`);
+        }
+    });
+
+    // Get all active sessions for a server
+    socket.on('game:get-server-sessions', async (data) => {
+        try {
+            const { serverId } = data;
+            const sessions = await GameSession.find({
+                server: serverId,
+                status: { $in: ['waiting', 'in_progress'] },
+            }).populate('players.user', 'username avatar')
+              .populate('joinRequests.user', 'username avatar')
+              .populate('spectators.user', 'username avatar')
+              .sort({ createdAt: -1 });
+
+            socket.emit('game:server-sessions', { sessions });
+        } catch (error) {
+            logger.error(`Get server sessions error: ${error.message}`);
+        }
+    });
 };
 
-// Helper functions
+// ── Helper: Update challenge message in chat ──
+async function updateChallengeMessage(io, session, populated) {
+    try {
+        if (!session.chatMessageId) return;
+
+        const playerNames = populated.players.map(p => p.user?.username || 'Player');
+        let content, status;
+
+        if (session.status === 'in_progress') {
+            content = `🎮 **${playerNames.join(' vs ')}** — **${formatGameName(session.game)}** [In Progress]`;
+            status = 'in_progress';
+        } else if (session.status === 'finished') {
+            const winnerPlayer = populated.players.find(p => p.user?._id?.toString() === session.winner?.toString());
+            const winnerName = winnerPlayer?.user?.username || 'Unknown';
+            content = `🏆 **${winnerName}** won! **${formatGameName(session.game)}** — ${playerNames.join(' vs ')} [Finished]`;
+            status = 'finished';
+        } else {
+            return;
+        }
+
+        await Message.findByIdAndUpdate(session.chatMessageId, {
+            content,
+            'gameChallenge.status': status,
+            'gameChallenge.players': playerNames,
+            'gameChallenge.winner': session.winner?.toString(),
+        });
+
+        // Broadcast message update to channel
+        const updatedMsg = await Message.findById(session.chatMessageId).populate('sender', 'username avatar');
+        if (updatedMsg && session.channel) {
+            io.to(`channel:${session.channel.toString()}`).emit('message:updated', updatedMsg);
+        }
+    } catch (error) {
+        logger.error(`Update challenge message error: ${error.message}`);
+    }
+}
+
+function formatGameName(game) {
+    return game.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ── Helper functions ──
 function getInitialState(game) {
     switch (game) {
         case 'tic-tac-toe':
@@ -208,16 +509,8 @@ function getInitialState(game) {
 
 function getMinPlayers(game) {
     switch (game) {
-        case 'tic-tac-toe': return 2;
-        case 'rock-paper-scissors': return 2;
-        case 'connect4': return 2;
-        case 'chess': return 2;
-        case 'checkers': return 2;
-        case 'battleship': return 2;
-        case 'pong': return 2;
         case 'ludo': return 2;
         case 'quiz': return 2;
-        case 'word-guess': return 2;
         default: return 2;
     }
 }
@@ -249,7 +542,6 @@ function processTicTacToe(session, userId, move) {
     state.board = board;
     state.xIsNext = !state.xIsNext;
 
-    // Check winner
     const lines = [
         [0, 1, 2], [3, 4, 5], [6, 7, 8],
         [0, 3, 6], [1, 4, 7], [2, 5, 8],
@@ -262,7 +554,6 @@ function processTicTacToe(session, userId, move) {
         }
     }
 
-    // Check draw
     if (board.every(cell => cell !== null)) {
         return { state, draw: true };
     }
@@ -299,18 +590,16 @@ function processConnect4(session, userId, move) {
     const playerIndex = session.players.findIndex(p => p.user.toString() === userId);
     const color = playerIndex === 0 ? 'R' : 'Y';
 
-    // Find lowest empty row in column
     let row = -1;
     for (let r = 5; r >= 0; r--) {
         if (!board[r][col]) { row = r; break; }
     }
-    if (row === -1) return { state }; // Column full
+    if (row === -1) return { state };
 
     board[row][col] = color;
     state.board = board;
     state.isRedNext = !state.isRedNext;
 
-    // Check win (4 in a row)
     const dirs = [[0,1],[1,0],[1,1],[1,-1]];
     for (const [dr, dc] of dirs) {
         let count = 1;
@@ -327,7 +616,6 @@ function processConnect4(session, userId, move) {
         if (count >= 4) return { state, winner: userId };
     }
 
-    // Check draw
     if (board[0].every(cell => cell !== null)) return { state, draw: true };
 
     const nextPlayerIndex = state.isRedNext ? 0 : 1;

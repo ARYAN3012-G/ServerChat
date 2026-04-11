@@ -94,6 +94,11 @@ module.exports = (io, socket) => {
         room.currentTime = currentTime;
         room.isPlaying = isPlaying;
 
+        // Clear skip votes when track changes
+        if (track && room.track?.url !== track.url) {
+            room.skipVotes = [];
+        }
+
         // Broadcast to ALL other users in the room
         socket.to(`stream:${roomId}`).emit('music:sync', {
             track,
@@ -103,7 +108,160 @@ module.exports = (io, socket) => {
             hostUserId: room.hostUserId,
             ownerUserId: room.ownerUserId,
             syncedBy: socket.userId,
+            queue: room.queue || [],
+            skipVotes: room.skipVotes?.length || 0,
         });
+    });
+
+    // ── DJ Queue: Request a song ──
+    socket.on('music:queue-request', (data) => {
+        const { roomId, track } = data;
+        if (!musicRooms.has(roomId) || !track) return;
+        const room = musicRooms.get(roomId);
+
+        if (!room.queue) room.queue = [];
+
+        // Check for duplicates
+        const alreadyQueued = room.queue.some(q => q.url === track.url);
+        if (alreadyQueued) {
+            socket.emit('music:error', { message: 'Song already in queue' });
+            return;
+        }
+
+        const queueItem = {
+            ...track,
+            requestedBy: { userId: socket.userId, username: socket.username },
+            status: 'pending',
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        };
+
+        room.queue.push(queueItem);
+
+        // Notify everyone in the room
+        io.to(`stream:${roomId}`).emit('music:queue-updated', {
+            queue: room.queue,
+            action: 'request',
+            track: queueItem,
+        });
+
+        logger.debug(`${socket.username} requested "${track.title}" in room ${roomId}`);
+    });
+
+    // ── DJ Queue: Approve/Reject (host only) ──
+    socket.on('music:queue-action', (data) => {
+        const { roomId, trackId, action } = data; // action = 'approve' | 'reject'
+        if (!musicRooms.has(roomId)) return;
+        const room = musicRooms.get(roomId);
+
+        if (socket.userId !== room.hostUserId && socket.userId !== room.ownerUserId) {
+            socket.emit('music:error', { message: 'Only the host can manage the queue' });
+            return;
+        }
+
+        if (!room.queue) room.queue = [];
+
+        if (action === 'approve') {
+            const item = room.queue.find(q => q.id === trackId);
+            if (item) item.status = 'approved';
+        } else if (action === 'reject') {
+            room.queue = room.queue.filter(q => q.id !== trackId);
+        }
+
+        io.to(`stream:${roomId}`).emit('music:queue-updated', {
+            queue: room.queue,
+            action,
+            trackId,
+        });
+    });
+
+    // ── DJ Queue: Play next from queue ──
+    socket.on('music:play-next', (data) => {
+        const { roomId } = data;
+        if (!musicRooms.has(roomId)) return;
+        const room = musicRooms.get(roomId);
+
+        if (socket.userId !== room.hostUserId && socket.userId !== room.ownerUserId) return;
+
+        if (!room.queue) room.queue = [];
+        const nextTrack = room.queue.find(q => q.status === 'approved');
+        if (!nextTrack) {
+            socket.emit('music:error', { message: 'No approved songs in queue' });
+            return;
+        }
+
+        // Remove from queue
+        room.queue = room.queue.filter(q => q.id !== nextTrack.id);
+        room.skipVotes = [];
+
+        // Update room state
+        room.track = nextTrack;
+        room.currentTime = 0;
+        room.isPlaying = true;
+
+        io.to(`stream:${roomId}`).emit('music:sync', {
+            track: nextTrack,
+            currentTime: 0,
+            isPlaying: true,
+            users: room.users,
+            hostUserId: room.hostUserId,
+            ownerUserId: room.ownerUserId,
+            syncedBy: 'queue',
+            queue: room.queue,
+            skipVotes: 0,
+        });
+    });
+
+    // ── Vote to Skip ──
+    socket.on('music:vote-skip', (data) => {
+        const { roomId } = data;
+        if (!musicRooms.has(roomId)) return;
+        const room = musicRooms.get(roomId);
+
+        if (!room.skipVotes) room.skipVotes = [];
+
+        // Prevent double voting
+        if (room.skipVotes.includes(socket.userId)) {
+            socket.emit('music:error', { message: 'You already voted to skip' });
+            return;
+        }
+
+        room.skipVotes.push(socket.userId);
+        const threshold = Math.ceil(room.users.length * 0.5);
+        const passed = room.skipVotes.length >= threshold;
+
+        io.to(`stream:${roomId}`).emit('music:skip-vote', {
+            votes: room.skipVotes.length,
+            needed: threshold,
+            passed,
+            votedBy: socket.username,
+        });
+
+        // Auto-skip if threshold reached
+        if (passed) {
+            room.skipVotes = [];
+            // Try to play next from queue
+            const nextTrack = (room.queue || []).find(q => q.status === 'approved');
+            if (nextTrack) {
+                room.queue = room.queue.filter(q => q.id !== nextTrack.id);
+                room.track = nextTrack;
+                room.currentTime = 0;
+                room.isPlaying = true;
+            } else {
+                room.isPlaying = false;
+            }
+
+            io.to(`stream:${roomId}`).emit('music:sync', {
+                track: nextTrack || room.track,
+                currentTime: 0,
+                isPlaying: !!nextTrack,
+                users: room.users,
+                hostUserId: room.hostUserId,
+                ownerUserId: room.ownerUserId,
+                syncedBy: 'vote-skip',
+                queue: room.queue || [],
+                skipVotes: 0,
+            });
+        }
     });
 
     // Transfer host to another user (host or owner only)

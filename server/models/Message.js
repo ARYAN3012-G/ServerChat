@@ -75,6 +75,17 @@ const messageSchema = new mongoose.Schema({
         default: false,
     },
     editedAt: Date,
+    // Game challenge message
+    gameSessionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'GameSession',
+    },
+    gameChallenge: {
+        game: String,
+        status: { type: String, enum: ['waiting', 'in_progress', 'finished'], default: 'waiting' },
+        players: [{ type: String }],
+        winner: String,
+    },
 }, { timestamps: true });
 
 // Indexes

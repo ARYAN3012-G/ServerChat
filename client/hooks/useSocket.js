@@ -4,7 +4,7 @@ import { useEffect, useCallback, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { connectSocket, disconnectSocket, getSocket } from '../services/socket';
 import { addMessage, updateMessage, removeMessage, setTypingUser, addOnlineUser, removeOnlineUser, updateReactions } from '../redux/chatSlice';
-import { setGameSession } from '../redux/gameSlice';
+import { setGameSession, updateServerSession } from '../redux/gameSlice';
 
 export function useSocket() {
     const dispatch = useDispatch();
@@ -29,14 +29,15 @@ export function useSocket() {
         const handleReactedMessage = ({ messageId, reactions }) => dispatch(updateReactions({ messageId, reactions }));
         const handlePresenceOnline = ({ userId }) => dispatch(addOnlineUser(userId));
         const handlePresenceOffline = ({ userId }) => dispatch(removeOnlineUser(userId));
-        const handleGameUpdated = ({ session }) => dispatch(setGameSession(session));
-        const handleGameCreated = ({ session }) => dispatch(setGameSession(session));
-        const handleGameRematch = ({ session }) => dispatch(setGameSession(session));
+        const handleGameUpdated = ({ session }) => { dispatch(setGameSession(session)); dispatch(updateServerSession(session)); };
+        const handleGameCreated = ({ session }) => { dispatch(setGameSession(session)); dispatch(updateServerSession(session)); };
+        const handleGameRematch = ({ session }) => { dispatch(setGameSession(session)); dispatch(updateServerSession(session)); };
         const handleVoiceJoined = ({ channelId, userId, username }) => setVoiceUsers(prev => ({ ...prev, [channelId]: [...(prev[channelId] || []).filter(u => u.userId !== userId), { userId, username }] }));
         const handleVoiceLeft = ({ channelId, userId }) => setVoiceUsers(prev => ({ ...prev, [channelId]: (prev[channelId] || []).filter(u => u.userId !== userId) }));
         const handleMusicSync = (data) => setMusicRoom(prev => ({ ...prev, ...data }));
         const handleStreamJoined = ({ userId, username, users, hostUserId, ownerUserId }) => setMusicRoom(prev => prev ? { ...prev, users: users || [...(prev.users || []), { userId, username }], hostUserId: hostUserId || prev.hostUserId, ownerUserId: ownerUserId || prev.ownerUserId } : prev);
         const handleStreamLeft = ({ userId }) => setMusicRoom(prev => prev ? { ...prev, users: (prev.users || []).filter(u => u.userId !== userId) } : prev);
+        const handleHostChanged = ({ hostUserId, users }) => setMusicRoom(prev => prev ? { ...prev, hostUserId, users: users || prev.users } : prev);
         const handleStatusChanged = ({ userId, status }) => {
             // Keep user in online list (they're still connected), status change is cosmetic
             if (status !== 'offline') {
@@ -67,6 +68,7 @@ export function useSocket() {
         socket.on('music:sync', handleMusicSync);
         socket.on('stream:user-joined', handleStreamJoined);
         socket.on('stream:user-left', handleStreamLeft);
+        socket.on('music:host-changed', handleHostChanged);
         socket.on('presence:status-changed', handleStatusChanged);
         socket.on('message:pinned', handleMessagePinned);
 
@@ -88,6 +90,7 @@ export function useSocket() {
                 socket.off('music:sync', handleMusicSync);
                 socket.off('stream:user-joined', handleStreamJoined);
                 socket.off('stream:user-left', handleStreamLeft);
+                socket.off('music:host-changed', handleHostChanged);
                 socket.off('presence:status-changed', handleStatusChanged);
                 socket.off('message:pinned', handleMessagePinned);
             }

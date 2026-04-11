@@ -148,6 +148,16 @@ const userSchema = new mongoose.Schema({
         background: { type: String, default: '' },
     },
 
+    // Music favorites
+    favoriteSongs: [{
+        title: String,
+        artist: String,
+        url: String,
+        thumbnail: String,
+        duration: String,
+        addedAt: { type: Date, default: Date.now },
+    }],
+
 }, { timestamps: true });
 
 // Hash password before saving

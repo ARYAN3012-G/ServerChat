@@ -583,9 +583,18 @@ export default function ChannelsPage() {
 
                     <div className="w-8 h-0.5 bg-white/10 rounded-full" />
 
-                    <motion.div whileHover={{ borderRadius: '35%' }} onClick={() => router.push('/games')}
-                        className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-indigo-500 cursor-pointer transition-all duration-200" title="Games">
+                    {/* Games — solo or server */}
+                    <motion.div whileHover={{ borderRadius: '35%' }}
+                        onClick={() => router.push(currentServer ? `/server-games/${currentServer._id}` : '/games')}
+                        className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-indigo-500 cursor-pointer transition-all duration-200" title={currentServer ? 'Server Games' : 'Solo Games'}>
                         <IoGameControllerOutline className="w-5 h-5" />
+                    </motion.div>
+
+                    {/* Music */}
+                    <motion.div whileHover={{ borderRadius: '35%' }}
+                        onClick={() => currentServer ? setShowMusicRoom(true) : router.push('/music')}
+                        className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-pink-500 cursor-pointer transition-all duration-200" title={currentServer ? 'Server Music' : 'My Music'}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                     </motion.div>
 
                     {user?.email === 'aryanrajeshgadam.3012@gmail.com' && (
@@ -1035,6 +1044,43 @@ export default function ChannelsPage() {
                                                             ) : part
                                                         )}
                                                     </p>
+                                                    {/* Game Challenge Card */}
+                                                    {msg.gameChallenge && (
+                                                        <div className={`mt-2 p-3 rounded-xl border ${
+                                                            msg.gameChallenge.status === 'waiting' ? 'bg-amber-500/5 border-amber-500/20' :
+                                                            msg.gameChallenge.status === 'in_progress' ? 'bg-emerald-500/5 border-emerald-500/20' :
+                                                            'bg-white/[0.02] border-white/10'
+                                                        }`}>
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="text-lg">{msg.gameChallenge.status === 'finished' ? '🏆' : '🎮'}</span>
+                                                                <span className="text-xs font-bold">
+                                                                    {msg.gameChallenge.game?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                                                </span>
+                                                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${
+                                                                    msg.gameChallenge.status === 'waiting' ? 'bg-amber-500/20 text-amber-400' :
+                                                                    msg.gameChallenge.status === 'in_progress' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                    'bg-white/5 text-white/30'
+                                                                }`}>
+                                                                    {msg.gameChallenge.status === 'waiting' ? 'Open' :
+                                                                     msg.gameChallenge.status === 'in_progress' ? 'Live' : 'Ended'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="mt-2 flex gap-2 flex-wrap">
+                                                                {msg.gameChallenge.status === 'waiting' && msg.sender?._id !== user?._id && (
+                                                                    <button onClick={() => { const s = getSocket(); s?.emit('game:request-join', { sessionId: msg.gameSessionId }); }}
+                                                                        className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-[10px] font-medium transition-colors">
+                                                                        ⚔️ Join Game
+                                                                    </button>
+                                                                )}
+                                                                {msg.gameChallenge.status === 'in_progress' && (
+                                                                    <button onClick={() => { const s = getSocket(); s?.emit('game:spectate', { sessionId: msg.gameSessionId }); router.push(currentServer ? `/server-games/${currentServer._id}?tab=spectate` : '/games'); }}
+                                                                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white/50 rounded-lg text-[10px] font-medium transition-colors border border-white/10">
+                                                                        👁️ Spectate
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     {msg.attachments?.length > 0 && (
                                                         <div className="mt-2 flex flex-wrap gap-2">
                                                             {msg.attachments.map((att, ai) => (
