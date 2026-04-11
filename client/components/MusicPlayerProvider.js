@@ -17,8 +17,13 @@ export default function MusicPlayerProvider({ children }) {
     const [duration, setDuration] = useState(0);
     const [volume, setVolume] = useState(80);
     const [muted, setMuted] = useState(false);
-    const [queue, setQueue] = useState([]); // list of songs for next/prev
+    const [queue, setQueue] = useState([]);
+    const [repeatMode, setRepeatMode] = useState('off'); // 'off' | 'one' | 'all'
     const audioRef = useRef(null);
+    const repeatRef = useRef(repeatMode);
+
+    // Keep ref synced so the event listener always sees current value
+    useEffect(() => { repeatRef.current = repeatMode; }, [repeatMode]);
 
     // Create audio element once (persists across page navigations)
     useEffect(() => {
@@ -29,7 +34,17 @@ export default function MusicPlayerProvider({ children }) {
 
         const audio = audioRef.current;
         const onTime = () => { setProgress(audio.currentTime); setDuration(audio.duration || 0); };
-        const onEnd = () => { setIsPlaying(false); playNext(); };
+        const onEnd = () => {
+            if (repeatRef.current === 'one') {
+                // Replay same song
+                audio.currentTime = 0;
+                audio.play().catch(() => {});
+            } else {
+                setIsPlaying(false);
+                // playNext handles 'all' wrap-around
+                playNextRef.current();
+            }
+        };
         const onPlay = () => setIsPlaying(true);
         const onPause = () => setIsPlaying(false);
 
@@ -73,13 +88,26 @@ export default function MusicPlayerProvider({ children }) {
     const playNext = useCallback(() => {
         if (!currentTrack || queue.length === 0) return;
         const idx = queue.findIndex(s => s.url === currentTrack.url);
-        if (idx >= 0 && idx < queue.length - 1) playSong(queue[idx + 1], queue);
+        if (idx >= 0 && idx < queue.length - 1) {
+            playSong(queue[idx + 1], queue);
+        } else if (repeatRef.current === 'all' && queue.length > 0) {
+            // Wrap around to beginning on repeat-all
+            playSong(queue[0], queue);
+        }
     }, [currentTrack, queue, playSong]);
+
+    // Keep a ref to playNext so the event listener always calls the latest version
+    const playNextRef = useRef(playNext);
+    useEffect(() => { playNextRef.current = playNext; }, [playNext]);
 
     const playPrev = useCallback(() => {
         if (!currentTrack || queue.length === 0) return;
         const idx = queue.findIndex(s => s.url === currentTrack.url);
-        if (idx > 0) playSong(queue[idx - 1], queue);
+        if (idx > 0) {
+            playSong(queue[idx - 1], queue);
+        } else if (repeatRef.current === 'all' && queue.length > 0) {
+            playSong(queue[queue.length - 1], queue);
+        }
     }, [currentTrack, queue, playSong]);
 
     const seekTo = useCallback((pct) => {
@@ -96,9 +124,13 @@ export default function MusicPlayerProvider({ children }) {
         setDuration(0);
     }, []);
 
+    const toggleRepeat = useCallback(() => {
+        setRepeatMode(prev => prev === 'off' ? 'one' : prev === 'one' ? 'all' : 'off');
+    }, []);
+
     const value = {
-        currentTrack, isPlaying, progress, duration, volume, muted, queue,
-        playSong, togglePlay, playNext, playPrev, seekTo, stopMusic,
+        currentTrack, isPlaying, progress, duration, volume, muted, queue, repeatMode,
+        playSong, togglePlay, playNext, playPrev, seekTo, stopMusic, toggleRepeat,
         setVolume, setMuted, setQueue,
     };
 

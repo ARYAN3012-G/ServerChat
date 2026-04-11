@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiSearch, FiHeart, FiPlay, FiPause, FiSkipForward, FiSkipBack, FiVolume2, FiVolumeX, FiX, FiMusic, FiTrash2, FiPlus, FiClock, FiUsers, FiRadio, FiChevronDown } from 'react-icons/fi';
+import { FiArrowLeft, FiSearch, FiHeart, FiPlay, FiPause, FiSkipForward, FiSkipBack, FiVolume2, FiVolumeX, FiX, FiMusic, FiTrash2, FiPlus, FiClock, FiUsers, FiRadio, FiChevronDown, FiRepeat } from 'react-icons/fi';
 import { getSocket } from '../../services/socket';
 import { useMusicPlayer } from '../../components/MusicPlayerProvider';
 import api from '../../services/api';
@@ -14,9 +14,9 @@ export default function MusicPage() {
     const searchParams = useSearchParams();
     const serverIdParam = searchParams.get('serverId');
     const serverId = serverIdParam || null; // Only use explicit URL param, not Redux
-    const { currentTrack, isPlaying, progress, duration, volume, muted,
+    const { currentTrack, isPlaying, progress, duration, volume, muted, repeatMode,
             playSong: globalPlay, togglePlay, playNext, playPrev, seekTo: globalSeek, stopMusic,
-            setVolume, setMuted, setQueue } = useMusicPlayer();
+            toggleRepeat, setVolume, setMuted, setQueue } = useMusicPlayer();
 
     const [tab, setTab] = useState('favorites'); // favorites | explore | sessions | search
     const [favorites, setFavorites] = useState([]);
@@ -657,7 +657,14 @@ export default function MusicPage() {
                                     </div>
 
                                     {/* Playback Controls */}
-                                    <div className="flex items-center justify-center gap-5 sm:gap-8 mb-3">
+                                    <div className="flex items-center justify-center gap-4 sm:gap-6 mb-3">
+                                        <button onClick={toggleRepeat} title={repeatMode === 'off' ? 'Repeat off' : repeatMode === 'one' ? 'Repeat one' : 'Repeat all'}
+                                            className={`p-2 rounded-full hover:bg-white/10 transition-all active:scale-90 relative ${
+                                                repeatMode !== 'off' ? 'text-pink-400' : 'text-white/25 hover:text-white/50'
+                                            }`}>
+                                            <FiRepeat className="w-4 h-4" />
+                                            {repeatMode === 'one' && <span className="absolute -top-0.5 -right-0.5 text-[8px] font-bold text-pink-400">1</span>}
+                                        </button>
                                         <button onClick={playPrev} className="p-2.5 sm:p-3 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all active:scale-90">
                                             <FiSkipBack className="w-5 h-5 sm:w-6 sm:h-6" />
                                         </button>
@@ -667,6 +674,7 @@ export default function MusicPage() {
                                         <button onClick={playNext} className="p-2.5 sm:p-3 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all active:scale-90">
                                             <FiSkipForward className="w-5 h-5 sm:w-6 sm:h-6" />
                                         </button>
+                                        <div className="w-8" /> {/* spacer to balance the repeat button */}
                                     </div>
 
                                     {/* Volume */}
@@ -698,17 +706,33 @@ export default function MusicPage() {
                                                 .replace(/\s{2,}/g, '\n')
                                                 .split('\n')
                                                 .map(l => l.trim());
+                                            // Filter out empty lines for index calculation but keep them for rendering
+                                            const nonEmptyLines = lines.filter(l => l !== '');
+                                            const totalNonEmpty = nonEmptyLines.length;
+                                            const progressPct = duration > 0 ? progress / duration : 0;
+                                            // Estimate which line is currently playing
+                                            const estimatedLine = Math.floor(progressPct * totalNonEmpty);
+                                            let nonEmptyIdx = 0;
                                             return (
                                                 <div className="space-y-0.5">
-                                                    {lines.map((line, i) => (
-                                                        line === '' ? (
-                                                            <div key={i} className="h-3" />
-                                                        ) : (
-                                                            <p key={i} className="text-sm sm:text-[15px] text-white/45 leading-[1.8] sm:leading-[2] font-light tracking-wide hover:text-white/80 transition-colors">
+                                                    {lines.map((line, i) => {
+                                                        if (line === '') return <div key={i} className="h-3" />;
+                                                        const myIdx = nonEmptyIdx++;
+                                                        const isActive = myIdx === estimatedLine;
+                                                        const isPast = myIdx < estimatedLine;
+                                                        return (
+                                                            <p key={i} className={`text-sm sm:text-[15px] leading-[1.8] sm:leading-[2] font-light tracking-wide transition-all duration-500 ${
+                                                                isActive
+                                                                    ? 'text-white font-medium scale-[1.02] origin-left'
+                                                                    : isPast
+                                                                        ? 'text-white/30'
+                                                                        : 'text-white/45 hover:text-white/70'
+                                                            }`}>
+                                                                {isActive && <span className="inline-block w-1.5 h-1.5 bg-pink-500 rounded-full mr-2 animate-pulse align-middle" />}
                                                                 {line}
                                                             </p>
-                                                        )
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </div>
                                             );
                                         })()}
