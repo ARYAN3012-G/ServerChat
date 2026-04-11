@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiSearch, FiHeart, FiPlay, FiPause, FiSkipForward, FiSkipBack, FiVolume2, FiVolumeX, FiX, FiMusic, FiTrash2, FiPlus, FiClock, FiUsers, FiRadio } from 'react-icons/fi';
+import { FiArrowLeft, FiSearch, FiHeart, FiPlay, FiPause, FiSkipForward, FiSkipBack, FiVolume2, FiVolumeX, FiX, FiMusic, FiTrash2, FiPlus, FiClock, FiUsers, FiRadio, FiChevronDown } from 'react-icons/fi';
 import { getSocket } from '../../services/socket';
 import { useMusicPlayer } from '../../components/MusicPlayerProvider';
 import api from '../../services/api';
@@ -24,6 +24,10 @@ export default function MusicPage() {
     const [searchResults, setSearchResults] = useState([]);
     const [searching, setSearching] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const [showExpanded, setShowExpanded] = useState(false);
+    const [lyrics, setLyrics] = useState(null);
+    const [loadingLyrics, setLoadingLyrics] = useState(false);
+    const [lastLyricsId, setLastLyricsId] = useState(null);
 
     // Sessions state
     const [musicSessions, setMusicSessions] = useState([]);
@@ -165,6 +169,26 @@ export default function MusicPage() {
         const rect = e.currentTarget.getBoundingClientRect();
         const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
         globalSeek(pct);
+    };
+
+    const fetchLyrics = async (songId) => {
+        if (!songId || songId === lastLyricsId) return;
+        setLoadingLyrics(true);
+        setLyrics(null);
+        setLastLyricsId(songId);
+        try {
+            const { data } = await api.get(`/music/lyrics/${songId}`);
+            setLyrics(data.lyrics || null);
+        } catch (e) {
+            console.error('Failed to fetch lyrics');
+            setLyrics(null);
+        }
+        setLoadingLyrics(false);
+    };
+
+    const openExpanded = () => {
+        setShowExpanded(true);
+        if (currentTrack?.id) fetchLyrics(currentTrack.id);
     };
 
     const formatTime = (s) => {
@@ -487,7 +511,7 @@ export default function MusicPage() {
 
             {/* Now Playing Bar */}
             <AnimatePresence>
-                {currentTrack && (
+                {currentTrack && !showExpanded && (
                     <motion.div initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }}
                         className="fixed bottom-0 left-0 right-0 bg-[#0c0e1a]/95 backdrop-blur-xl border-t border-white/5 z-50">
                         <div className="h-1 bg-white/5 cursor-pointer" onClick={handleSeek}>
@@ -495,14 +519,16 @@ export default function MusicPage() {
                                 style={{ width: duration ? `${(progress / duration) * 100}%` : '0%' }} />
                         </div>
                         <div className="flex items-center gap-3 px-4 sm:px-6 py-2.5 sm:py-3">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg overflow-hidden bg-white/5 flex-shrink-0">
-                                {(currentTrack.thumbnail || currentTrack.image) ?
-                                    <img src={currentTrack.thumbnail || currentTrack.image} alt="" className="w-full h-full object-cover" /> :
-                                    <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-xs sm:text-sm font-medium truncate">{currentTrack.title}</p>
-                                <p className="text-[9px] sm:text-[10px] text-white/30 truncate">{currentTrack.artist}</p>
+                            <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={openExpanded}>
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg overflow-hidden bg-white/5 flex-shrink-0">
+                                    {(currentTrack.thumbnail || currentTrack.image) ?
+                                        <img src={currentTrack.thumbnail || currentTrack.image} alt="" className="w-full h-full object-cover" /> :
+                                        <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>}
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-xs sm:text-sm font-medium truncate">{currentTrack.title}</p>
+                                    <p className="text-[9px] sm:text-[10px] text-white/30 truncate">{currentTrack.artist}</p>
+                                </div>
                             </div>
                             <span className="text-[9px] text-white/20 flex-shrink-0 hidden sm:block">
                                 {formatTime(progress)} / {formatTime(duration)}
@@ -535,6 +561,105 @@ export default function MusicPage() {
                                 className="p-1.5 rounded-lg hover:bg-white/10 text-white/20 hover:text-white transition-colors flex-shrink-0">
                                 <FiX className="w-4 h-4" />
                             </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Expanded Now Playing View */}
+            <AnimatePresence>
+                {showExpanded && currentTrack && (
+                    <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                        className="fixed inset-0 z-[100] bg-gradient-to-b from-[#1a0a2e] via-[#0c0e1a] to-[#0c0e1a] flex flex-col">
+
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-4 flex-shrink-0">
+                            <button onClick={() => setShowExpanded(false)} className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors">
+                                <FiChevronDown className="w-6 h-6" />
+                            </button>
+                            <span className="text-xs text-white/30 uppercase tracking-widest font-medium">Now Playing</span>
+                            <div className="w-10" />
+                        </div>
+
+                        {/* Scrollable content */}
+                        <div className="flex-1 overflow-y-auto px-6 pb-8">
+                            <div className="max-w-md mx-auto">
+                                {/* Big Album Art */}
+                                <div className="w-full aspect-square max-w-[320px] mx-auto rounded-2xl overflow-hidden shadow-2xl shadow-pink-500/10 mb-8">
+                                    {(currentTrack.thumbnail || currentTrack.image) ?
+                                        <img src={currentTrack.thumbnail || currentTrack.image} alt="" className="w-full h-full object-cover" /> :
+                                        <div className="w-full h-full bg-gradient-to-br from-pink-500/20 to-purple-500/20 flex items-center justify-center text-6xl">🎵</div>}
+                                </div>
+
+                                {/* Track Info */}
+                                <div className="text-center mb-6">
+                                    <h2 className="text-xl sm:text-2xl font-bold text-white mb-1 line-clamp-2">{currentTrack.title}</h2>
+                                    <p className="text-sm text-white/40">{currentTrack.artist}</p>
+                                    {currentTrack.album && <p className="text-xs text-white/20 mt-1">{currentTrack.album}</p>}
+                                </div>
+
+                                {/* Seek Bar */}
+                                <div className="mb-6">
+                                    <div className="h-1.5 bg-white/5 rounded-full cursor-pointer" onClick={handleSeek}>
+                                        <div className="h-full bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all duration-200"
+                                            style={{ width: duration ? `${(progress / duration) * 100}%` : '0%' }} />
+                                    </div>
+                                    <div className="flex justify-between mt-1.5 text-[10px] text-white/20">
+                                        <span>{formatTime(progress)}</span>
+                                        <span>{formatTime(duration)}</span>
+                                    </div>
+                                </div>
+
+                                {/* Controls */}
+                                <div className="flex items-center justify-center gap-6 mb-8">
+                                    <button onClick={playPrev} className="p-3 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors">
+                                        <FiSkipBack className="w-6 h-6" />
+                                    </button>
+                                    <button onClick={togglePlay} className="p-4 rounded-full bg-pink-500 hover:bg-pink-600 text-white transition-colors shadow-lg shadow-pink-500/30">
+                                        {isPlaying ? <FiPause className="w-7 h-7" /> : <FiPlay className="w-7 h-7" />}
+                                    </button>
+                                    <button onClick={playNext} className="p-3 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors">
+                                        <FiSkipForward className="w-6 h-6" />
+                                    </button>
+                                </div>
+
+                                {/* Volume */}
+                                <div className="flex items-center justify-center gap-3 mb-10">
+                                    <button onClick={() => setMuted(!muted)} className="p-1.5 rounded-lg hover:bg-white/10 text-white/30 hover:text-white transition-colors">
+                                        {muted || volume === 0 ? <FiVolumeX className="w-4 h-4" /> : <FiVolume2 className="w-4 h-4" />}
+                                    </button>
+                                    <input type="range" min="0" max="100" value={muted ? 0 : volume} onChange={e => { setVolume(Number(e.target.value)); setMuted(false); }}
+                                        className="w-40 accent-pink-500" />
+                                    <button onClick={() => isFavorited(currentTrack.url) ? null : addToFavorites(currentTrack)}
+                                        className={`p-1.5 rounded-lg transition-colors ${
+                                            isFavorited(currentTrack.url) ? 'text-pink-400' : 'text-white/30 hover:text-pink-400'
+                                        }`}>
+                                        <FiHeart className={`w-4 h-4 ${isFavorited(currentTrack.url) ? 'fill-current' : ''}`} />
+                                    </button>
+                                </div>
+
+                                {/* Lyrics */}
+                                <div className="border-t border-white/5 pt-6">
+                                    <h3 className="text-sm font-semibold text-white/50 mb-4 flex items-center gap-2">
+                                        <FiMusic className="w-4 h-4" /> Lyrics
+                                    </h3>
+                                    {loadingLyrics && (
+                                        <div className="flex items-center justify-center py-8">
+                                            <div className="w-6 h-6 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+                                        </div>
+                                    )}
+                                    {!loadingLyrics && lyrics && (
+                                        <div className="text-sm text-white/50 leading-relaxed whitespace-pre-wrap font-light"
+                                            dangerouslySetInnerHTML={{ __html: lyrics }} />
+                                    )}
+                                    {!loadingLyrics && !lyrics && (
+                                        <div className="text-center py-8">
+                                            <div className="text-3xl mb-2">🎶</div>
+                                            <p className="text-white/20 text-sm">Lyrics not available for this song</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </motion.div>
                 )}

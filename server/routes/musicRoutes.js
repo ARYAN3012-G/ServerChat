@@ -170,5 +170,24 @@ router.put('/sessions/:sessionId/end', auth, async (req, res) => {
         res.json({ session });
     } catch (error) { res.status(500).json({ message: 'Failed to end session' }); }
 });
+// ─── LYRICS ───
+router.get('/lyrics/:songId', auth, async (req, res) => {
+    try {
+        const { songId } = req.params;
+        // Try fetching song details with lyrics=true
+        const result = await fetchFromAPI(`/songs/${songId}?lyrics=true`);
+        if (!result) return res.status(502).json({ message: 'Lyrics API unavailable', lyrics: null });
+
+        const { data } = result;
+        const songData = data.data?.[0] || data.data || data;
+        const lyrics = songData.lyrics?.lyrics || songData.lyrics || null;
+        const hasLyrics = songData.hasLyrics || !!lyrics;
+
+        res.json({ lyrics: lyrics || null, hasLyrics });
+    } catch (error) {
+        console.error('Lyrics fetch error:', error.message);
+        res.status(500).json({ message: 'Failed to fetch lyrics', lyrics: null });
+    }
+});
 
 module.exports = router;
