@@ -3,6 +3,20 @@ const Message = require('../models/Message');
 const { logger } = require('../config/logger');
 
 module.exports = (io, socket) => {
+    // Rejoin a game socket room (for when client navigates back)
+    socket.on('game:join-room', async ({ sessionId }) => {
+        try {
+            const session = await GameSession.findById(sessionId);
+            if (!session) return;
+            const isPlayer = session.players.some(p => p.user.toString() === socket.userId);
+            const isSpectator = session.spectators?.some(s => s.user.toString() === socket.userId);
+            if (isPlayer || isSpectator) {
+                socket.join(`game:${sessionId}`);
+                logger.debug(`${socket.username} rejoined game room ${sessionId}`);
+            }
+        } catch (e) { logger.error(`game:join-room error: ${e.message}`); }
+    });
+
     // Create a game
     socket.on('game:create', async (data) => {
         try {
@@ -78,11 +92,20 @@ module.exports = (io, socket) => {
 
             const populated = await session.populate(['players.user', 'joinRequests.user']);
 
-            // Notify host (first player)
+            // Notify game room + also broadcast as game:updated so host sees it instantly
             io.to(`game:${sessionId}`).emit('game:join-request', {
                 session: populated,
                 requester: { _id: socket.userId, username: socket.username },
             });
+            io.to(`game:${sessionId}`).emit('game:updated', { session: populated });
+
+            // Also send directly to host in case they're not in the room yet
+            const hostUserId = session.players[0]?.user.toString();
+            const allSockets = await io.fetchSockets();
+            const hostSocket = allSockets.find(s => s.userId === hostUserId);
+            if (hostSocket) {
+                hostSocket.emit('game:updated', { session: populated });
+            }
 
             socket.emit('game:request-sent', { sessionId });
 
@@ -136,21 +159,29 @@ module.exports = (io, socket) => {
             const populated = await session.populate(['players.user', 'joinRequests.user', 'spectators.user']);
 
             // Make the accepted player join the game socket room
-            const acceptedSockets = await io.fetchSockets();
-            const targetSocket = acceptedSockets.find(s => s.userId === userId);
+            const allSockets = await io.fetchSockets();
+            const targetSocket = allSockets.find(s => s.userId === userId);
             if (targetSocket) targetSocket.join(`game:${sessionId}`);
 
             // Broadcast to all in game room + channel
             io.to(`game:${sessionId}`).emit('game:updated', { session: populated });
-            if (session.channel) {
-                io.to(`channel:${session.channel.toString()}`).emit('game:updated', { session: populated });
+            io.to(`game:${sessionId}`).emit('game:player-accepted', { userId, session: populated });
 
-                // Update the challenge message in chat
-                await updateChallengeMessage(io, session, populated);
+            // Also send directly to both players' sockets as backup
+            const hostSocket = allSockets.find(s => s.userId === socket.userId);
+            if (targetSocket) {
+                targetSocket.emit('game:player-accepted', { userId, session: populated });
+                targetSocket.emit('game:updated', { session: populated });
+            }
+            if (hostSocket) {
+                hostSocket.emit('game:player-accepted', { userId, session: populated });
+                hostSocket.emit('game:updated', { session: populated });
             }
 
-            // Notify the accepted player
-            io.to(`game:${sessionId}`).emit('game:player-accepted', { userId, session: populated });
+            if (session.channel) {
+                io.to(`channel:${session.channel.toString()}`).emit('game:updated', { session: populated });
+                await updateChallengeMessage(io, session, populated);
+            }
 
             logger.debug(`Host accepted ${userId} to game ${sessionId}`);
         } catch (error) {
@@ -326,6 +357,13 @@ module.exports = (io, socket) => {
             const populated = await session.populate(['players.user', 'spectators.user']);
 
             io.to(`game:${sessionId}`).emit('game:updated', { session: populated });
+
+            // Also send directly to both player sockets as backup for instant sync
+            const allSockets = await io.fetchSockets();
+            for (const player of session.players) {
+                const pSocket = allSockets.find(s => s.userId === player.user._id?.toString() || s.userId === player.user?.toString());
+                if (pSocket) pSocket.emit('game:updated', { session: populated });
+            }
             if (session.channel) {
                 io.to(`channel:${session.channel.toString()}`).emit('game:updated', { session: populated });
                 if (session.status === 'finished') {

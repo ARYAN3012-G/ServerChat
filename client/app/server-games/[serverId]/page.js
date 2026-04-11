@@ -175,9 +175,24 @@ export default function ServerGamesPage({ params }) {
         s.players?.some(p => (p.user?._id || p.user)?.toString() === user?._id?.toString())
     );
 
+    // Helper: extract user ID from various formats (ObjectId, populated object, string)
+    const getUserId = (val) => {
+        if (!val) return null;
+        if (typeof val === 'string') return val;
+        if (val._id) return val._id.toString();
+        return val.toString();
+    };
+
+    // Auto-join socket room when we have an active session
+    useEffect(() => {
+        const socket = getSocket();
+        if (!socket || !activeSession?._id) return;
+        socket.emit('game:join-room', { sessionId: activeSession._id });
+    }, [activeSession?._id]);
+
     // Check if user is actively in a game session
     const isInGame = activeSession &&
-        activeSession.players?.some(p => (p.user?._id || p.user)?.toString() === user?._id?.toString()) &&
+        activeSession.players?.some(p => getUserId(p.user) === user?._id?.toString()) &&
         !spectatingSessionId;
 
     const makeMove = (move) => {
@@ -192,12 +207,12 @@ export default function ServerGamesPage({ params }) {
         const session = activeSession;
         const gameName = session.game?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         const gameEmoji = MULTIPLAYER_GAMES.find(g => g.id === session.game)?.emoji?.slice(0, 2) || '🎮';
-        const myIndex = session.players?.findIndex(p => (p.user?._id || p.user)?.toString() === user?._id?.toString());
+        const myIndex = session.players?.findIndex(p => getUserId(p.user) === user?._id?.toString());
         const opponentPlayer = session.players?.find((p, i) => i !== myIndex);
-        const isMyTurn = (session.currentTurn?._id || session.currentTurn)?.toString() === user?._id?.toString();
+        const isMyTurn = getUserId(session.currentTurn) === user?._id?.toString();
         const isFinished = session.status === 'finished';
         const isWaiting = session.status === 'waiting';
-        const iWon = session.winner?.toString() === user?._id?.toString() || session.winner?._id?.toString() === user?._id?.toString();
+        const iWon = getUserId(session.winner) === user?._id?.toString();
         const isDraw = isFinished && !session.winner;
 
         return (
