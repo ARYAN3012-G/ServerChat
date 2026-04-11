@@ -171,49 +171,6 @@ router.put('/sessions/:sessionId/end', auth, async (req, res) => {
     } catch (error) { res.status(500).json({ message: 'Failed to end session' }); }
 });
 // ─── LYRICS ───
-
-// Synced lyrics from LRCLIB (free, no key needed)
-router.get('/lyrics/synced', auth, async (req, res) => {
-    try {
-        const { track, artist, duration } = req.query;
-        if (!track) return res.status(400).json({ message: 'Track name required' });
-
-        let url = `https://lrclib.net/api/search?track_name=${encodeURIComponent(track)}`;
-        if (artist) url += `&artist_name=${encodeURIComponent(artist)}`;
-
-        const response = await fetch(url, {
-            headers: { 'User-Agent': 'DiscoApp/1.0' },
-            signal: AbortSignal.timeout(8000),
-        });
-
-        if (!response.ok) return res.json({ syncedLyrics: null, plainLyrics: null });
-
-        const results = await response.json();
-        if (!results || results.length === 0) return res.json({ syncedLyrics: null, plainLyrics: null });
-
-        // Pick the best match (prefer one with synced lyrics and closest duration)
-        const durationSec = parseInt(duration) || 0;
-        let best = results.find(r => r.syncedLyrics) || results[0];
-        if (durationSec > 0) {
-            const withSync = results.filter(r => r.syncedLyrics);
-            if (withSync.length > 0) {
-                best = withSync.reduce((prev, curr) =>
-                    Math.abs(curr.duration - durationSec) < Math.abs(prev.duration - durationSec) ? curr : prev
-                );
-            }
-        }
-
-        res.json({
-            syncedLyrics: best.syncedLyrics || null,
-            plainLyrics: best.plainLyrics || null,
-        });
-    } catch (error) {
-        console.error('LRCLIB lyrics error:', error.message);
-        res.json({ syncedLyrics: null, plainLyrics: null });
-    }
-});
-
-// Plain lyrics fallback from JioSaavn
 router.get('/lyrics/:songId', auth, async (req, res) => {
     try {
         const { songId } = req.params;
