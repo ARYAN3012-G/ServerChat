@@ -127,8 +127,11 @@ export default function MusicPage() {
     const joinMusicSession = (sessionId) => {
         const socket = getSocket();
         if (!socket) return;
-        // Navigate to channels and open the music room for this session
-        router.push(`/channels?musicSession=${sessionId}`);
+        // Join the music room via socket — stay on the music page
+        socket.emit('stream:join', { roomId: sessionId });
+        toast.success('Joined music session!');
+        // Refresh sessions to show updated listener count
+        setTimeout(() => fetchSessions(), 500);
     };
 
     // ── EXPLORE ──
