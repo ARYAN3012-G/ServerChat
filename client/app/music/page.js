@@ -33,6 +33,23 @@ export default function MusicPage() {
     const [newSessionName, setNewSessionName] = useState('');
     const [showCreateSession, setShowCreateSession] = useState(false);
 
+    // Explore state
+    const [trendingSongs, setTrendingSongs] = useState([]);
+    const [loadingTrending, setLoadingTrending] = useState(false);
+    const [selectedLanguage, setSelectedLanguage] = useState('all');
+    const LANGUAGES = [
+        { id: 'all', label: 'All', emoji: '🌍' },
+        { id: 'telugu', label: 'Telugu', emoji: '🇮🇳' },
+        { id: 'hindi', label: 'Hindi', emoji: '🇮🇳' },
+        { id: 'english', label: 'English', emoji: '🇬🇧' },
+        { id: 'tamil', label: 'Tamil', emoji: '🇮🇳' },
+        { id: 'punjabi', label: 'Punjabi', emoji: '🇮🇳' },
+        { id: 'malayalam', label: 'Malayalam', emoji: '🇮🇳' },
+        { id: 'kannada', label: 'Kannada', emoji: '🇮🇳' },
+        { id: 'bengali', label: 'Bengali', emoji: '🇮🇳' },
+        { id: 'marathi', label: 'Marathi', emoji: '🇮🇳' },
+    ];
+
     const audioRef = useRef(null);
     const searchTimeoutRef = useRef(null);
 
@@ -41,6 +58,11 @@ export default function MusicPage() {
         fetchFavorites();
         if (serverId) { setTab('sessions'); fetchSessions(); }
     }, []);
+
+    // Fetch trending when language changes
+    useEffect(() => {
+        if (tab === 'explore') fetchTrending(selectedLanguage);
+    }, [selectedLanguage, tab]);
 
     // ── FAVORITES ──
     const fetchFavorites = async () => {
@@ -106,6 +128,17 @@ export default function MusicPage() {
         if (!socket) return;
         // Navigate to channels and open the music room for this session
         router.push(`/channels?musicSession=${sessionId}`);
+    };
+
+    // ── EXPLORE ──
+    const fetchTrending = async (lang = 'all') => {
+        setLoadingTrending(true);
+        try {
+            const query = lang === 'all' ? 'trending' : `trending ${lang}`;
+            const { data } = await api.get(`/music/search?query=${encodeURIComponent(query)}&limit=30`);
+            setTrendingSongs(data.songs || []);
+        } catch (e) { console.error('Failed to fetch trending'); }
+        setLoadingTrending(false);
     };
 
     // ── SEARCH ──
@@ -184,6 +217,7 @@ export default function MusicPage() {
 
     const tabs = [
         { id: 'favorites', label: '❤️ My Music', count: favorites.length },
+        { id: 'explore', label: '🌍 Explore', count: trendingSongs.length },
         ...(serverId ? [{ id: 'sessions', label: '🎧 Sessions', count: musicSessions.length }] : []),
         { id: 'search', label: '🔍 Search', count: searchResults.length },
     ];
@@ -351,6 +385,75 @@ export default function MusicPage() {
                                             </div>
                                         </div>
                                     </div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* ── EXPLORE TAB ── */}
+                    {tab === 'explore' && (
+                        <motion.div key="explore" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            className="max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+
+                            {/* Language Filter Chips */}
+                            <div className="flex gap-2 mb-5 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+                                {LANGUAGES.map(lang => (
+                                    <button key={lang.id} onClick={() => setSelectedLanguage(lang.id)}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+                                            selectedLanguage === lang.id
+                                                ? 'bg-pink-500 text-white shadow-lg shadow-pink-500/20'
+                                                : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/70'
+                                        }`}>
+                                        <span>{lang.emoji}</span> {lang.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {loadingTrending && (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            )}
+
+                            {!loadingTrending && trendingSongs.length === 0 && (
+                                <div className="text-center py-12">
+                                    <div className="text-5xl mb-4">🎶</div>
+                                    <p className="text-white/40">No trending songs found</p>
+                                    <p className="text-xs text-white/20 mt-1">Try a different language</p>
+                                </div>
+                            )}
+
+                            <div className="space-y-1">
+                                {trendingSongs.map((song, i) => (
+                                    <motion.div key={song.id || i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.015 }}
+                                        className={`flex items-center gap-3 p-2.5 sm:p-3 rounded-xl cursor-pointer group transition-all ${
+                                            currentTrack?.url === song.url ? 'bg-pink-500/10 border border-pink-500/20' : 'hover:bg-white/5'
+                                        }`} onClick={() => playSong(song)}>
+
+                                        <span className="text-[10px] text-white/15 w-5 text-right flex-shrink-0 font-mono">{i + 1}</span>
+
+                                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg overflow-hidden bg-white/5 flex-shrink-0 relative">
+                                            {song.image ? <img src={song.image} alt="" className="w-full h-full object-cover" /> :
+                                                <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>}
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                {currentTrack?.url === song.url && isPlaying ? <FiPause className="w-4 h-4" /> : <FiPlay className="w-4 h-4" />}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium truncate">{song.title}</p>
+                                            <p className="text-[10px] sm:text-xs text-white/30 truncate">{song.artist}</p>
+                                        </div>
+
+                                        <span className="text-[10px] text-white/20 flex-shrink-0 hidden sm:block">{song.duration || '--'}</span>
+
+                                        <button onClick={(e) => { e.stopPropagation(); isFavorited(song.url) ? null : addToFavorites(song); }}
+                                            className={`p-1.5 rounded-lg transition-all flex-shrink-0 ${
+                                                isFavorited(song.url) ? 'text-pink-400 bg-pink-500/10' : 'opacity-0 group-hover:opacity-100 hover:bg-pink-500/20 text-white/30 hover:text-pink-400'
+                                            }`}>
+                                            <FiHeart className={`w-3.5 h-3.5 ${isFavorited(song.url) ? 'fill-current' : ''}`} />
+                                        </button>
+                                    </motion.div>
                                 ))}
                             </div>
                         </motion.div>
