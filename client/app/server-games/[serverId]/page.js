@@ -69,7 +69,18 @@ export default function ServerGamesPage({ params }) {
         const handleUpdated = ({ session }) => { dispatch(updateServerSession(session)); };
         const handleCreated = ({ session }) => {
             dispatch(updateServerSession(session));
-            setActiveTab('live'); // Auto-switch to live when game created
+        };
+        // Creator receives this — enter game UI immediately
+        const handleSessionCreated = ({ session }) => {
+            dispatch(setGameSession(session));
+            dispatch(updateServerSession(session));
+            setCreatingGame(null);
+            setActiveTab('live');
+            toast.success('Game created! Waiting for challengers…');
+        };
+        const handleGameError = ({ message }) => {
+            setCreatingGame(null);
+            toast.error(message || 'Failed to create game');
         };
         const handleRequestSent = () => toast.success('Join request sent! Waiting for host…');
         const handleRequestDeclined = () => toast.error('Your join request was declined');
@@ -91,6 +102,8 @@ export default function ServerGamesPage({ params }) {
 
         socket.on('game:updated', handleUpdated);
         socket.on('game:created', handleCreated);
+        socket.on('game:session-created', handleSessionCreated);
+        socket.on('game:error', handleGameError);
         socket.on('game:request-sent', handleRequestSent);
         socket.on('game:request-declined', handleRequestDeclined);
         socket.on('game:player-accepted', handlePlayerAccepted);
@@ -101,6 +114,8 @@ export default function ServerGamesPage({ params }) {
         return () => {
             socket.off('game:updated', handleUpdated);
             socket.off('game:created', handleCreated);
+            socket.off('game:session-created', handleSessionCreated);
+            socket.off('game:error', handleGameError);
             socket.off('game:request-sent', handleRequestSent);
             socket.off('game:request-declined', handleRequestDeclined);
             socket.off('game:player-accepted', handlePlayerAccepted);
@@ -113,10 +128,13 @@ export default function ServerGamesPage({ params }) {
     const createGame = (gameId) => {
         const socket = getSocket();
         if (!socket || !serverId) return;
+        // Block if user already has active game
+        if (myActiveSession) {
+            toast.error('You already have an active game. Cancel or finish it first.');
+            return;
+        }
         setCreatingGame(gameId);
         socket.emit('game:create', { game: gameId, serverId, channelId: currentServer?.channels?.[0] });
-        setTimeout(() => setCreatingGame(null), 2000);
-        toast.success('Game created! Waiting for challengers…');
     };
 
     const requestJoin = (sessionId) => { const s = getSocket(); s?.emit('game:request-join', { sessionId }); };
@@ -248,9 +266,11 @@ export default function ServerGamesPage({ params }) {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                                     {MULTIPLAYER_GAMES.map(g => (
                                         <motion.button key={g.id} onClick={() => createGame(g.id)}
-                                            disabled={creatingGame === g.id}
-                                            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                                            className={`group relative text-left p-4 sm:p-5 rounded-2xl border bg-gradient-to-br ${g.color} ${g.border} hover:border-white/20 transition-all overflow-hidden disabled:opacity-50`}>
+                                            disabled={!!creatingGame || !!myActiveSession}
+                                            whileHover={!myActiveSession ? { scale: 1.02 } : {}} whileTap={!myActiveSession ? { scale: 0.98 } : {}}
+                                            className={`group relative text-left p-4 sm:p-5 rounded-2xl border bg-gradient-to-br ${g.color} ${g.border} transition-all overflow-hidden ${
+                                                myActiveSession ? 'opacity-40 cursor-not-allowed' : 'hover:border-white/20'
+                                            } ${creatingGame === g.id ? 'opacity-50' : ''}`}>
                                             {/* Glow effect */}
                                             <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                             <div className="relative">
@@ -268,6 +288,10 @@ export default function ServerGamesPage({ params }) {
                                                             <div className="w-3 h-3 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
                                                             Creating…
                                                         </div>
+                                                    ) : myActiveSession ? (
+                                                        <span className="text-[10px] text-red-400/60 font-medium">
+                                                            ⚠️ You have an active game
+                                                        </span>
                                                     ) : (
                                                         <span className="text-[10px] text-indigo-400/60 group-hover:text-indigo-400 font-medium transition-colors flex items-center gap-1">
                                                             <FiPlay className="w-3 h-3" /> Click to create

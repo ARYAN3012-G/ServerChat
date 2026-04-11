@@ -3,10 +3,20 @@ const Message = require('../models/Message');
 const { logger } = require('../config/logger');
 
 module.exports = (io, socket) => {
-    // Create a game (and post challenge message in chat)
+    // Create a game
     socket.on('game:create', async (data) => {
         try {
             const { game, channelId, serverId, settings = {} } = data;
+
+            // Block: one active game per user per server
+            const existing = await GameSession.findOne({
+                server: serverId,
+                'players.user': socket.userId,
+                status: { $in: ['waiting', 'in_progress'] },
+            });
+            if (existing) {
+                return socket.emit('game:error', { message: 'You already have an active game. Cancel or finish it first.' });
+            }
 
             const session = await GameSession.create({
                 game,
@@ -21,36 +31,15 @@ module.exports = (io, socket) => {
 
             const populated = await session.populate('players.user', 'username avatar');
 
-            // Post a challenge message in chat
-            if (channelId) {
-                const challengeMsg = await Message.create({
-                    content: `🎮 **Game Challenge!** I want to play **${formatGameName(game)}**! Click to join.`,
-                    sender: socket.userId,
-                    channel: channelId,
-                    type: 'text',
-                    gameSessionId: session._id,
-                    gameChallenge: {
-                        game,
-                        status: 'waiting',
-                        players: [socket.username || 'Player'],
-                    },
-                });
-
-                // Save reference back to the session
-                session.chatMessageId = challengeMsg._id;
-                await session.save();
-
-                const populatedMsg = await challengeMsg.populate('sender', 'username avatar');
-                io.to(`channel:${channelId}`).emit('message:new', populatedMsg);
+            // Notify the server's game lobby (no chat message — Live Sessions tab is the lobby)
+            if (serverId) {
+                io.emit('game:created', { session: populated });
             }
 
-            // Notify channel
-            if (channelId) {
-                io.to(`channel:${channelId}`).emit('game:created', { session: populated });
-            }
-            socket.emit('game:updated', { session: populated });
+            // Send session back to the creator so they enter the game UI immediately
+            socket.emit('game:session-created', { session: populated });
 
-            logger.debug(`${socket.username} created game ${game} in channel ${channelId}`);
+            logger.debug(`${socket.username} created game ${game} in server ${serverId}`);
         } catch (error) {
             logger.error(`Game create error: ${error.message}`);
             socket.emit('error', { message: 'Failed to create game' });
