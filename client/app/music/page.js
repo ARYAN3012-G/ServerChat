@@ -171,45 +171,85 @@ export default function MusicPage() {
         globalSeek(pct);
     };
 
-    const fetchLyrics = async (songId) => {
-        if (!songId) return;
+    const [syncedLines, setSyncedLines] = useState([]); // [{time: seconds, text: string}]
+
+    // Parse LRC format: "[mm:ss.xx] text" → {time, text}
+    const parseLRC = (lrc) => {
+        if (!lrc) return [];
+        return lrc.split('\n').map(line => {
+            const match = line.match(/\[(\d+):(\d+)\.(\d+)\]\s*(.*)/);
+            if (!match) return null;
+            const time = parseInt(match[1]) * 60 + parseInt(match[2]) + parseInt(match[3]) / 100;
+            return { time, text: match[4].trim() };
+        }).filter(l => l && l.text);
+    };
+
+    const fetchLyrics = async () => {
+        if (!currentTrack) return;
         setLoadingLyrics(true);
         setLyrics(null);
+        setSyncedLines([]);
+
         try {
-            const { data } = await api.get(`/music/lyrics/${songId}`);
-            setLyrics(data.lyrics || null);
+            // Step 1: Try LRCLIB for synced lyrics (uses track name + artist)
+            const params = new URLSearchParams({ track: currentTrack.title });
+            if (currentTrack.artist) params.append('artist', currentTrack.artist);
+            if (currentTrack.durationSec) params.append('duration', currentTrack.durationSec);
+
+            const { data: lrcData } = await api.get(`/music/lyrics/synced?${params.toString()}`);
+            
+            if (lrcData.syncedLyrics) {
+                const parsed = parseLRC(lrcData.syncedLyrics);
+                if (parsed.length > 0) {
+                    setSyncedLines(parsed);
+                    setLoadingLyrics(false);
+                    return;
+                }
+            }
+            // If LRCLIB returned plain but no synced
+            if (lrcData.plainLyrics) {
+                setLyrics(lrcData.plainLyrics);
+                setLoadingLyrics(false);
+                return;
+            }
         } catch (e) {
-            console.error('Failed to fetch lyrics:', e);
-            setLyrics(null);
+            console.log('LRCLIB failed, trying JioSaavn fallback');
+        }
+
+        try {
+            // Step 2: Fall back to JioSaavn plain lyrics
+            if (currentTrack.id) {
+                const { data } = await api.get(`/music/lyrics/${currentTrack.id}`);
+                setLyrics(data.lyrics || null);
+            } else {
+                // Search for song ID first
+                const q = `${currentTrack.title} ${currentTrack.artist || ''}`.trim();
+                const { data: searchData } = await api.get(`/music/search?query=${encodeURIComponent(q)}&limit=5`);
+                const match = searchData.songs?.find(s =>
+                    s.title?.toLowerCase().includes(currentTrack.title.toLowerCase().substring(0, 15))
+                ) || searchData.songs?.[0];
+                if (match?.id) {
+                    const { data } = await api.get(`/music/lyrics/${match.id}`);
+                    setLyrics(data.lyrics || null);
+                }
+            }
+        } catch (e) {
+            console.error('All lyrics sources failed');
         }
         setLoadingLyrics(false);
     };
 
-    const openExpanded = async () => {
+    const openExpanded = () => {
         setShowExpanded(true);
-        if (currentTrack?.id) {
-            fetchLyrics(currentTrack.id);
-        } else if (currentTrack?.title) {
-            // Song has no id (e.g. from favorites) — search for it to get the id
-            setLoadingLyrics(true);
-            setLyrics(null);
-            try {
-                const q = `${currentTrack.title} ${currentTrack.artist || ''}`.trim();
-                const { data } = await api.get(`/music/search?query=${encodeURIComponent(q)}&limit=5`);
-                const match = data.songs?.find(s =>
-                    s.title?.toLowerCase().includes(currentTrack.title.toLowerCase().substring(0, 15))
-                ) || data.songs?.[0];
-                if (match?.id) {
-                    fetchLyrics(match.id);
-                } else {
-                    setLoadingLyrics(false);
-                }
-            } catch (e) {
-                console.error('Failed to find song for lyrics:', e);
-                setLoadingLyrics(false);
-            }
-        }
+        fetchLyrics();
     };
+
+    // Auto-scroll to active lyric line
+    useEffect(() => {
+        if (syncedLines.length === 0 || !showExpanded) return;
+        const el = document.getElementById('active-lyric');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, [Math.floor(progress)]);
 
     const formatTime = (s) => {
         if (!s || isNaN(s)) return '0:00';
@@ -700,43 +740,62 @@ export default function MusicPage() {
                                                 <span className="text-xs text-white/20">Loading lyrics…</span>
                                             </div>
                                         )}
-                                        {!loadingLyrics && lyrics && (() => {
-                                            const lines = lyrics
-                                                .replace(/<br\s*\/?>/gi, '\n')
-                                                .replace(/\s{2,}/g, '\n')
-                                                .split('\n')
-                                                .map(l => l.trim());
-                                            // Filter out empty lines for index calculation but keep them for rendering
-                                            const nonEmptyLines = lines.filter(l => l !== '');
-                                            const totalNonEmpty = nonEmptyLines.length;
-                                            const progressPct = duration > 0 ? progress / duration : 0;
-                                            // Estimate which line is currently playing
-                                            const estimatedLine = Math.floor(progressPct * totalNonEmpty);
-                                            let nonEmptyIdx = 0;
+
+                                        {/* SYNCED LYRICS — real timestamp-based highlighting */}
+                                        {!loadingLyrics && syncedLines.length > 0 && (() => {
+                                            // Find current active line based on actual playback time
+                                            let activeIdx = -1;
+                                            for (let i = syncedLines.length - 1; i >= 0; i--) {
+                                                if (progress >= syncedLines[i].time) { activeIdx = i; break; }
+                                            }
                                             return (
-                                                <div className="space-y-0.5">
-                                                    {lines.map((line, i) => {
-                                                        if (line === '') return <div key={i} className="h-3" />;
-                                                        const myIdx = nonEmptyIdx++;
-                                                        const isActive = myIdx === estimatedLine;
-                                                        const isPast = myIdx < estimatedLine;
+                                                <div className="space-y-1">
+                                                    {syncedLines.map((line, i) => {
+                                                        const isActive = i === activeIdx;
+                                                        const isPast = i < activeIdx;
                                                         return (
-                                                            <p key={i} className={`text-sm sm:text-[15px] leading-[1.8] sm:leading-[2] font-light tracking-wide transition-all duration-500 ${
-                                                                isActive
-                                                                    ? 'text-white font-medium scale-[1.02] origin-left'
-                                                                    : isPast
-                                                                        ? 'text-white/30'
-                                                                        : 'text-white/45 hover:text-white/70'
-                                                            }`}>
-                                                                {isActive && <span className="inline-block w-1.5 h-1.5 bg-pink-500 rounded-full mr-2 animate-pulse align-middle" />}
-                                                                {line}
+                                                            <p key={i}
+                                                                id={isActive ? 'active-lyric' : undefined}
+                                                                className={`text-sm sm:text-base leading-[2] tracking-wide transition-all duration-300 cursor-default py-0.5 ${
+                                                                    isActive
+                                                                        ? 'text-white font-semibold text-base sm:text-lg scale-[1.02] origin-left'
+                                                                        : isPast
+                                                                            ? 'text-white/25 font-light'
+                                                                            : 'text-white/50 font-light hover:text-white/70'
+                                                                }`}>
+                                                                {isActive && <span className="inline-block w-2 h-2 bg-pink-500 rounded-full mr-2.5 animate-pulse align-middle shadow-lg shadow-pink-500/50" />}
+                                                                {line.text}
                                                             </p>
                                                         );
                                                     })}
                                                 </div>
                                             );
                                         })()}
-                                        {!loadingLyrics && !lyrics && (
+
+                                        {/* PLAIN LYRICS fallback — no fake highlighting */}
+                                        {!loadingLyrics && syncedLines.length === 0 && lyrics && (() => {
+                                            const lines = lyrics
+                                                .replace(/<br\s*\/?>/gi, '\n')
+                                                .replace(/\s{2,}/g, '\n')
+                                                .split('\n')
+                                                .map(l => l.trim());
+                                            return (
+                                                <div className="space-y-0.5">
+                                                    {lines.map((line, i) => (
+                                                        line === '' ? (
+                                                            <div key={i} className="h-3" />
+                                                        ) : (
+                                                            <p key={i} className="text-sm sm:text-[15px] text-white/50 leading-[2] font-light tracking-wide hover:text-white/80 transition-colors">
+                                                                {line}
+                                                            </p>
+                                                        )
+                                                    ))}
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {/* No lyrics at all */}
+                                        {!loadingLyrics && syncedLines.length === 0 && !lyrics && (
                                             <div className="text-center py-10 sm:py-16">
                                                 <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-3 rounded-2xl bg-white/5 flex items-center justify-center">
                                                     <FiMusic className="w-6 h-6 sm:w-7 sm:h-7 text-white/10" />
