@@ -94,6 +94,15 @@ export default function ServerGamesPage({ params }) {
             if (session) dispatch(updateServerSession(session));
             toast('Game was cancelled', { icon: '🚫' });
         };
+        const handleForfeited = ({ session, forfeitedBy }) => {
+            dispatch(clearGame());
+            if (session) dispatch(updateServerSession(session));
+            if (forfeitedBy === user?._id) {
+                toast('You forfeited the game', { icon: '🏳️' });
+            } else {
+                toast('Opponent forfeited — you win!', { icon: '🏆' });
+            }
+        };
         const handleSpectating = ({ session }) => {
             dispatch(setGameSession(session));
             dispatch(setSpectatingSessionId(session._id));
@@ -109,6 +118,7 @@ export default function ServerGamesPage({ params }) {
         socket.on('game:player-accepted', handlePlayerAccepted);
         socket.on('game:rematch', handleRematch);
         socket.on('game:cancelled', handleCancelled);
+        socket.on('game:forfeited', handleForfeited);
         socket.on('game:spectating', handleSpectating);
 
         return () => {
@@ -121,6 +131,7 @@ export default function ServerGamesPage({ params }) {
             socket.off('game:player-accepted', handlePlayerAccepted);
             socket.off('game:rematch', handleRematch);
             socket.off('game:cancelled', handleCancelled);
+            socket.off('game:forfeited', handleForfeited);
             socket.off('game:spectating', handleSpectating);
         };
     }, [dispatch]);
@@ -147,6 +158,11 @@ export default function ServerGamesPage({ params }) {
     };
     const requestRematch = (sessionId) => { const s = getSocket(); s?.emit('game:rematch', { sessionId }); };
     const cancelGame = (sessionId) => { const s = getSocket(); s?.emit('game:cancel', { sessionId }); };
+    const forfeitGame = (sessionId) => {
+        if (confirm('Are you sure you want to forfeit? The other player will win.')) {
+            const s = getSocket(); s?.emit('game:forfeit', { sessionId });
+        }
+    };
 
     const waitingSessions = serverSessions.filter(s => s.status === 'waiting');
     const activeSessions = serverSessions.filter(s => s.status === 'in_progress');
@@ -199,7 +215,7 @@ export default function ServerGamesPage({ params }) {
 
             {/* Active game banner */}
             {myActiveSession && (
-                <div className="mx-4 sm:mx-6 mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3 flex-shrink-0">
+                <div className="mx-4 sm:mx-6 mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 sm:gap-3 flex-shrink-0">
                     <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse flex-shrink-0" />
                     <p className="text-xs sm:text-sm text-emerald-400 font-medium flex-1 truncate">
                         You're in a {myActiveSession.game?.replace(/-/g, ' ')} game ({myActiveSession.status === 'waiting' ? 'waiting' : 'in progress'})
@@ -207,6 +223,10 @@ export default function ServerGamesPage({ params }) {
                     <button onClick={() => dispatch(setGameSession(myActiveSession))}
                         className="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-[10px] sm:text-xs font-medium hover:bg-emerald-600 transition-colors flex-shrink-0">
                         Rejoin
+                    </button>
+                    <button onClick={() => myActiveSession.status === 'in_progress' ? forfeitGame(myActiveSession._id) : cancelGame(myActiveSession._id)}
+                        className="px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-[10px] sm:text-xs font-medium hover:bg-red-500/20 transition-colors flex-shrink-0">
+                        {myActiveSession.status === 'in_progress' ? '🏳️ Forfeit' : '✕ Cancel'}
                     </button>
                 </div>
             )}
@@ -348,7 +368,7 @@ export default function ServerGamesPage({ params }) {
                                         <div className="space-y-2">
                                             {activeSessions.map(s => (
                                                 <SessionCard key={s._id} session={s} user={user}
-                                                    onSpectate={spectateGame}
+                                                    onSpectate={spectateGame} onForfeit={forfeitGame}
                                                     onRejoin={() => dispatch(setGameSession(s))} />
                                             ))}
                                         </div>
@@ -391,7 +411,7 @@ export default function ServerGamesPage({ params }) {
 }
 
 /* ─── Session Card ─── */
-function SessionCard({ session, user, onRequestJoin, onAcceptJoin, onDeclineJoin, onSpectate, onCancel, onRejoin, onRematch }) {
+function SessionCard({ session, user, onRequestJoin, onAcceptJoin, onDeclineJoin, onSpectate, onCancel, onForfeit, onRejoin, onRematch }) {
     const isHost = session.players?.[0]?.user?._id?.toString() === user?._id?.toString() ||
                    session.players?.[0]?.user?.toString() === user?._id?.toString();
     const isPlayer = session.players?.some(p => (p.user?._id || p.user)?.toString() === user?._id?.toString());
@@ -473,17 +493,23 @@ function SessionCard({ session, user, onRequestJoin, onAcceptJoin, onDeclineJoin
                             ⚔️ Join
                         </button>
                     )}
-                    {session.status === 'waiting' && isHost && (
+                    {session.status === 'waiting' && isPlayer && (
                         <button onClick={() => onCancel?.(session._id)}
                             className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] sm:text-xs font-medium transition-colors border border-red-500/20">
-                            Cancel
+                            ✕ Cancel
                         </button>
                     )}
                     {session.status === 'in_progress' && isPlayer && (
-                        <button onClick={() => onRejoin?.()}
-                            className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[10px] sm:text-xs font-medium transition-colors">
-                            Rejoin
-                        </button>
+                        <>
+                            <button onClick={() => onRejoin?.()}
+                                className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[10px] sm:text-xs font-medium transition-colors">
+                                Rejoin
+                            </button>
+                            <button onClick={() => onForfeit?.(session._id)}
+                                className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] sm:text-xs font-medium transition-colors border border-red-500/20">
+                                🏳️ Forfeit
+                            </button>
+                        </>
                     )}
                     {session.status === 'in_progress' && !isPlayer && (
                         <button onClick={() => onSpectate?.(session._id)}

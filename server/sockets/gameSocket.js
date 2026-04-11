@@ -393,8 +393,14 @@ module.exports = (io, socket) => {
             const session = await GameSession.findById(sessionId);
             if (!session) return;
 
-            if (session.players[0]?.user.toString() !== socket.userId) {
-                return socket.emit('error', { message: 'Only the host can cancel' });
+            // Any player can cancel a waiting game
+            const isPlayer = session.players.some(p => p.user.toString() === socket.userId);
+            if (!isPlayer) {
+                return socket.emit('error', { message: 'You are not in this game' });
+            }
+
+            if (session.status === 'in_progress') {
+                return socket.emit('error', { message: 'Use forfeit for in-progress games' });
             }
 
             session.status = 'cancelled';
@@ -404,13 +410,67 @@ module.exports = (io, socket) => {
             io.to(`game:${sessionId}`).emit('game:cancelled', { session: populated });
             if (session.channel) {
                 io.to(`channel:${session.channel.toString()}`).emit('game:updated', { session: populated });
-                // Update or delete the challenge message in chat
                 await updateChallengeMessage(io, session, populated);
             }
 
-            logger.debug(`Game ${sessionId} cancelled by host`);
+            logger.debug(`Game ${sessionId} cancelled by ${socket.username}`);
         } catch (error) {
             logger.error(`Game cancel error: ${error.message}`);
+        }
+    });
+
+    // Forfeit / leave an in-progress game
+    socket.on('game:forfeit', async (data) => {
+        try {
+            const { sessionId } = data;
+            const session = await GameSession.findById(sessionId);
+            if (!session) return;
+
+            const isPlayer = session.players.some(p => p.user.toString() === socket.userId);
+            if (!isPlayer) {
+                return socket.emit('error', { message: 'You are not in this game' });
+            }
+
+            // If waiting, just cancel
+            if (session.status === 'waiting') {
+                session.status = 'cancelled';
+                await session.save();
+                const populated = await session.populate('players.user', 'username avatar');
+                io.to(`game:${sessionId}`).emit('game:cancelled', { session: populated });
+                logger.debug(`Game ${sessionId} cancelled via forfeit by ${socket.username}`);
+                return;
+            }
+
+            if (session.status !== 'in_progress') {
+                return socket.emit('error', { message: 'Game is not in progress' });
+            }
+
+            // The other player wins
+            const opponent = session.players.find(p => p.user.toString() !== socket.userId);
+            session.status = 'finished';
+            session.winner = opponent ? opponent.user : null;
+            session.finishedAt = new Date();
+
+            // Give opponent a win point
+            if (opponent) opponent.score = (opponent.score || 0) + 1;
+
+            await session.save();
+
+            const populated = await session.populate(['players.user', 'spectators.user']);
+
+            io.to(`game:${sessionId}`).emit('game:forfeited', {
+                session: populated,
+                forfeitedBy: socket.userId,
+            });
+            io.to(`game:${sessionId}`).emit('game:updated', { session: populated });
+
+            if (session.channel) {
+                io.to(`channel:${session.channel.toString()}`).emit('game:updated', { session: populated });
+            }
+
+            logger.debug(`${socket.username} forfeited game ${sessionId}`);
+        } catch (error) {
+            logger.error(`Game forfeit error: ${error.message}`);
         }
     });
 
