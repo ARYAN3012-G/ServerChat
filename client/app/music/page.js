@@ -192,14 +192,21 @@ export default function MusicPage() {
 
         try {
             // Step 1: Try LRCLIB for synced lyrics (uses track name + artist)
-            const params = new URLSearchParams({ track: currentTrack.title });
-            if (currentTrack.artist) params.append('artist', currentTrack.artist);
-            if (currentTrack.durationSec) params.append('duration', currentTrack.durationSec);
+            // Clean title: remove "(From XYZ)" or similar suffixes JioSaavn adds
+            const cleanTitle = currentTrack.title.replace(/\s*\(.*?\)\s*/g, '').trim();
+            // Use first artist only (JioSaavn sends "Mithoon, Arijit Singh")
+            const cleanArtist = currentTrack.artist?.split(',')[0].trim();
+            
+            const params = new URLSearchParams({ track: cleanTitle });
+            if (cleanArtist) params.append('artist', cleanArtist);
 
+            console.log('[Lyrics] Trying LRCLIB:', cleanTitle, 'by', cleanArtist);
             const { data: lrcData } = await api.get(`/music/lyrics/synced?${params.toString()}`);
+            console.log('[Lyrics] LRCLIB response:', !!lrcData.syncedLyrics, !!lrcData.plainLyrics);
             
             if (lrcData.syncedLyrics) {
                 const parsed = parseLRC(lrcData.syncedLyrics);
+                console.log('[Lyrics] Parsed', parsed.length, 'synced lines');
                 if (parsed.length > 0) {
                     setSyncedLines(parsed);
                     setLoadingLyrics(false);
@@ -213,7 +220,7 @@ export default function MusicPage() {
                 return;
             }
         } catch (e) {
-            console.log('LRCLIB failed, trying JioSaavn fallback');
+            console.log('[Lyrics] LRCLIB failed:', e.message, '- trying JioSaavn fallback');
         }
 
         try {
