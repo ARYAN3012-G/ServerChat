@@ -172,15 +172,14 @@ export default function MusicPage() {
     };
 
     const fetchLyrics = async (songId) => {
-        if (!songId || songId === lastLyricsId) return;
+        if (!songId) return;
         setLoadingLyrics(true);
         setLyrics(null);
-        setLastLyricsId(songId);
         try {
             const { data } = await api.get(`/music/lyrics/${songId}`);
             setLyrics(data.lyrics || null);
         } catch (e) {
-            console.error('Failed to fetch lyrics');
+            console.error('Failed to fetch lyrics:', e);
             setLyrics(null);
         }
         setLoadingLyrics(false);
@@ -572,13 +571,13 @@ export default function MusicPage() {
                     <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }}
                         className="fixed inset-0 z-[100] flex flex-col overflow-hidden">
 
-                        {/* Blurred album art background */}
+                        {/* Solid background with subtle album art tint */}
                         <div className="absolute inset-0 z-0">
+                            <div className="absolute inset-0 bg-[#0a0c18]" />
                             {(currentTrack.thumbnail || currentTrack.image) && (
-                                <img src={currentTrack.thumbnail || currentTrack.image} alt="" className="w-full h-full object-cover scale-110 blur-[80px] opacity-30" />
+                                <img src={currentTrack.thumbnail || currentTrack.image} alt="" className="absolute inset-0 w-full h-full object-cover scale-125 blur-[100px] opacity-15" />
                             )}
-                            <div className="absolute inset-0 bg-[#0a0c18]/80" />
-                            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0a0c18]/60 to-[#0a0c18]" />
+                            <div className="absolute inset-0 bg-gradient-to-b from-[#0a0c18]/40 via-[#0a0c18]/70 to-[#0a0c18]" />
                         </div>
 
                         {/* Header */}
