@@ -185,9 +185,30 @@ export default function MusicPage() {
         setLoadingLyrics(false);
     };
 
-    const openExpanded = () => {
+    const openExpanded = async () => {
         setShowExpanded(true);
-        if (currentTrack?.id) fetchLyrics(currentTrack.id);
+        if (currentTrack?.id) {
+            fetchLyrics(currentTrack.id);
+        } else if (currentTrack?.title) {
+            // Song has no id (e.g. from favorites) — search for it to get the id
+            setLoadingLyrics(true);
+            setLyrics(null);
+            try {
+                const q = `${currentTrack.title} ${currentTrack.artist || ''}`.trim();
+                const { data } = await api.get(`/music/search?query=${encodeURIComponent(q)}&limit=5`);
+                const match = data.songs?.find(s =>
+                    s.title?.toLowerCase().includes(currentTrack.title.toLowerCase().substring(0, 15))
+                ) || data.songs?.[0];
+                if (match?.id) {
+                    fetchLyrics(match.id);
+                } else {
+                    setLoadingLyrics(false);
+                }
+            } catch (e) {
+                console.error('Failed to find song for lyrics:', e);
+                setLoadingLyrics(false);
+            }
+        }
     };
 
     const formatTime = (s) => {
