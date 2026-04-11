@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUser, FiLock, FiMoon, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap, FiMenu, FiSmartphone, FiShield, FiSlash, FiLogOut } from 'react-icons/fi';
+import { FiArrowLeft, FiUser, FiLock, FiMoon, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap, FiMenu, FiSmartphone, FiShield, FiSlash, FiLogOut, FiX } from 'react-icons/fi';
 import dynamic from 'next/dynamic';
 const AvatarPicker = dynamic(() => import('../../components/AvatarPicker'), { ssr: false });
 import { useAuth } from '../../hooks/useAuth';
@@ -48,6 +48,11 @@ export default function SettingsPage() {
     const [blockedUsers, setBlockedUsers] = useState([]);
     const [blockedLoading, setBlockedLoading] = useState(false);
 
+    // Username availability check
+    const [usernameAvailability, setUsernameAvailability] = useState(null);
+    const [checkingUsername, setCheckingUsername] = useState(false);
+    const usernameDebounceRef = useRef(null);
+
     // Read ?tab= query param
     const searchParams = useSearchParams();
     useEffect(() => {
@@ -60,6 +65,27 @@ export default function SettingsPage() {
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
     useEffect(() => { if (user) { setUsername(user.username || ''); setBio(user.bio || ''); setCustomStatus(typeof user.customStatus === 'string' ? user.customStatus : (user.customStatus?.text || '')); setBackground(user.preferences?.background || ''); setPhoneNumber(user.phone || ''); if (user.phone) setPhoneSaved(true); if (user.hasFaceId) setFaceRegistered(true); setAvatarData(user.avatar || null); setBanner(user.banner || ''); setAccentColor(user.accentColor || '#6366f1'); } }, [user]);
     useEffect(() => { if (isAuthenticated) fetchSubscription(); }, [isAuthenticated]);
+
+    // Debounced username availability check
+    useEffect(() => {
+        if (!username || username.length < 3 || username === user?.username) {
+            setUsernameAvailability(null);
+            setCheckingUsername(false);
+            return;
+        }
+        setCheckingUsername(true);
+        if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current);
+        usernameDebounceRef.current = setTimeout(async () => {
+            try {
+                const { data } = await api.get(`/users/check-username?username=${encodeURIComponent(username)}`);
+                setUsernameAvailability(data);
+            } catch {
+                setUsernameAvailability(null);
+            }
+            setCheckingUsername(false);
+        }, 400);
+        return () => { if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current); };
+    }, [username, user?.username]);
 
     const handleLogout = () => {
         logout();
@@ -226,8 +252,31 @@ export default function SettingsPage() {
                                         </div>
                                     </div>
                                     <div className="space-y-5 relative z-10">
-                                        <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Username</label>
-                                            <input value={username} onChange={(e) => setUsername(e.target.value)} className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" /></div>
+                                        <div>
+                                            <label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Username</label>
+                                            <div className="relative mt-2">
+                                                <input value={username} onChange={(e) => { setUsername(e.target.value); setUsernameAvailability(null); }}
+                                                    className={`w-full bg-white/5 border rounded-xl px-4 py-3 text-sm outline-none text-white transition-all pr-10 ${
+                                                        usernameAvailability?.available === true ? 'border-emerald-500/40 focus:ring-2 focus:ring-emerald-500' :
+                                                        usernameAvailability?.available === false ? 'border-red-500/40 focus:ring-2 focus:ring-red-500' :
+                                                        'border-white/10 focus:ring-2 focus:ring-indigo-500'
+                                                    }`} />
+                                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                    {checkingUsername ? (
+                                                        <div className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                                                    ) : usernameAvailability?.available === true ? (
+                                                        <FiCheck className="w-4 h-4 text-emerald-400" />
+                                                    ) : usernameAvailability?.available === false ? (
+                                                        <FiX className="w-4 h-4 text-red-400" />
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                            {usernameAvailability && (
+                                                <p className={`text-[11px] mt-1.5 ${usernameAvailability.available ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
+                                                    {usernameAvailability.message}
+                                                </p>
+                                            )}
+                                        </div>
                                         <div>
                                             <label className="text-[11px] font-bold text-white/40 uppercase tracking-wider flex items-center gap-2">
                                                 Bio <span className="text-[9px] lowercase font-normal">({bio.length}/{subscription?.tier === 'pro' ? 500 : 200})</span>

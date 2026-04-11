@@ -8,6 +8,7 @@ router.get('/search', auth, userController.searchUsers);
 router.get('/online', auth, userController.getOnlineUsers);
 router.get('/activity', auth, userController.getActivityHistory);
 router.get('/blocked', auth, userController.getBlockedUsers);
+router.get('/check-username', auth, userController.checkUsername);
 router.get('/:id', auth, userController.getProfile);
 router.put('/profile', auth, userController.updateProfile);
 router.put('/avatar', auth, upload.single('avatar'), userController.uploadAvatar);

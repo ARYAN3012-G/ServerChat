@@ -25,7 +25,16 @@ exports.updateProfile = async (req, res, next) => {
         const { username, bio, customStatus, preferences, prebuiltAvatar, banner, accentColor } = req.body;
         const updates = {};
 
-        if (username) updates.username = username;
+        if (username) {
+            // Check uniqueness if username is being changed
+            if (username !== req.user.username) {
+                const existing = await User.findOne({ username, _id: { $ne: req.user._id } });
+                if (existing) {
+                    return res.status(400).json({ message: 'Username already taken' });
+                }
+            }
+            updates.username = username;
+        }
         if (bio !== undefined) updates.bio = bio;
         if (customStatus !== undefined) updates.customStatus = customStatus;
         if (banner !== undefined) updates.banner = banner;
@@ -194,6 +203,30 @@ exports.getActivityHistory = async (req, res, next) => {
             .skip((page - 1) * limit);
 
         res.json({ activities });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Check username availability
+exports.checkUsername = async (req, res, next) => {
+    try {
+        const { username } = req.query;
+        if (!username || username.length < 3) {
+            return res.json({ available: false, message: 'Username must be at least 3 characters' });
+        }
+        if (username.length > 30) {
+            return res.json({ available: false, message: 'Username must be 30 characters or less' });
+        }
+        // Check if it's the current user's own username
+        if (req.user.username === username) {
+            return res.json({ available: true, message: 'This is your current username' });
+        }
+        const existing = await User.findOne({ username });
+        if (existing) {
+            return res.json({ available: false, message: 'Username already taken' });
+        }
+        res.json({ available: true, message: 'Username is available' });
     } catch (error) {
         next(error);
     }

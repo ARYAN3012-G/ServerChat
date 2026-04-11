@@ -110,7 +110,7 @@ exports.sendPasswordResetEmail = async (to, resetToken) => {
 /**
  * Send contact form email to admin via Resend
  */
-exports.sendContactEmail = async ({ name, email, subject, message }) => {
+exports.sendContactEmail = async ({ name, email, subject, message, inGameUsername }) => {
     const submittedAt = new Date().toLocaleString('en-IN', {
         timeZone: 'Asia/Kolkata',
         dateStyle: 'medium',
@@ -188,6 +188,11 @@ exports.sendContactEmail = async ({ name, email, subject, message }) => {
                                     </td>
                                 </tr>
                             </table>
+${inGameUsername ? `
+                            <div style="margin-top:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(139,92,246,0.2);border-radius:12px;padding:14px 16px;">
+                                <p style="color:#8b5cf6;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;margin:0 0 6px;">🎮 In-Game Username</p>
+                                <p style="color:#c4b5fd;font-size:14px;font-weight:600;margin:0;">${inGameUsername}</p>
+                            </div>` : ''}
                         </td>
                     </tr>
 

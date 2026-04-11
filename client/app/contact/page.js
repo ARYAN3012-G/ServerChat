@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiMessageSquare, FiMail, FiPhone, FiSend, FiCheck, FiAlertCircle, FiLoader } from 'react-icons/fi';
+import { FiArrowLeft, FiMessageSquare, FiMail, FiPhone, FiSend, FiCheck, FiAlertCircle, FiLoader, FiUser, FiX } from 'react-icons/fi';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -11,10 +11,38 @@ export default function Contact() {
     const router = useRouter();
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
+    const [inGameUsername, setInGameUsername] = useState('');
+    const [usernameAvailability, setUsernameAvailability] = useState(null); // null | { available, message }
+    const [checkingUsername, setCheckingUsername] = useState(false);
+    const usernameDebounceRef = useRef(null);
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
     const [status, setStatus] = useState('idle'); // idle | loading | success | error
     const [errorMsg, setErrorMsg] = useState('');
+
+    // Debounced username availability check
+    useEffect(() => {
+        if (!inGameUsername || inGameUsername.length < 3) {
+            setUsernameAvailability(null);
+            return;
+        }
+        setCheckingUsername(true);
+        if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current);
+        usernameDebounceRef.current = setTimeout(async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/users/check-username?username=${encodeURIComponent(inGameUsername)}`, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                });
+                const data = await res.json();
+                setUsernameAvailability(data);
+            } catch {
+                setUsernameAvailability(null);
+            }
+            setCheckingUsername(false);
+        }, 400);
+        return () => { if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current); };
+    }, [inGameUsername]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -24,7 +52,7 @@ export default function Contact() {
             const res = await fetch(`${API_URL}/api/contact`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email, subject, message }),
+                body: JSON.stringify({ name, email, subject, message, inGameUsername }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || 'Failed to send message');
@@ -112,6 +140,37 @@ export default function Contact() {
                                 />
                             </div>
                             <div>
+                                <label className="text-[11px] font-bold text-white/40 uppercase tracking-wider flex items-center gap-2">
+                                    In-Game Username
+                                    <FiUser className="w-3 h-3 text-indigo-400" />
+                                </label>
+                                <div className="relative mt-2">
+                                    <input
+                                        value={inGameUsername} onChange={e => setInGameUsername(e.target.value)}
+                                        placeholder="Enter your username..."
+                                        className={`w-full bg-white/5 border rounded-xl px-4 py-3 text-sm outline-none text-white transition-all placeholder-white/20 pr-10 ${
+                                            usernameAvailability?.available === true ? 'border-emerald-500/40 focus:ring-2 focus:ring-emerald-500' :
+                                            usernameAvailability?.available === false ? 'border-red-500/40 focus:ring-2 focus:ring-red-500' :
+                                            'border-white/10 focus:ring-2 focus:ring-indigo-500'
+                                        }`}
+                                    />
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                        {checkingUsername ? (
+                                            <div className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                                        ) : usernameAvailability?.available === true ? (
+                                            <FiCheck className="w-4 h-4 text-emerald-400" />
+                                        ) : usernameAvailability?.available === false ? (
+                                            <FiX className="w-4 h-4 text-red-400" />
+                                        ) : null}
+                                    </div>
+                                </div>
+                                {usernameAvailability && (
+                                    <p className={`text-[11px] mt-1.5 ${usernameAvailability.available ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
+                                        {usernameAvailability.message}
+                                    </p>
+                                )}
+                            </div>
+                            <div>
                                 <label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Your Email</label>
                                 <input
                                     type="email" value={email} onChange={e => setEmail(e.target.value)} required
@@ -175,9 +234,9 @@ export default function Contact() {
                                     <FiCheck className="w-8 h-8 text-emerald-400" />
                                 </div>
                                 <h2 className="text-xl font-bold mb-2">Message Sent! 🎉</h2>
-                                <p className="text-white/50 text-sm mb-6">Your message has been delivered to our team. We'll get back to you within 24 hours at <span className="text-indigo-300">{email}</span>.</p>
+                                <p className="text-white/50 text-sm mb-6">Your message has been delivered to our team. We'll get back to you within 24 hours at <span className="text-indigo-300">{email}</span>.{inGameUsername && <> (Username: <span className="text-violet-300">{inGameUsername}</span>)</>}</p>
                                 <button
-                                    onClick={() => { setStatus('idle'); setName(''); setEmail(''); setSubject(''); setMessage(''); }}
+                                    onClick={() => { setStatus('idle'); setName(''); setEmail(''); setSubject(''); setMessage(''); setInGameUsername(''); setUsernameAvailability(null); }}
                                     className="w-full py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold transition-colors"
                                 >
                                     Send Another Message
