@@ -56,7 +56,7 @@ export default function MusicSessionPage() {
     ];
 
     // Derived
-    const isServerOwner = (currentServer?.owner?._id || currentServer?.owner)?.toString() === user?._id?.toString();
+    const isServerOwner = session?.server?.owner === user?._id || session?.server?.owner?._id === user?._id || (currentServer?.owner?._id || currentServer?.owner)?.toString() === user?._id?.toString();
     const amIHost = roomState.hostUserId === user?._id;
     const amIOwner = roomState.ownerUserId === user?._id;
     const amIHostOrOwner = amIHost || amIOwner || isServerOwner;
@@ -77,8 +77,8 @@ export default function MusicSessionPage() {
         const socket = getSocket();
         if (!socket) return;
 
-        // Join the room
-        socket.emit('stream:join', { roomId: sessionId, isServerOwner });
+        // Join the room (Backend handles host/owner extraction securely)
+        socket.emit('stream:join', { roomId: sessionId });
         setConnected(true);
 
         const handleSync = (data) => {
@@ -131,6 +131,22 @@ export default function MusicSessionPage() {
     useEffect(() => {
         if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
     }, [roomState.chat]);
+
+    // ── Auto-sync Listeners with Host's Music ──
+    useEffect(() => {
+        if (!amIHostOrOwner && roomState.track) {
+            if (currentTrack?.url !== roomState.track.url) {
+                globalPlay(roomState.track);
+            }
+        }
+    }, [roomState.track, amIHostOrOwner, currentTrack?.url, globalPlay]);
+
+    useEffect(() => {
+        if (!amIHostOrOwner && roomState.track) {
+            if (roomState.isPlaying && !globalIsPlaying) togglePlay();
+            if (!roomState.isPlaying && globalIsPlaying) togglePlay();
+        }
+    }, [roomState.isPlaying, amIHostOrOwner, globalIsPlaying, togglePlay, roomState.track]);
 
     // ── Music Controls ──
     const playSong = (song) => {
@@ -240,29 +256,7 @@ export default function MusicSessionPage() {
         { id: 'queue', label: `📋 Queue (${roomState.queue?.length || 0})` },
     ];
 
-    // ── Song Item Component ──
-    const SongItem = ({ song, index }) => (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }}
-            onClick={() => playSong(song)}
-            className="group flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 rounded-xl cursor-pointer transition-all">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg overflow-hidden bg-white/5 flex-shrink-0 relative">
-                {song.image || song.thumbnail ?
-                    <img src={song.image || song.thumbnail} alt="" className="w-full h-full object-cover" /> :
-                    <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                    <FiPlay className="w-4 h-4" />
-                </div>
-            </div>
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{song.title}</p>
-                <p className="text-[10px] text-white/30 truncate">{song.artist}</p>
-            </div>
-            <span className="text-[10px] text-white/20 flex-shrink-0 hidden sm:block">{song.duration || '--'}</span>
-            <span className="text-[9px] text-pink-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                {amIHostOrOwner ? '▶ Play' : '+ Request'}
-            </span>
-        </motion.div>
-    );
+
 
     return (
         <div className="flex h-[100dvh] bg-[#0c0e1a] text-white overflow-hidden">
@@ -410,7 +404,28 @@ export default function MusicSessionPage() {
                                     <div className="flex justify-center py-8"><div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" /></div>
                                 ) : (
                                     <div className="space-y-0.5">
-                                        {trendingSongs.map((song, i) => <SongItem key={i} song={song} index={i} />)}
+                                        {trendingSongs.map((song, i) => (
+                                            <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+                                                onClick={() => playSong(song)}
+                                                className="group flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 rounded-xl cursor-pointer transition-all">
+                                                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg overflow-hidden bg-white/5 flex-shrink-0 relative">
+                                                    {song.image || song.thumbnail ?
+                                                        <img src={song.image || song.thumbnail} alt="" className="w-full h-full object-cover" /> :
+                                                        <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>}
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                        <FiPlay className="w-4 h-4" />
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium truncate">{song.title}</p>
+                                                    <p className="text-[10px] text-white/30 truncate">{song.artist}</p>
+                                                </div>
+                                                <span className="text-[10px] text-white/20 flex-shrink-0 hidden sm:block">{song.duration || '--'}</span>
+                                                <span className="text-[9px] text-pink-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                                    {amIHostOrOwner ? '▶ Play' : '+ Request'}
+                                                </span>
+                                            </motion.div>
+                                        ))}
                                     </div>
                                 )}
                             </motion.div>
@@ -430,7 +445,28 @@ export default function MusicSessionPage() {
                                 </div>
                                 {searching && <div className="text-center py-4 text-[11px] text-white/20">Searching...</div>}
                                 <div className="space-y-0.5">
-                                    {searchResults.map((song, i) => <SongItem key={i} song={song} index={i} />)}
+                                    {searchResults.map((song, i) => (
+                                        <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+                                            onClick={() => playSong(song)}
+                                            className="group flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 rounded-xl cursor-pointer transition-all">
+                                            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg overflow-hidden bg-white/5 flex-shrink-0 relative">
+                                                {song.image || song.thumbnail ?
+                                                    <img src={song.image || song.thumbnail} alt="" className="w-full h-full object-cover" /> :
+                                                    <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>}
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                    <FiPlay className="w-4 h-4" />
+                                                </div>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium truncate">{song.title}</p>
+                                                <p className="text-[10px] text-white/30 truncate">{song.artist}</p>
+                                            </div>
+                                            <span className="text-[10px] text-white/20 flex-shrink-0 hidden sm:block">{song.duration || '--'}</span>
+                                            <span className="text-[9px] text-pink-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                                {amIHostOrOwner ? '▶ Play' : '+ Request'}
+                                            </span>
+                                        </motion.div>
+                                    ))}
                                 </div>
                                 {!searching && searchResults.length === 0 && searchQuery && (
                                     <div className="text-center py-8 text-white/20 text-sm">No results found</div>

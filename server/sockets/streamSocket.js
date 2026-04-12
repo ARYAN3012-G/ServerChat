@@ -6,9 +6,22 @@ const musicRooms = new Map();
 
 module.exports = (io, socket) => {
     // Join a stream/music room
-    socket.on('stream:join', (data) => {
-        const { roomId, isServerOwner } = data;
+    socket.on('stream:join', async (data) => {
+        const { roomId } = data;
         socket.join(`stream:${roomId}`);
+
+        // Fetch session from DB to accurately determine host and server owner
+        let isServerOwner = false;
+        let dbHostId = null;
+        try {
+            const dbSession = await MusicSession.findById(roomId).populate('server');
+            if (dbSession) {
+                dbHostId = dbSession.host?.toString();
+                isServerOwner = dbSession.server?.owner?.toString() === socket.userId;
+            }
+        } catch (e) {
+            logger.error(`Error fetching session in stream:join: ${e.message}`);
+        }
 
         // Create room if it doesn't exist
         if (!musicRooms.has(roomId)) {
@@ -17,16 +30,16 @@ module.exports = (io, socket) => {
                 track: null,
                 isPlaying: false,
                 currentTime: 0,
-                hostUserId: null,    // first joiner or server owner
-                ownerUserId: null,   // server owner always has control
-                sessionCreatorId: null, // tracks who created the session
+                hostUserId: null,
+                ownerUserId: null,
+                sessionCreatorId: null,
             });
         }
         const room = musicRooms.get(roomId);
 
-        // Track session creator (first joiner creates it)
-        if (!room.sessionCreatorId && room.users.length === 0) {
-            room.sessionCreatorId = socket.userId;
+        // Track session creator securely from DB
+        if (!room.sessionCreatorId) {
+            room.sessionCreatorId = dbHostId || socket.userId;
         }
 
         // Add user if not already present
@@ -48,15 +61,14 @@ module.exports = (io, socket) => {
             room.ownerUserId = socket.userId;
         }
 
-        // Host priority: server owner > original creator rejoining > first joiner
+        // Host priority: server owner > original creator > first joiner
         if (!room.hostUserId) {
             room.hostUserId = socket.userId;
         }
-        // Server owner always takes host
         if (isServerOwner) {
             room.hostUserId = socket.userId;
         }
-        // Original session creator reclaims host if current host is not the server owner
+        // Original session creator reclaims host if current host is not server owner
         if (socket.userId === room.sessionCreatorId && room.hostUserId !== room.ownerUserId) {
             room.hostUserId = socket.userId;
         }
