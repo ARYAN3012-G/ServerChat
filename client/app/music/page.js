@@ -175,16 +175,11 @@ export default function MusicPage() {
         if (!newSessionName.trim() || !serverId) return;
         try {
             const { data } = await api.post('/music/sessions', { name: newSessionName.trim(), serverId });
-            setMusicSessions(prev => [data.session, ...prev]);
             setNewSessionName('');
             setShowCreateSession(false);
             toast.success('Music session created!');
-            // Auto-join the socket room as host
-            const socket = getSocket();
-            if (socket) {
-                socket.emit('stream:join', { roomId: data.session._id, isServerOwner });
-                setActiveSessionId(data.session._id);
-            }
+            // Navigate to the dedicated session page
+            router.push(`/music/session/${data.session._id}`);
         } catch (e) { toast.error('Failed to create session'); }
     };
 
@@ -200,12 +195,7 @@ export default function MusicPage() {
     };
 
     const joinMusicSession = (sessionId) => {
-        const socket = getSocket();
-        if (!socket) return;
-        socket.emit('stream:join', { roomId: sessionId, isServerOwner });
-        setActiveSessionId(sessionId);
-        toast.success('Joined music session!');
-        setTimeout(() => fetchSessions(), 500);
+        router.push(`/music/session/${sessionId}`);
     };
 
     const leaveSession = (sessionId) => {
@@ -470,160 +460,7 @@ export default function MusicPage() {
                         <motion.div key="sessions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
 
-                            {activeSessionId ? (
-                            /* ═══ ACTIVE MUSIC ROOM INTERFACE ═══ */
-                            <div className="space-y-4">
-                                {/* Room Header */}
-                                <div className="flex items-center justify-between">
-                                    <button onClick={() => leaveSession(activeSessionId)}
-                                        className="flex items-center gap-2 text-white/40 hover:text-white transition-colors text-sm">
-                                        <FiArrowLeft className="w-4 h-4" /> Back to Sessions
-                                    </button>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                                        <span className="text-[10px] text-white/40">{roomState.users.length} listening</span>
-                                        {amIHostOrOwner && <span className="text-[9px] px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded-full">👑 Host</span>}
-                                    </div>
-                                </div>
-
-                                {/* Now Playing + Controls */}
-                                <div className="p-5 rounded-2xl bg-gradient-to-br from-pink-500/5 via-purple-500/5 to-indigo-500/5 border border-white/5">
-                                    {roomState.track ? (
-                                        <div className="flex flex-col sm:flex-row items-center gap-5">
-                                            <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-white/5 flex-shrink-0 shadow-xl">
-                                                {(roomState.track.image || roomState.track.thumbnail) ?
-                                                    <img src={roomState.track.image || roomState.track.thumbnail} alt="" className="w-full h-full object-cover" /> :
-                                                    <div className="w-full h-full flex items-center justify-center text-4xl">🎵</div>}
-                                            </div>
-                                            <div className="flex-1 min-w-0 text-center sm:text-left">
-                                                <h3 className="text-lg font-bold text-white truncate">{roomState.track.title}</h3>
-                                                <p className="text-sm text-white/40 truncate">{roomState.track.artist}</p>
-                                                <div className="flex items-center justify-center sm:justify-start gap-3 mt-4">
-                                                    {amIHostOrOwner ? (
-                                                        <button onClick={roomTogglePlay}
-                                                            className="w-12 h-12 rounded-full bg-pink-500 hover:bg-pink-600 flex items-center justify-center text-white transition-colors shadow-lg shadow-pink-500/20">
-                                                            {roomState.isPlaying ? <FiPause className="w-5 h-5" /> : <FiPlay className="w-5 h-5 ml-0.5" />}
-                                                        </button>
-                                                    ) : (
-                                                        <div className="flex items-center gap-2">
-                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${roomState.isPlaying ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/30'}`}>
-                                                                {roomState.isPlaying ? <FiVolume2 className="w-4 h-4" /> : <FiPause className="w-4 h-4" />}
-                                                            </div>
-                                                            <span className="text-[10px] text-white/30">{roomState.isPlaying ? 'Playing' : 'Paused'}</span>
-                                                        </div>
-                                                    )}
-                                                    <button onClick={roomVoteSkip} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white/40 rounded-lg text-xs transition-colors">⏭ Vote Skip</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-10">
-                                            <div className="text-5xl mb-3">🎵</div>
-                                            <p className="text-white/40 text-sm">No track playing</p>
-                                            <p className="text-[10px] text-white/20 mt-1">{amIHostOrOwner ? 'Search and play a song below!' : 'Waiting for host to play...'}</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Search Songs */}
-                                <div className="rounded-xl bg-white/[0.02] border border-white/5 overflow-hidden">
-                                    <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2">
-                                        <FiSearch className="w-4 h-4 text-white/20" />
-                                        <input type="text" value={roomSearchQuery}
-                                            onChange={e => { setRoomSearchQuery(e.target.value); roomSearchSongs(e.target.value); }}
-                                            placeholder={amIHostOrOwner ? 'Search songs to play...' : 'Search songs to request...'}
-                                            className="flex-1 bg-transparent text-sm outline-none text-white placeholder-white/20" />
-                                        {roomSearchQuery && <button onClick={() => { setRoomSearchQuery(''); setRoomSearchResults([]); }} className="text-white/20 hover:text-white"><FiX className="w-3.5 h-3.5" /></button>}
-                                    </div>
-                                    {roomSearching && <div className="px-4 py-3 text-[10px] text-white/20">Searching...</div>}
-                                    {roomSearchResults.length > 0 && (
-                                        <div className="max-h-48 overflow-y-auto">
-                                            {roomSearchResults.map((song, i) => (
-                                                <button key={i} onClick={() => { roomPlaySong(song); setRoomSearchQuery(''); setRoomSearchResults([]); }}
-                                                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left">
-                                                    <div className="w-9 h-9 rounded-lg overflow-hidden bg-white/5 flex-shrink-0">
-                                                        {song.image ? <img src={song.image} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-sm">🎵</div>}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-xs font-medium truncate text-white/80">{song.title}</p>
-                                                        <p className="text-[10px] text-white/30 truncate">{song.artist}</p>
-                                                    </div>
-                                                    <span className="text-[9px] text-pink-400 flex-shrink-0">{amIHostOrOwner ? '▶ Play' : '+ Request'}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Queue + Listeners */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="rounded-xl bg-white/[0.02] border border-white/5">
-                                        <div className="px-4 py-2.5 border-b border-white/5"><span className="text-xs font-bold text-white/50">🎶 Queue ({roomState.queue?.length || 0})</span></div>
-                                        <div className="max-h-48 overflow-y-auto">
-                                            {(!roomState.queue || roomState.queue.length === 0) ? <p className="px-4 py-4 text-[10px] text-white/20 text-center">No songs in queue</p> : roomState.queue.map((q, i) => (
-                                                <div key={i} className="flex items-center gap-2 px-3 py-2 hover:bg-white/5 transition-colors">
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-[11px] font-medium truncate text-white/70">{q.title}</p>
-                                                        <p className="text-[9px] text-white/20 truncate">{q.artist} • by {q.requestedBy?.username || '?'} {q.status === 'pending' ? <span className="text-amber-400">⏳</span> : <span className="text-emerald-400">✓</span>}</p>
-                                                    </div>
-                                                    {amIHostOrOwner && q.status === 'pending' && (
-                                                        <div className="flex gap-1 flex-shrink-0">
-                                                            <button onClick={() => roomApproveTrack(q.id)} className="text-[9px] px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded">✓</button>
-                                                            <button onClick={() => roomRejectTrack(q.id)} className="text-[9px] px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded">✕</button>
-                                                        </div>
-                                                    )}
-                                                    {amIHostOrOwner && q.status === 'approved' && <button onClick={() => roomPlaySong(q)} className="text-[9px] px-1.5 py-0.5 bg-pink-500/20 text-pink-400 rounded flex-shrink-0">▶</button>}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="rounded-xl bg-white/[0.02] border border-white/5">
-                                        <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
-                                            <span className="text-xs font-bold text-white/50"><FiUsers className="w-3 h-3 inline mr-1" />Listeners ({roomState.users.length})</span>
-                                            {amIHostOrOwner && roomState.users.length > 1 && <button onClick={() => setShowHostTransfer(true)} className="text-[9px] text-amber-400 hover:text-amber-300">👑 Transfer</button>}
-                                        </div>
-                                        <div className="max-h-48 overflow-y-auto p-2">
-                                            {roomState.users.map((u, i) => (
-                                                <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5">
-                                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${u.userId === roomState.hostUserId ? 'bg-amber-500/20 text-amber-400' : u.userId === roomState.ownerUserId ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-white/30'}`}>
-                                                        {(u.username || 'U')[0].toUpperCase()}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-[11px] font-medium truncate text-white/70">{u.username}{u.userId === user?._id ? <span className="text-white/20 ml-1">(you)</span> : ''}</p>
-                                                        <p className="text-[9px] text-white/20">{u.userId === roomState.hostUserId ? '👑 Host' : u.userId === roomState.ownerUserId ? '🔑 Owner' : '🎧 Listener'}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Room Chat */}
-                                <div className="rounded-xl bg-white/[0.02] border border-white/5">
-                                    <div className="px-4 py-2.5 border-b border-white/5"><span className="text-xs font-bold text-white/50">💬 Chat</span></div>
-                                    <div className="h-32 overflow-y-auto px-3 py-2 space-y-1">
-                                        {roomState.chat.length === 0 && <p className="text-[10px] text-white/15 text-center py-4">No messages yet</p>}
-                                        {roomState.chat.map((msg, i) => (
-                                            <div key={i} className="text-[11px]"><span className="font-medium text-pink-400/60">{msg.username}: </span><span className="text-white/50">{msg.message}</span></div>
-                                        ))}
-                                    </div>
-                                    <div className="px-3 py-2 border-t border-white/5">
-                                        <input type="text" placeholder="Send a message..."
-                                            onKeyDown={e => { if (e.key === 'Enter' && e.target.value.trim()) { sendRoomChat(e.target.value); e.target.value = ''; } }}
-                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-[11px] outline-none text-white placeholder-white/15 focus:border-pink-500/30" />
-                                    </div>
-                                </div>
-
-                                {/* Room Actions */}
-                                <div className="flex justify-center gap-3">
-                                    {(roomState.hostUserId === user?._id || isServerOwner) && (
-                                        <button onClick={() => endSession(activeSessionId)} className="px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl text-xs font-medium hover:bg-red-500/20 transition-colors">✕ End Session</button>
-                                    )}
-                                    <button onClick={() => leaveSession(activeSessionId)} className="px-4 py-2 bg-white/5 text-white/40 border border-white/10 rounded-xl text-xs font-medium hover:bg-white/10 transition-colors">👋 Leave</button>
-                                </div>
-                            </div>
-                            ) : (
-                            /* ═══ SESSION LIST ═══ */
+                            {/* Session List */}
                             <div>                            {/* Create Session */}
                             <div className="mb-6">
                                 {!showCreateSession ? (
@@ -690,17 +527,10 @@ export default function MusicPage() {
                                                 )}
                                             </div>
                                             <div className="flex flex-col gap-1.5 flex-shrink-0">
-                                                {activeSessionId === session._id ? (
-                                                    <button onClick={() => leaveSession(session._id)}
-                                                        className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-[10px] sm:text-xs font-medium transition-colors border border-emerald-500/20 hover:bg-emerald-500/30">
-                                                        ✓ Listening
-                                                    </button>
-                                                ) : (
-                                                    <button onClick={() => joinMusicSession(session._id)}
-                                                        className="px-3 py-1.5 bg-pink-500 hover:bg-pink-600 text-white rounded-lg text-[10px] sm:text-xs font-medium transition-colors">
-                                                        🎧 Join
-                                                    </button>
-                                                )}
+                                                <button onClick={() => joinMusicSession(session._id)}
+                                                    className="px-3 py-1.5 bg-pink-500 hover:bg-pink-600 text-white rounded-lg text-[10px] sm:text-xs font-medium transition-colors">
+                                                    🎧 Join
+                                                </button>
                                                 {(session.host?._id || session.host)?.toString() === user?._id?.toString() && (
                                                     <button onClick={() => endSession(session._id)}
                                                         className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] sm:text-xs font-medium transition-colors border border-red-500/20">
@@ -719,10 +549,7 @@ export default function MusicPage() {
                                     </div>
                                 ))}
                             </div>
-
-                            {/* Active Session Status Bar - only shown in list view when somehow active */}
                             </div>
-                            )}
 
                             {/* Host Transfer Modal */}
                             <AnimatePresence>

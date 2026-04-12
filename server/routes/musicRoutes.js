@@ -160,11 +160,27 @@ router.post('/sessions', auth, async (req, res) => {
     } catch (error) { res.status(500).json({ message: 'Failed to create session' }); }
 });
 
+// Get single session by ID
+router.get('/sessions/:sessionId', auth, async (req, res) => {
+    try {
+        const session = await MusicSession.findById(req.params.sessionId)
+            .populate('host', 'username avatar')
+            .populate('server', 'name owner')
+            .populate('listeners.user', 'username avatar')
+            .populate('queue.requestedBy', 'username avatar');
+        if (!session) return res.status(404).json({ message: 'Session not found' });
+        res.json({ session });
+    } catch (error) { res.status(500).json({ message: 'Failed to fetch session' }); }
+});
+
 router.put('/sessions/:sessionId/end', auth, async (req, res) => {
     try {
-        const session = await MusicSession.findById(req.params.sessionId);
+        const session = await MusicSession.findById(req.params.sessionId).populate('server', 'owner');
         if (!session) return res.status(404).json({ message: 'Session not found' });
-        if (session.host.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'Only host can end' });
+        // Allow host OR server owner to end
+        const isHost = session.host.toString() === req.user._id.toString();
+        const isServerOwner = session.server?.owner?.toString() === req.user._id.toString();
+        if (!isHost && !isServerOwner) return res.status(403).json({ message: 'Only host or server owner can end' });
         session.status = 'ended';
         await session.save();
         res.json({ session });
