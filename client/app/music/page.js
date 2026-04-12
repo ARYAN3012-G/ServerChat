@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiArrowLeft, FiSearch, FiHeart, FiPlay, FiPause, FiSkipForward, FiSkipBack, FiVolume2, FiVolumeX, FiX, FiMusic, FiTrash2, FiPlus, FiClock, FiUsers, FiRadio, FiChevronDown, FiRepeat } from 'react-icons/fi';
 import { getSocket } from '../../services/socket';
@@ -14,13 +15,18 @@ export default function MusicPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user } = useAuth();
+    const { currentServer } = useSelector(s => s.server);
     const serverIdParam = searchParams.get('serverId');
-    const serverId = serverIdParam || null; // Only use explicit URL param, not Redux
+    const serverId = serverIdParam || null;
     const { currentTrack, isPlaying, progress, duration, volume, muted, repeatMode,
             playSong: globalPlay, togglePlay, playNext, playPrev, seekTo: globalSeek, stopMusic,
             toggleRepeat, setVolume, setMuted, setQueue } = useMusicPlayer();
 
-    const [tab, setTab] = useState('favorites'); // favorites | explore | sessions | search
+    // Check if current user is the server owner
+    const isServerOwner = currentServer?.owner?.toString() === user?._id?.toString()
+        || (currentServer?.owner?._id || currentServer?.owner)?.toString() === user?._id?.toString();
+
+    const [tab, setTab] = useState('favorites');
     const [favorites, setFavorites] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -37,6 +43,10 @@ export default function MusicPage() {
     const [newSessionName, setNewSessionName] = useState('');
     const [showCreateSession, setShowCreateSession] = useState(false);
     const [activeSessionId, setActiveSessionId] = useState(null);
+    const [showHostTransfer, setShowHostTransfer] = useState(false);
+
+    // Room state from socket events (host, users, etc.)
+    const [roomState, setRoomState] = useState({ hostUserId: null, ownerUserId: null, users: [] });
 
     // Explore state
     const [trendingSongs, setTrendingSongs] = useState([]);
@@ -62,6 +72,38 @@ export default function MusicPage() {
         fetchFavorites();
         if (serverId) { setTab('sessions'); fetchSessions(); }
     }, []);
+
+    // Socket listeners for room state updates
+    useEffect(() => {
+        const socket = getSocket();
+        if (!socket) return;
+
+        const handleSync = (data) => {
+            if (data.users) setRoomState(prev => ({ ...prev, users: data.users, hostUserId: data.hostUserId || prev.hostUserId, ownerUserId: data.ownerUserId || prev.ownerUserId }));
+        };
+        const handleHostChanged = ({ hostUserId, users }) => {
+            setRoomState(prev => ({ ...prev, hostUserId, users: users || prev.users }));
+            if (hostUserId === user?._id) toast('You are now the host! 🎤', { icon: '👑' });
+        };
+        const handleUserJoined = ({ users, hostUserId, ownerUserId }) => {
+            setRoomState(prev => ({ ...prev, users, hostUserId: hostUserId || prev.hostUserId, ownerUserId: ownerUserId || prev.ownerUserId }));
+        };
+        const handleUserLeft = ({ userId }) => {
+            setRoomState(prev => ({ ...prev, users: prev.users.filter(u => u.userId !== userId) }));
+        };
+
+        socket.on('music:sync', handleSync);
+        socket.on('music:host-changed', handleHostChanged);
+        socket.on('stream:user-joined', handleUserJoined);
+        socket.on('stream:user-left', handleUserLeft);
+
+        return () => {
+            socket.off('music:sync', handleSync);
+            socket.off('music:host-changed', handleHostChanged);
+            socket.off('stream:user-joined', handleUserJoined);
+            socket.off('stream:user-left', handleUserLeft);
+        };
+    }, [user?._id]);
 
     // Fetch trending when language changes
     useEffect(() => {
@@ -119,7 +161,7 @@ export default function MusicPage() {
             // Auto-join the socket room as host
             const socket = getSocket();
             if (socket) {
-                socket.emit('stream:join', { roomId: data.session._id, isServerOwner: false });
+                socket.emit('stream:join', { roomId: data.session._id, isServerOwner });
                 setActiveSessionId(data.session._id);
             }
         } catch (e) { toast.error('Failed to create session'); }
@@ -128,11 +170,10 @@ export default function MusicPage() {
     const endSession = async (sessionId) => {
         try {
             await api.put(`/music/sessions/${sessionId}/end`);
-            // Leave the socket room too
             const socket = getSocket();
             if (socket) socket.emit('stream:leave', { roomId: sessionId });
             setMusicSessions(prev => prev.filter(s => s._id !== sessionId));
-            if (activeSessionId === sessionId) setActiveSessionId(null);
+            if (activeSessionId === sessionId) { setActiveSessionId(null); setRoomState({ hostUserId: null, ownerUserId: null, users: [] }); }
             toast.success('Session ended');
         } catch (e) { toast.error('Failed to end session'); }
     };
@@ -140,18 +181,43 @@ export default function MusicPage() {
     const joinMusicSession = (sessionId) => {
         const socket = getSocket();
         if (!socket) return;
-        socket.emit('stream:join', { roomId: sessionId });
+        socket.emit('stream:join', { roomId: sessionId, isServerOwner });
         setActiveSessionId(sessionId);
         toast.success('Joined music session!');
         setTimeout(() => fetchSessions(), 500);
     };
 
     const leaveSession = (sessionId) => {
+        const amIHost = roomState.hostUserId === user?._id;
+        const otherUsers = roomState.users.filter(u => u.userId !== user?._id);
+        // If host is leaving and others are present, show transfer prompt
+        if (amIHost && otherUsers.length > 0) {
+            setShowHostTransfer(true);
+            return;
+        }
+        doLeave(sessionId);
+    };
+
+    const doLeave = (sessionId) => {
         const socket = getSocket();
-        if (socket) socket.emit('stream:leave', { roomId: sessionId });
-        if (activeSessionId === sessionId) setActiveSessionId(null);
+        if (socket) socket.emit('stream:leave', { roomId: sessionId || activeSessionId });
+        if (activeSessionId === (sessionId || activeSessionId)) { setActiveSessionId(null); setRoomState({ hostUserId: null, ownerUserId: null, users: [] }); }
+        setShowHostTransfer(false);
         toast('Left music session', { icon: '👋' });
         setTimeout(() => fetchSessions(), 500);
+    };
+
+    const transferHost = (newHostUserId) => {
+        const socket = getSocket();
+        if (!socket || !activeSessionId) return;
+        socket.emit('music:transfer-host', { roomId: activeSessionId, newHostUserId });
+        toast.success('Host transferred!');
+        setShowHostTransfer(false);
+    };
+
+    const transferAndLeave = (newHostUserId) => {
+        transferHost(newHostUserId);
+        setTimeout(() => doLeave(activeSessionId), 300);
     };
 
     // ── EXPLORE ──
@@ -404,11 +470,103 @@ export default function MusicPage() {
                                                         ✕ End
                                                     </button>
                                                 )}
+                                                {/* Server owner can also end any session */}
+                                                {isServerOwner && (session.host?._id || session.host)?.toString() !== user?._id?.toString() && (
+                                                    <button onClick={() => endSession(session._id)}
+                                                        className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] sm:text-xs font-medium transition-colors border border-red-500/20">
+                                                        ✕ End (Owner)
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
+
+                            {/* Active Session Status Bar */}
+                            {activeSessionId && roomState.users.length > 0 && (
+                                <div className="mt-4 p-3 rounded-xl bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-indigo-500/10 border border-pink-500/15">
+                                    <div className="flex items-center justify-between flex-wrap gap-2">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse flex-shrink-0" />
+                                            <span className="text-[10px] text-white/50">
+                                                {roomState.users.length} listener{roomState.users.length !== 1 ? 's' : ''}
+                                                {roomState.hostUserId === user?._id ? ' • 👑 You are Host' : ''}
+                                                {roomState.ownerUserId === user?._id && roomState.hostUserId !== user?._id ? ' • 🔑 Server Owner' : ''}
+                                            </span>
+                                        </div>
+                                        <div className="flex gap-1.5 flex-shrink-0">
+                                            {(roomState.hostUserId === user?._id || roomState.ownerUserId === user?._id) && roomState.users.length > 1 && (
+                                                <button onClick={() => setShowHostTransfer(true)}
+                                                    className="px-2 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-lg text-[9px] font-medium hover:bg-amber-500/20 transition-colors">
+                                                    👑 Transfer Host
+                                                </button>
+                                            )}
+                                            <button onClick={() => leaveSession(activeSessionId)}
+                                                className="px-2 py-1 bg-white/5 text-white/40 border border-white/10 rounded-lg text-[9px] font-medium hover:bg-white/10 transition-colors">
+                                                Leave
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {/* Room users list */}
+                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                        {roomState.users.map((u, i) => (
+                                            <span key={i} className={`px-2 py-0.5 rounded-full text-[9px] font-medium ${
+                                                u.userId === roomState.hostUserId ? 'bg-amber-500/20 text-amber-400 border border-amber-500/20' :
+                                                u.userId === roomState.ownerUserId ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/20' :
+                                                'bg-white/5 text-white/30'
+                                            }`}>
+                                                {u.userId === roomState.hostUserId && '👑 '}{u.userId === roomState.ownerUserId && u.userId !== roomState.hostUserId ? '🔑 ' : ''}{u.username || 'User'}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Host Transfer Modal */}
+                            <AnimatePresence>
+                                {showHostTransfer && (
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                        className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+                                        onClick={() => setShowHostTransfer(false)}>
+                                        <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+                                            className="bg-[#1a1d2e] border border-white/10 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden"
+                                            onClick={e => e.stopPropagation()}>
+                                            <div className="px-4 py-3 border-b border-white/5">
+                                                <h3 className="text-sm font-bold text-white">👑 Transfer Host</h3>
+                                                <p className="text-[10px] text-white/30 mt-0.5">Choose someone to be the new host before leaving</p>
+                                            </div>
+                                            <div className="p-2 max-h-48 overflow-y-auto">
+                                                {roomState.users.filter(u => u.userId !== user?._id).map((u, i) => (
+                                                    <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/5 transition-colors">
+                                                        <span className="text-xs text-white/70">{u.username || 'User'}</span>
+                                                        <div className="flex gap-1.5">
+                                                            <button onClick={() => transferHost(u.userId)}
+                                                                className="px-2.5 py-1 bg-amber-500/20 text-amber-400 rounded-lg text-[10px] font-medium hover:bg-amber-500/30 transition-colors">
+                                                                Make Host
+                                                            </button>
+                                                            <button onClick={() => transferAndLeave(u.userId)}
+                                                                className="px-2.5 py-1 bg-pink-500/20 text-pink-400 rounded-lg text-[10px] font-medium hover:bg-pink-500/30 transition-colors">
+                                                                Transfer & Leave
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="px-4 py-3 border-t border-white/5 flex justify-between">
+                                                <button onClick={() => setShowHostTransfer(false)}
+                                                    className="px-3 py-1.5 text-white/30 text-xs hover:text-white/50 transition-colors">
+                                                    Cancel
+                                                </button>
+                                                <button onClick={() => doLeave(activeSessionId)}
+                                                    className="px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-xs font-medium hover:bg-red-500/20 transition-colors">
+                                                    Leave without transferring
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </motion.div>
                     )}
 

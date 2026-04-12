@@ -19,9 +19,15 @@ module.exports = (io, socket) => {
                 currentTime: 0,
                 hostUserId: null,    // first joiner or server owner
                 ownerUserId: null,   // server owner always has control
+                sessionCreatorId: null, // tracks who created the session
             });
         }
         const room = musicRooms.get(roomId);
+
+        // Track session creator (first joiner creates it)
+        if (!room.sessionCreatorId && room.users.length === 0) {
+            room.sessionCreatorId = socket.userId;
+        }
 
         // Add user if not already present
         if (!room.users.find(u => u.userId === socket.userId)) {
@@ -31,6 +37,10 @@ module.exports = (io, socket) => {
                 isHost: false,
                 isOwner: !!isServerOwner,
             });
+        } else {
+            // User is rejoining — update their owner status
+            const existingUser = room.users.find(u => u.userId === socket.userId);
+            if (existingUser && isServerOwner) existingUser.isOwner = true;
         }
 
         // Set owner if this user is the server owner
@@ -38,11 +48,16 @@ module.exports = (io, socket) => {
             room.ownerUserId = socket.userId;
         }
 
-        // Set host: server owner always takes host, otherwise first joiner
+        // Host priority: server owner > original creator rejoining > first joiner
         if (!room.hostUserId) {
             room.hostUserId = socket.userId;
         }
+        // Server owner always takes host
         if (isServerOwner) {
+            room.hostUserId = socket.userId;
+        }
+        // Original session creator reclaims host if current host is not the server owner
+        if (socket.userId === room.sessionCreatorId && room.hostUserId !== room.ownerUserId) {
             room.hostUserId = socket.userId;
         }
 
