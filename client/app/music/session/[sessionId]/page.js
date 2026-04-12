@@ -208,39 +208,71 @@ export default function MusicSessionPage() {
         if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
     }, [roomState.chat]);
 
-    // ── Auto-sync Listeners with Host's Music ──
+    // ── Auto-sync ALL devices with incoming roomState changes ──
+    // This handles BOTH listeners AND host (for server-initiated changes like vote-skip)
     const lastSyncedTrackRef = useRef(null);
-    useEffect(() => {
-        if (!amIHostOrOwner && roomState.track && roomState.track.url) {
-            if (lastSyncedTrackRef.current !== roomState.track.url) {
-                lastSyncedTrackRef.current = roomState.track.url;
-                globalPlay(roomState.track);
-            }
-        }
-    }, [roomState.track?.url, amIHostOrOwner]);
-
     const lastSyncedPlayingRef = useRef(null);
-    useEffect(() => {
-        if (!amIHostOrOwner && roomState.track) {
-            const shouldPlay = roomState.isPlaying;
-            if (lastSyncedPlayingRef.current !== shouldPlay) {
-                lastSyncedPlayingRef.current = shouldPlay;
-                if (shouldPlay && !globalIsPlaying) togglePlay();
-                if (!shouldPlay && globalIsPlaying) togglePlay();
-            }
-        }
-    }, [roomState.isPlaying, amIHostOrOwner, roomState.track, globalIsPlaying, togglePlay]);
 
-    // ── Time Sync Listener (seek when too far behind) ──
+    useEffect(() => {
+        if (!roomState.track || !roomState.track.url) return;
+
+        const isServerInitiated = roomState.syncedBy === 'server' || roomState.syncedBy === 'vote-skip' || roomState.syncedBy === 'queue';
+        const isFromOtherUser = roomState.syncedBy && roomState.syncedBy !== user?._id;
+
+        // Should we react to this sync event?
+        // Listeners: always react to any sync
+        // Host: only react to server-initiated events (vote-skip, queue, initial server sync)
+        const shouldReact = !amIHostOrOwner || isServerInitiated;
+        if (!shouldReact) return;
+
+        // Track changed — play the new track
+        if (lastSyncedTrackRef.current !== roomState.track.url) {
+            lastSyncedTrackRef.current = roomState.track.url;
+            globalPlay(roomState.track);
+        }
+    }, [roomState.track?.url, roomState.syncedBy, amIHostOrOwner, globalPlay, user?._id]);
+
+    useEffect(() => {
+        if (!roomState.track) return;
+
+        const isServerInitiated = roomState.syncedBy === 'server' || roomState.syncedBy === 'vote-skip' || roomState.syncedBy === 'queue';
+        const shouldReact = !amIHostOrOwner || isServerInitiated;
+        if (!shouldReact) return;
+
+        const shouldPlay = roomState.isPlaying;
+        if (lastSyncedPlayingRef.current !== shouldPlay) {
+            lastSyncedPlayingRef.current = shouldPlay;
+            if (shouldPlay && !globalIsPlaying) togglePlay();
+            if (!shouldPlay && globalIsPlaying) togglePlay();
+        }
+    }, [roomState.isPlaying, roomState.syncedBy, amIHostOrOwner, roomState.track, globalIsPlaying, togglePlay, user?._id]);
+
+    // ── Time Sync for Listeners (seek when too far behind) ──
     useEffect(() => {
         if (!amIHostOrOwner && roomState.track && roomState.syncTimestamp && duration) {
-            // Only seek if we are too far out of sync (> 1.5 seconds)
-            if (Math.abs(progress - roomState.serverTime) > 1.5) {
+            if (Math.abs(progress - roomState.serverTime) > 2) {
                 seekTo(roomState.serverTime / duration);
             }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [roomState.syncTimestamp, amIHostOrOwner]);
+
+    // ── Periodic sync broadcast from Host (every 5 seconds) ──
+    useEffect(() => {
+        if (!amIHostOrOwner || !roomState.track) return;
+        const interval = setInterval(() => {
+            const socket = getSocket();
+            if (socket && globalIsPlaying) {
+                socket.emit('music:sync', {
+                    roomId: sessionId,
+                    track: roomState.track,
+                    currentTime: progress,
+                    isPlaying: true,
+                });
+            }
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [amIHostOrOwner, roomState.track, sessionId, globalIsPlaying, progress]);
 
     // ── Music Controls ──
     const playSong = useCallback((song) => {
@@ -251,24 +283,28 @@ export default function MusicSessionPage() {
             toast.success('Song requested!');
             return;
         }
-        socket.emit('music:sync', { roomId: sessionId, track: song, currentTime: 0, isPlaying: true });
-        setRoomState(prev => ({ ...prev, track: song, isPlaying: true }));
+        // Host plays locally AND broadcasts to all listeners
         globalPlay(song);
+        lastSyncedTrackRef.current = song.url;
+        lastSyncedPlayingRef.current = true;
+        setRoomState(prev => ({ ...prev, track: song, isPlaying: true }));
+        socket.emit('music:sync', { roomId: sessionId, track: song, currentTime: 0, isPlaying: true });
     }, [amIHostOrOwner, sessionId, globalPlay]);
 
     const togglePlayback = useCallback(() => {
         const socket = getSocket();
         if (!socket || !amIHostOrOwner) return;
-        const newPlaying = !roomState.isPlaying;
-        socket.emit('music:sync', { roomId: sessionId, track: roomState.track, currentTime: progress, isPlaying: newPlaying });
-        setRoomState(prev => ({ ...prev, isPlaying: newPlaying }));
+        const newPlaying = !globalIsPlaying;
         togglePlay();
-    }, [amIHostOrOwner, roomState.isPlaying, roomState.track, sessionId, togglePlay, progress]);
+        lastSyncedPlayingRef.current = newPlaying;
+        setRoomState(prev => ({ ...prev, isPlaying: newPlaying }));
+        socket.emit('music:sync', { roomId: sessionId, track: roomState.track, currentTime: progress, isPlaying: newPlaying });
+    }, [amIHostOrOwner, globalIsPlaying, roomState.track, sessionId, togglePlay, progress]);
 
     const handleSeek = useCallback((e) => {
         if (!amIHostOrOwner || !duration) return;
         const rect = e.currentTarget.getBoundingClientRect();
-        const pct = (e.clientX - rect.left) / rect.width;
+        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
         seekTo(pct);
         const newTime = pct * duration;
         const socket = getSocket();
