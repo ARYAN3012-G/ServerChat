@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiSearch, FiPlay, FiPause, FiSkipForward, FiVolume2, FiVolumeX, FiX, FiMusic, FiPlus, FiUsers, FiMessageCircle, FiList, FiChevronDown, FiImage } from 'react-icons/fi';
+import { FiArrowLeft, FiSearch, FiPlay, FiPause, FiSkipForward, FiVolume2, FiVolumeX, FiX, FiMusic, FiPlus, FiUsers, FiMessageCircle, FiList, FiChevronDown, FiImage, FiHeart, FiSkipBack } from 'react-icons/fi';
 import { getSocket } from '../../../../services/socket';
 import { useMusicPlayer } from '../../../../components/MusicPlayerProvider';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -16,7 +16,15 @@ export default function MusicSessionPage() {
     const { sessionId } = useParams();
     const { user } = useAuth();
     const { currentServer } = useSelector(s => s.server);
-    const { playSong: globalPlay, togglePlay, currentTrack, isPlaying: globalIsPlaying, stopMusic, setActiveSessionId } = useMusicPlayer();
+    const { playSong: globalPlay, togglePlay, currentTrack, isPlaying: globalIsPlaying, stopMusic, setActiveSessionId, progress, duration, volume, muted, setVolume, setMuted } = useMusicPlayer();
+
+    // Helper
+    const formatTime = (seconds) => {
+        if (!seconds || isNaN(seconds)) return '0:00';
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    };
 
     // Track active session for MiniPlayer
     useEffect(() => {
@@ -371,8 +379,8 @@ export default function MusicSessionPage() {
     );
 
     return (
-        <div className="flex h-[100dvh] bg-[#0c0e1a] text-white overflow-hidden">
-            <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex flex-col h-[100dvh] bg-[#0c0e1a] text-white overflow-hidden">
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
                 {/* Header */}
                 <div className="flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-white/5 bg-gradient-to-r from-pink-500/10 via-purple-500/5 to-indigo-500/10 flex-shrink-0">
@@ -713,6 +721,74 @@ export default function MusicSessionPage() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Persistent Bottom Music Player Bar */}
+            <AnimatePresence>
+                {currentTrack && (
+                    <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }}
+                        className="h-[72px] sm:h-20 bg-[#0a0c18] border-t border-white/5 flex items-center justify-between px-3 sm:px-6 flex-shrink-0 z-50 relative">
+
+                        {/* Progress Bar (Absolute Top) */}
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-white/5">
+                            <motion.div className="h-full bg-pink-500 relative"
+                                style={{ width: `${duration ? (progress / duration) * 100 : 0}%` }}>
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg" />
+                            </motion.div>
+                        </div>
+
+                        {/* Left: Track Info */}
+                        <div className="flex items-center gap-3 w-1/2 sm:w-1/3 min-w-0">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg overflow-hidden bg-white/5 flex-shrink-0">
+                                {(currentTrack.thumbnail || currentTrack.image) ?
+                                    <img src={currentTrack.thumbnail || currentTrack.image} alt="" className="w-full h-full object-cover relative z-10" /> :
+                                    <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-xs sm:text-sm font-medium truncate">{currentTrack.title}</p>
+                                <p className="text-[9px] sm:text-[10px] text-white/30 truncate">{currentTrack.artist}</p>
+                            </div>
+                        </div>
+
+                        {/* Center: Controls */}
+                        <div className="flex flex-col items-end sm:items-center flex-1 max-w-md px-2 sm:px-4">
+                            <div className="flex items-center gap-1 sm:gap-4">
+                                {amIHostOrOwner ? (
+                                    <>
+                                        <button onClick={togglePlayback} className="p-2 sm:p-2.5 rounded-full bg-pink-500 hover:bg-pink-600 text-white transition-colors shadow-lg shadow-pink-500/20 hover:scale-105 active:scale-95">
+                                            {roomState.isPlaying ? <FiPause className="w-4 h-4 sm:w-5 sm:h-5" /> : <FiPlay className="w-4 h-4 sm:w-5 sm:h-5 ml-0.5" />}
+                                        </button>
+                                        <button onClick={voteSkip} className="p-1.5 sm:p-2 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-colors ml-2">
+                                            <FiSkipForward className="w-4 h-4" />
+                                        </button>
+                                    </>
+                                ) : (
+                                    <div className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-white/5">
+                                        {roomState.isPlaying ?
+                                            <><FiVolume2 className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-400" /><span className="text-[10px] sm:text-xs text-emerald-400">Playing</span></> :
+                                            <><FiPause className="w-3 h-3 sm:w-4 sm:h-4 text-white/30" /><span className="text-[10px] sm:text-xs text-white/30">Paused</span></>}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Right: Volume & Time */}
+                        <div className="hidden sm:flex items-center justify-end gap-4 w-1/3">
+                            <span className="text-[10px] text-white/30 font-medium font-mono min-w-[80px] text-right">
+                                {formatTime(progress)} / {formatTime(duration)}
+                            </span>
+                            <div className="flex items-center gap-2 ml-4">
+                                <button onClick={() => setMuted(!muted)} className="p-1.5 rounded-lg hover:bg-white/10 text-white/30 hover:text-white transition-colors">
+                                    {muted || volume === 0 ? <FiVolumeX className="w-4 h-4" /> : <FiVolume2 className="w-4 h-4" />}
+                                </button>
+                                <input type="range" min="0" max="100" value={muted ? 0 : volume} onChange={e => { setVolume(Number(e.target.value)); setMuted(false); }}
+                                    className="w-20 accent-pink-500" />
+                            </div>
+                        </div>
+
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
         </div>
     );
 }
