@@ -1,4 +1,5 @@
 const { logger } = require('../config/logger');
+const MusicSession = require('../models/MusicSession');
 
 // In-memory music room state (persists track/playback state for late joiners)
 const musicRooms = new Map();
@@ -71,6 +72,17 @@ module.exports = (io, socket) => {
         });
 
         logger.debug(`${socket.username} joined music room ${roomId} (host: ${room.hostUserId})`);
+
+        // Also persist listener in MongoDB (best-effort, don't block socket flow)
+        MusicSession.findById(roomId).then(dbSession => {
+            if (dbSession && dbSession.status === 'active') {
+                const alreadyListening = dbSession.listeners?.some(l => l.user?.toString() === socket.userId);
+                if (!alreadyListening) {
+                    dbSession.listeners.push({ user: socket.userId });
+                    dbSession.save().catch(() => {});
+                }
+            }
+        }).catch(() => {});
     });
 
     // Music sync — only host or server owner can change playback
@@ -342,6 +354,14 @@ module.exports = (io, socket) => {
         });
 
         logger.debug(`${socket.username} left music room ${roomId}`);
+
+        // Remove listener from MongoDB (best-effort)
+        MusicSession.findById(roomId).then(dbSession => {
+            if (dbSession && dbSession.status === 'active') {
+                dbSession.listeners = (dbSession.listeners || []).filter(l => l.user?.toString() !== socket.userId);
+                dbSession.save().catch(() => {});
+            }
+        }).catch(() => {});
     });
 
     // Clean up on disconnect

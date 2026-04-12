@@ -6,12 +6,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiArrowLeft, FiSearch, FiHeart, FiPlay, FiPause, FiSkipForward, FiSkipBack, FiVolume2, FiVolumeX, FiX, FiMusic, FiTrash2, FiPlus, FiClock, FiUsers, FiRadio, FiChevronDown, FiRepeat } from 'react-icons/fi';
 import { getSocket } from '../../services/socket';
 import { useMusicPlayer } from '../../components/MusicPlayerProvider';
+import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
 export default function MusicPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { user } = useAuth();
     const serverIdParam = searchParams.get('serverId');
     const serverId = serverIdParam || null; // Only use explicit URL param, not Redux
     const { currentTrack, isPlaying, progress, duration, volume, muted, repeatMode,
@@ -34,6 +36,7 @@ export default function MusicPage() {
     const [loadingSessions, setLoadingSessions] = useState(false);
     const [newSessionName, setNewSessionName] = useState('');
     const [showCreateSession, setShowCreateSession] = useState(false);
+    const [activeSessionId, setActiveSessionId] = useState(null);
 
     // Explore state
     const [trendingSongs, setTrendingSongs] = useState([]);
@@ -113,13 +116,23 @@ export default function MusicPage() {
             setNewSessionName('');
             setShowCreateSession(false);
             toast.success('Music session created!');
+            // Auto-join the socket room as host
+            const socket = getSocket();
+            if (socket) {
+                socket.emit('stream:join', { roomId: data.session._id, isServerOwner: false });
+                setActiveSessionId(data.session._id);
+            }
         } catch (e) { toast.error('Failed to create session'); }
     };
 
     const endSession = async (sessionId) => {
         try {
             await api.put(`/music/sessions/${sessionId}/end`);
+            // Leave the socket room too
+            const socket = getSocket();
+            if (socket) socket.emit('stream:leave', { roomId: sessionId });
             setMusicSessions(prev => prev.filter(s => s._id !== sessionId));
+            if (activeSessionId === sessionId) setActiveSessionId(null);
             toast.success('Session ended');
         } catch (e) { toast.error('Failed to end session'); }
     };
@@ -127,10 +140,17 @@ export default function MusicPage() {
     const joinMusicSession = (sessionId) => {
         const socket = getSocket();
         if (!socket) return;
-        // Join the music room via socket — stay on the music page
         socket.emit('stream:join', { roomId: sessionId });
+        setActiveSessionId(sessionId);
         toast.success('Joined music session!');
-        // Refresh sessions to show updated listener count
+        setTimeout(() => fetchSessions(), 500);
+    };
+
+    const leaveSession = (sessionId) => {
+        const socket = getSocket();
+        if (socket) socket.emit('stream:leave', { roomId: sessionId });
+        if (activeSessionId === sessionId) setActiveSessionId(null);
+        toast('Left music session', { icon: '👋' });
         setTimeout(() => fetchSessions(), 500);
     };
 
@@ -367,14 +387,21 @@ export default function MusicPage() {
                                                 )}
                                             </div>
                                             <div className="flex flex-col gap-1.5 flex-shrink-0">
-                                                <button onClick={() => joinMusicSession(session._id)}
-                                                    className="px-3 py-1.5 bg-pink-500 hover:bg-pink-600 text-white rounded-lg text-[10px] sm:text-xs font-medium transition-colors">
-                                                    🎧 Join
-                                                </button>
-                                                {session.host?._id === (typeof window !== 'undefined' ? localStorage.getItem('userId') : '') && (
+                                                {activeSessionId === session._id ? (
+                                                    <button onClick={() => leaveSession(session._id)}
+                                                        className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-[10px] sm:text-xs font-medium transition-colors border border-emerald-500/20 hover:bg-emerald-500/30">
+                                                        ✓ Listening
+                                                    </button>
+                                                ) : (
+                                                    <button onClick={() => joinMusicSession(session._id)}
+                                                        className="px-3 py-1.5 bg-pink-500 hover:bg-pink-600 text-white rounded-lg text-[10px] sm:text-xs font-medium transition-colors">
+                                                        🎧 Join
+                                                    </button>
+                                                )}
+                                                {(session.host?._id || session.host)?.toString() === user?._id?.toString() && (
                                                     <button onClick={() => endSession(session._id)}
                                                         className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] sm:text-xs font-medium transition-colors border border-red-500/20">
-                                                        End
+                                                        ✕ End
                                                     </button>
                                                 )}
                                             </div>
