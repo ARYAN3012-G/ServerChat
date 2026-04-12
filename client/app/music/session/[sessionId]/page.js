@@ -319,6 +319,27 @@ export default function MusicSessionPage() {
         toast('Vote skip submitted', { icon: '⏭' });
     }, [sessionId]);
 
+    // ── Queue Actions (Host/Owner only) ──
+    const roomApproveTrack = useCallback((trackId) => {
+        const socket = getSocket();
+        if (!socket || !amIHostOrOwner) return;
+        socket.emit('music:queue-action', { roomId: sessionId, trackId, action: 'approve' });
+        toast.success('Song approved!');
+    }, [sessionId, amIHostOrOwner]);
+
+    const roomRejectTrack = useCallback((trackId) => {
+        const socket = getSocket();
+        if (!socket || !amIHostOrOwner) return;
+        socket.emit('music:queue-action', { roomId: sessionId, trackId, action: 'reject' });
+        toast('Song removed from queue', { icon: '🗑' });
+    }, [sessionId, amIHostOrOwner]);
+
+    const playNextFromQueue = useCallback(() => {
+        const socket = getSocket();
+        if (!socket || !amIHostOrOwner) return;
+        socket.emit('music:play-next', { roomId: sessionId });
+    }, [sessionId, amIHostOrOwner]);
+
     // ── Search (debounced) ──
     const searchSongs = useCallback((q) => {
         if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -397,10 +418,6 @@ export default function MusicSessionPage() {
         setTimeout(() => router.push(getBackUrl()), 500);
     }, [transferHost, stopMusic, router, getBackUrl]);
 
-    const roomApproveTrack = useCallback((trackId) => {
-        const socket = getSocket();
-        if (socket) socket.emit('music:queue-action', { roomId: sessionId, trackId, action: 'approve' });
-    }, [sessionId]);
 
     if (!mounted) return null;
 
@@ -639,7 +656,15 @@ export default function MusicSessionPage() {
                         {tab === 'queue' && (
                             <motion.div key="queue" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                                 className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
-                                <h3 className="text-sm font-bold text-white/50 mb-3">🎶 Song Queue</h3>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-bold text-white/50">🎶 Song Queue</h3>
+                                    {amIHostOrOwner && roomState.queue?.some(q => q.status === 'approved') && (
+                                        <button onClick={playNextFromQueue}
+                                            className="px-3 py-1.5 bg-pink-500/20 text-pink-400 border border-pink-500/20 rounded-lg text-[10px] font-medium hover:bg-pink-500/30 transition-colors">
+                                            ▶ Play Next
+                                        </button>
+                                    )}
+                                </div>
                                 {(!roomState.queue || roomState.queue.length === 0) ? (
                                     <div className="text-center py-8">
                                         <FiList className="w-8 h-8 text-white/10 mx-auto mb-2" />
@@ -656,6 +681,7 @@ export default function MusicSessionPage() {
                                                     <p className="text-[10px] text-white/30 truncate">
                                                         {q.artist} • by {q.requestedBy?.username || '?'}
                                                         {q.status === 'pending' && <span className="text-amber-400 ml-1">⏳ Pending</span>}
+                                                        {q.status === 'approved' && <span className="text-emerald-400 ml-1">✓ Approved</span>}
                                                     </p>
                                                 </div>
                                                 {amIHostOrOwner && (
@@ -666,6 +692,8 @@ export default function MusicSessionPage() {
                                                             <button onClick={() => roomApproveTrack(q.id)}
                                                                 className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded text-[9px] hover:bg-emerald-500/30">✓</button>
                                                         )}
+                                                        <button onClick={() => roomRejectTrack(q.id)}
+                                                            className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-[9px] hover:bg-red-500/30">✕</button>
                                                     </div>
                                                 )}
                                             </div>
