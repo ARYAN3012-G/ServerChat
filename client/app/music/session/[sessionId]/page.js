@@ -112,9 +112,6 @@ export default function MusicSessionPage() {
         const socket = getSocket();
         if (!socket) return;
 
-        socket.emit('stream:join', { roomId: sessionId });
-        setConnected(true);
-
         const handleSync = (data) => {
             setRoomState(prev => ({
                 ...prev,
@@ -151,6 +148,7 @@ export default function MusicSessionPage() {
             toast.error(message);
         };
 
+        // Register ALL listeners FIRST, then emit join
         socket.on('music:sync', handleSync);
         socket.on('music:host-changed', handleHostChanged);
         socket.on('stream:user-joined', handleUserJoined);
@@ -158,6 +156,10 @@ export default function MusicSessionPage() {
         socket.on('stream:chat', handleChat);
         socket.on('music:queue-updated', handleQueueUpdated);
         socket.on('music:error', handleError);
+
+        // NOW join the room (server will respond to the listeners above)
+        socket.emit('stream:join', { roomId: sessionId });
+        setConnected(true);
 
         return () => {
             socket.emit('stream:leave', { roomId: sessionId });
