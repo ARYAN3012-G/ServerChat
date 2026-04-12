@@ -107,8 +107,12 @@ const User = require('../models/User');
 router.get('/favorites', auth, async (req, res) => {
     try {
         const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
         res.json({ favorites: user.favoriteSongs || [] });
-    } catch (error) { res.status(500).json({ message: 'Failed to fetch favorites' }); }
+    } catch (error) {
+        console.error('Fetch favorites error:', error.message);
+        res.status(500).json({ message: 'Failed to fetch favorites' });
+    }
 });
 
 router.post('/favorites', auth, async (req, res) => {
@@ -116,21 +120,31 @@ router.post('/favorites', auth, async (req, res) => {
         const { title, artist, url, thumbnail, duration } = req.body;
         if (!title || !url) return res.status(400).json({ message: 'Title and URL required' });
         const user = await User.findById(req.user._id);
-        const exists = user.favoriteSongs?.some(s => s.url === url);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        if (!user.favoriteSongs) user.favoriteSongs = [];
+        const exists = user.favoriteSongs.some(s => s.url === url);
         if (exists) return res.status(400).json({ message: 'Already in favorites' });
         user.favoriteSongs.push({ title, artist, url, thumbnail, duration });
         await user.save();
         res.status(201).json({ favorites: user.favoriteSongs });
-    } catch (error) { res.status(500).json({ message: 'Failed to add favorite' }); }
+    } catch (error) {
+        console.error('Add favorite error:', error.message);
+        res.status(500).json({ message: 'Failed to add favorite' });
+    }
 });
 
 router.delete('/favorites/:songId', auth, async (req, res) => {
     try {
         const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        if (!user.favoriteSongs) user.favoriteSongs = [];
         user.favoriteSongs = user.favoriteSongs.filter(s => s._id.toString() !== req.params.songId);
         await user.save();
         res.json({ favorites: user.favoriteSongs });
-    } catch (error) { res.status(500).json({ message: 'Failed to remove favorite' }); }
+    } catch (error) {
+        console.error('Remove favorite error:', error.message);
+        res.status(500).json({ message: 'Failed to remove favorite' });
+    }
 });
 
 // ─── MUSIC SESSIONS ───

@@ -33,6 +33,8 @@ module.exports = (io, socket) => {
                 hostUserId: null,
                 ownerUserId: null,
                 sessionCreatorId: null,
+                queue: [],
+                skipVotes: [],
             });
         }
         const room = musicRooms.get(roomId);
@@ -64,17 +66,21 @@ module.exports = (io, socket) => {
         // Assign host strictly to the session creator
         if (!room.hostUserId) {
             room.hostUserId = room.sessionCreatorId || socket.userId;
-        } else if (socket.userId === room.sessionCreatorId && !room.users.some(u => u.userId === room.hostUserId && u.userId !== socket.userId)) {
-            // Reclaim host if original creator returns and the temporary host left
-            room.hostUserId = socket.userId;
+        } else if (socket.userId === room.sessionCreatorId) {
+            // Creator reclaims host if the current host already left
+            const currentHostStillHere = room.users.some(u => u.userId === room.hostUserId && u.userId !== socket.userId);
+            if (!currentHostStillHere) {
+                room.hostUserId = socket.userId;
+            }
         }
 
-        // Mark host flags on users
+        // Mark host/owner flags on users
         room.users.forEach(u => {
-            u.isHost = (u.userId === room.hostUserId || u.userId === room.ownerUserId);
+            u.isHost = u.userId === room.hostUserId;
+            u.isOwner = u.userId === room.ownerUserId;
         });
 
-        // Notify everyone in the room
+        // Notify EVERYONE in the room about the new user (includes full user list)
         io.to(`stream:${roomId}`).emit('stream:user-joined', {
             userId: socket.userId,
             username: socket.username,
@@ -91,10 +97,11 @@ module.exports = (io, socket) => {
             users: room.users,
             hostUserId: room.hostUserId,
             ownerUserId: room.ownerUserId,
+            queue: room.queue || [],
             syncedBy: 'server',
         });
 
-        logger.debug(`${socket.username} joined music room ${roomId} (host: ${room.hostUserId})`);
+        logger.debug(`${socket.username} joined music room ${roomId} (host: ${room.hostUserId}, users: ${room.users.length})`);
 
         // Also persist listener in MongoDB (best-effort, don't block socket flow)
         MusicSession.findById(roomId).then(dbSession => {
@@ -119,25 +126,24 @@ module.exports = (io, socket) => {
         const isHost = socket.userId === room.hostUserId;
         const isOwner = socket.userId === room.ownerUserId;
         if (!isHost && !isOwner) {
-            // Reject — send error back to the user
-            socket.emit('music:error', { message: 'Only the host can control playback. Use chat to request a song!' });
+            socket.emit('music:error', { message: 'Only the host can control playback.' });
             return;
+        }
+
+        // Clear skip votes when track changes
+        if (track && room.track?.url !== track?.url) {
+            room.skipVotes = [];
         }
 
         // Update server-side room state
         room.track = track;
-        room.currentTime = currentTime;
+        room.currentTime = currentTime || 0;
         room.isPlaying = isPlaying;
-
-        // Clear skip votes when track changes
-        if (track && room.track?.url !== track.url) {
-            room.skipVotes = [];
-        }
 
         // Broadcast to ALL other users in the room
         socket.to(`stream:${roomId}`).emit('music:sync', {
             track,
-            currentTime,
+            currentTime: room.currentTime,
             isPlaying,
             users: room.users,
             hostUserId: room.hostUserId,
@@ -274,7 +280,6 @@ module.exports = (io, socket) => {
         // Auto-skip if threshold reached
         if (passed) {
             room.skipVotes = [];
-            // Try to play next from queue
             const nextTrack = (room.queue || []).find(q => q.status === 'approved');
             if (nextTrack) {
                 room.queue = room.queue.filter(q => q.id !== nextTrack.id);
@@ -309,7 +314,8 @@ module.exports = (io, socket) => {
 
         room.hostUserId = newHostUserId;
         room.users.forEach(u => {
-            u.isHost = (u.userId === room.hostUserId || u.userId === room.ownerUserId);
+            u.isHost = u.userId === room.hostUserId;
+            u.isOwner = u.userId === room.ownerUserId;
         });
 
         io.to(`stream:${roomId}`).emit('music:host-changed', {
@@ -332,7 +338,6 @@ module.exports = (io, socket) => {
     // Chat in stream/music room
     socket.on('stream:chat', (data) => {
         const { roomId, message, isGif } = data;
-        // Broadcast to ALL users including sender so chat appears for everyone
         io.to(`stream:${roomId}`).emit('stream:chat', {
             userId: socket.userId,
             username: socket.username,
@@ -347,7 +352,6 @@ module.exports = (io, socket) => {
         const { roomId } = data;
         socket.leave(`stream:${roomId}`);
 
-        // Remove user from room state
         if (musicRooms.has(roomId)) {
             const room = musicRooms.get(roomId);
             room.users = room.users.filter(u => u.userId !== socket.userId);
@@ -357,7 +361,8 @@ module.exports = (io, socket) => {
                 const ownerStillHere = room.users.find(u => u.userId === room.ownerUserId);
                 room.hostUserId = ownerStillHere ? ownerStillHere.userId : (room.users[0]?.userId || null);
                 room.users.forEach(u => {
-                    u.isHost = (u.userId === room.hostUserId || u.userId === room.ownerUserId);
+                    u.isHost = u.userId === room.hostUserId;
+                    u.isOwner = u.userId === room.ownerUserId;
                 });
             }
 
@@ -365,17 +370,18 @@ module.exports = (io, socket) => {
             if (room.users.length === 0) {
                 musicRooms.delete(roomId);
             } else {
+                // Send updated user list and host info to remaining users
+                io.to(`stream:${roomId}`).emit('stream:user-left', {
+                    userId: socket.userId,
+                    username: socket.username,
+                    users: room.users,
+                });
                 io.to(`stream:${roomId}`).emit('music:host-changed', {
                     hostUserId: room.hostUserId,
                     users: room.users,
                 });
             }
         }
-
-        io.to(`stream:${roomId}`).emit('stream:user-left', {
-            userId: socket.userId,
-            username: socket.username,
-        });
 
         logger.debug(`${socket.username} left music room ${roomId}`);
 
@@ -400,18 +406,19 @@ module.exports = (io, socket) => {
                     const ownerStillHere = room.users.find(u => u.userId === room.ownerUserId);
                     room.hostUserId = ownerStillHere ? ownerStillHere.userId : (room.users[0]?.userId || null);
                     room.users.forEach(u => {
-                        u.isHost = (u.userId === room.hostUserId || u.userId === room.ownerUserId);
+                        u.isHost = u.userId === room.hostUserId;
+                        u.isOwner = u.userId === room.ownerUserId;
                     });
                 }
-
-                io.to(`stream:${roomId}`).emit('stream:user-left', {
-                    userId: socket.userId,
-                    username: socket.username,
-                });
 
                 if (room.users.length === 0) {
                     musicRooms.delete(roomId);
                 } else {
+                    io.to(`stream:${roomId}`).emit('stream:user-left', {
+                        userId: socket.userId,
+                        username: socket.username,
+                        users: room.users,
+                    });
                     io.to(`stream:${roomId}`).emit('music:host-changed', {
                         hostUserId: room.hostUserId,
                         users: room.users,
