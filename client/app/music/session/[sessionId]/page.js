@@ -16,7 +16,7 @@ export default function MusicSessionPage() {
     const { sessionId } = useParams();
     const { user } = useAuth();
     const { currentServer } = useSelector(s => s.server);
-    const { playSong: globalPlay, togglePlay, currentTrack, isPlaying: globalIsPlaying, stopMusic, setActiveSessionId, progress, duration, volume, muted, setVolume, setMuted } = useMusicPlayer();
+    const { playSong: globalPlay, togglePlay, currentTrack, isPlaying: globalIsPlaying, stopMusic, setActiveSessionId, progress, duration, volume, muted, setVolume, setMuted, seekTo } = useMusicPlayer();
 
     // Helper
     const formatTime = (seconds) => {
