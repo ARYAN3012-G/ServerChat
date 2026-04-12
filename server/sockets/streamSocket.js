@@ -335,12 +335,13 @@ module.exports = (io, socket) => {
 
     // Chat in stream/music room
     socket.on('stream:chat', (data) => {
-        const { roomId, message } = data;
+        const { roomId, message, isGif } = data;
         // Broadcast to ALL users including sender so chat appears for everyone
         io.to(`stream:${roomId}`).emit('stream:chat', {
             userId: socket.userId,
             username: socket.username,
             message,
+            isGif: !!isGif,
             timestamp: new Date(),
         });
     });

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiSearch, FiPlay, FiPause, FiSkipForward, FiVolume2, FiVolumeX, FiX, FiMusic, FiPlus, FiUsers, FiMessageCircle, FiList, FiChevronDown } from 'react-icons/fi';
+import { FiArrowLeft, FiSearch, FiPlay, FiPause, FiSkipForward, FiVolume2, FiVolumeX, FiX, FiMusic, FiPlus, FiUsers, FiMessageCircle, FiList, FiChevronDown, FiImage } from 'react-icons/fi';
 import { getSocket } from '../../../../services/socket';
 import { useMusicPlayer } from '../../../../components/MusicPlayerProvider';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -45,6 +45,19 @@ export default function MusicSessionPage() {
 
     // Host transfer
     const [showHostTransfer, setShowHostTransfer] = useState(false);
+
+    // GIF state
+    const [showGifPicker, setShowGifPicker] = useState(false);
+    const GIF_PRESETS = [
+        'https://media.tenor.com/x8v1oNUOmg4AAAAd/rickroll-roll.gif',
+        'https://media.tenor.com/jxcxI4jAiy0AAAAC/vibing-cat.gif',
+        'https://media.tenor.com/UtbpeGzK9r0AAAAC/dance.gif',
+        'https://media.tenor.com/gK2R02U0a0YAAAAC/pepe-dance.gif',
+        'https://media.tenor.com/R_vQy3L73qMAAAAd/giga-chad-chad.gif',
+        'https://media.tenor.com/4N9e7G4ZqFMAAAAC/chill-music.gif',
+        'https://media.tenor.com/_q1A1xXmJcwAAAAd/homer-simpson-homer.gif',
+        'https://media.tenor.com/XqU0c0G7yJ0AAAAC/party-parrot.gif',
+    ];
 
     const LANGUAGES = [
         { id: 'all', label: 'All', emoji: '🌍' },
@@ -103,6 +116,7 @@ export default function MusicSessionPage() {
             setRoomState(prev => ({ ...prev, users: prev.users.filter(u => u.userId !== userId) }));
         };
         const handleChat = (msg) => {
+            // Also fetch current users state if missing username but we shouldn't ordinarily miss it.
             setRoomState(prev => ({ ...prev, chat: [...prev.chat.slice(-100), msg] }));
         };
         const handleQueueUpdated = ({ queue }) => {
@@ -204,11 +218,13 @@ export default function MusicSessionPage() {
     }, [tab, selectedLanguage]);
 
     // ── Chat ──
-    const sendChat = () => {
+    const sendChat = (gifUrl = null) => {
         const socket = getSocket();
-        if (!socket || !chatMsg.trim()) return;
-        socket.emit('stream:chat', { roomId: sessionId, message: chatMsg });
-        setChatMsg('');
+        const msg = typeof gifUrl === 'string' ? gifUrl : chatMsg;
+        if (!socket || !msg.trim()) return;
+        socket.emit('stream:chat', { roomId: sessionId, message: msg, isGif: typeof gifUrl === 'string' });
+        if (typeof gifUrl !== 'string') setChatMsg('');
+        setShowGifPicker(false);
     };
 
     // ── Session Actions ──
@@ -254,6 +270,7 @@ export default function MusicSessionPage() {
         { id: 'explore', label: '🌍 Explore' },
         { id: 'search', label: '🔍 Search' },
         { id: 'queue', label: `📋 Queue (${roomState.queue?.length || 0})` },
+        { id: 'chat', label: `💬 Chat` },
     ];
 
 
@@ -518,27 +535,86 @@ export default function MusicSessionPage() {
                                     </div>
                                 )}
 
-                                {/* Chat Section within Queue tab */}
-                                <div className="mt-6">
-                                    <h3 className="text-sm font-bold text-white/50 mb-3">💬 Room Chat</h3>
-                                    <div ref={chatRef} className="h-40 overflow-y-auto rounded-xl bg-white/[0.02] border border-white/5 px-3 py-2 space-y-1 mb-2">
-                                        {roomState.chat.length === 0 && <p className="text-[10px] text-white/15 text-center py-6">No messages yet — say hello!</p>}
+                            </motion.div>
+                        )}
+
+                        {/* ── CHAT TAB ── */}
+                        {tab === 'chat' && (
+                            <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row gap-4 h-[calc(100vh-160px)]">
+                                
+                                {/* Left Side: Chat UI */}
+                                <div className="flex-1 flex flex-col rounded-xl bg-white/[0.02] border border-white/5 relative">
+                                    <div className="px-4 py-3 border-b border-white/5 flex-shrink-0 flex items-center justify-between">
+                                        <h3 className="text-sm font-bold text-white/50">💬 Room Chat</h3>
+                                    </div>
+                                    <div ref={chatRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                        {roomState.chat.length === 0 && <p className="text-xs text-white/15 text-center mt-10">No messages yet — start typing or send a GIF!</p>}
                                         {roomState.chat.map((msg, i) => (
-                                            <div key={i} className="text-[11px]">
-                                                <span className="font-medium text-pink-400/60">{msg.username}: </span>
-                                                <span className="text-white/50">{msg.message}</span>
+                                            <div key={i} className="flex flex-col mb-1.5">
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-xs font-bold text-pink-400/80">{msg.username}</span>
+                                                    <span className="text-[9px] text-white/20">{new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                                </div>
+                                                {msg.isGif ? (
+                                                    <img src={msg.message} alt="GIF" className="max-w-[200px] rounded-lg mt-1 border border-white/5" />
+                                                ) : (
+                                                    <span className="text-sm text-white/70 leading-relaxed mt-0.5">{msg.message}</span>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="flex gap-2">
-                                        <input type="text" value={chatMsg} onChange={e => setChatMsg(e.target.value)}
-                                            onKeyDown={e => e.key === 'Enter' && sendChat()}
-                                            placeholder="Type a message..."
-                                            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs outline-none text-white placeholder-white/15 focus:border-pink-500/30" />
-                                        <button onClick={sendChat} disabled={!chatMsg.trim()}
-                                            className="px-3 py-2 bg-pink-500/20 text-pink-400 rounded-xl text-xs font-medium hover:bg-pink-500/30 disabled:opacity-30 transition-colors">
-                                            Send
-                                        </button>
+                                    <div className="p-3 border-t border-white/5 bg-[#0c0e1a]/50 relative">
+                                        <AnimatePresence>
+                                            {showGifPicker && (
+                                                <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                    className="absolute bottom-full left-3 mb-2 p-3 bg-[#1a1d2e] border border-white/10 rounded-xl shadow-2xl w-64 grid grid-cols-2 gap-2 z-10">
+                                                    {GIF_PRESETS.map((url, i) => (
+                                                        <button key={i} onClick={() => sendChat(url)} className="rounded-lg overflow-hidden border border-transparent hover:border-pink-500 transition-colors">
+                                                            <img src={url} alt="gif" className="w-full h-20 object-cover" />
+                                                        </button>
+                                                    ))}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => setShowGifPicker(!showGifPicker)}
+                                                className={`p-2.5 rounded-xl transition-colors ${showGifPicker ? 'bg-pink-500/20 text-pink-400' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>
+                                                <FiImage className="w-4 h-4" />
+                                            </button>
+                                            <input type="text" value={chatMsg} onChange={e => setChatMsg(e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && sendChat()}
+                                                placeholder="Type a message..."
+                                                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none text-white placeholder-white/20 focus:border-pink-500/40 transition-all" />
+                                            <button onClick={() => sendChat()} disabled={!chatMsg.trim()}
+                                                className="px-5 py-2.5 bg-pink-500 text-white rounded-xl text-sm font-bold hover:bg-pink-600 disabled:opacity-30 transition-colors shadow-lg shadow-pink-500/20">
+                                                Send
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right Side: Members Sidebar */}
+                                <div className="hidden sm:flex w-64 flex-col rounded-xl bg-white/[0.02] border border-white/5 flex-shrink-0 relative overflow-hidden">
+                                    <div className="px-4 py-3 border-b border-white/5 bg-black/20 flex-shrink-0">
+                                        <h3 className="text-xs font-bold text-white/50 tracking-wider uppercase"><FiUsers className="w-3 h-3 inline mr-1.5 -mt-0.5" />Room Members — {roomState.users.length}</h3>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto p-2 space-y-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                        {roomState.users.map((u, i) => (
+                                            <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors group">
+                                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-lg flex-shrink-0 ${u.userId === roomState.hostUserId ? 'bg-amber-500/20 text-amber-400 border border-amber-500/20' : u.userId === roomState.ownerUserId ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/20' : 'bg-[#1a1d2e] text-white/50 border border-white/10 group-hover:border-white/20'}`}>
+                                                    {(u.username || 'U')[0].toUpperCase()}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-bold truncate text-white/90">
+                                                        {u.username}{u.userId === user?._id ? <span className="text-white/30 font-normal ml-1">(you)</span> : ''}
+                                                    </p>
+                                                    <p className="text-[10px] uppercase tracking-wider mt-0.5 font-medium truncate">
+                                                        {u.userId === roomState.hostUserId ? <span className="text-amber-400 flex items-center gap-1">👑 Room Host</span> : u.userId === roomState.ownerUserId ? <span className="text-indigo-400 flex items-center gap-1">🔑 Server Owner</span> : <span className="text-white/30 flex items-center gap-1">🎧 Listener</span>}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </motion.div>
