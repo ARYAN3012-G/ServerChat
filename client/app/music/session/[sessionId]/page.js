@@ -129,6 +129,9 @@ export default function MusicSessionPage() {
                 track: data.track !== undefined ? data.track : prev.track,
                 isPlaying: data.isPlaying !== undefined ? data.isPlaying : prev.isPlaying,
                 queue: data.queue !== undefined ? data.queue : prev.queue,
+                serverTime: data.currentTime !== undefined ? data.currentTime : prev.serverTime,
+                syncTimestamp: data.syncedBy !== user?._id ? Date.now() : prev.syncTimestamp,
+                syncedBy: data.syncedBy
             }));
         };
         const handleHostChanged = ({ hostUserId, users }) => {
@@ -207,7 +210,18 @@ export default function MusicSessionPage() {
                 if (!shouldPlay && globalIsPlaying) togglePlay();
             }
         }
-    }, [roomState.isPlaying, amIHostOrOwner, roomState.track]);
+    }, [roomState.isPlaying, amIHostOrOwner, roomState.track, globalIsPlaying, togglePlay]);
+
+    // ── Time Sync Listener (seek when too far behind) ──
+    useEffect(() => {
+        if (!amIHostOrOwner && roomState.track && roomState.syncTimestamp && duration) {
+            // Only seek if we are too far out of sync (> 1.5 seconds)
+            if (Math.abs(progress - roomState.serverTime) > 1.5) {
+                seekTo(roomState.serverTime / duration);
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [roomState.syncTimestamp, amIHostOrOwner]);
 
     // ── Music Controls ──
     const playSong = useCallback((song) => {
@@ -227,10 +241,22 @@ export default function MusicSessionPage() {
         const socket = getSocket();
         if (!socket || !amIHostOrOwner) return;
         const newPlaying = !roomState.isPlaying;
-        socket.emit('music:sync', { roomId: sessionId, track: roomState.track, currentTime: 0, isPlaying: newPlaying });
+        socket.emit('music:sync', { roomId: sessionId, track: roomState.track, currentTime: progress, isPlaying: newPlaying });
         setRoomState(prev => ({ ...prev, isPlaying: newPlaying }));
         togglePlay();
-    }, [amIHostOrOwner, roomState.isPlaying, roomState.track, sessionId, togglePlay]);
+    }, [amIHostOrOwner, roomState.isPlaying, roomState.track, sessionId, togglePlay, progress]);
+
+    const handleSeek = useCallback((e) => {
+        if (!amIHostOrOwner || !duration) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const pct = (e.clientX - rect.left) / rect.width;
+        seekTo(pct);
+        const newTime = pct * duration;
+        const socket = getSocket();
+        if (socket) {
+            socket.emit('music:sync', { roomId: sessionId, track: roomState.track, currentTime: newTime, isPlaying: roomState.isPlaying });
+        }
+    }, [amIHostOrOwner, duration, seekTo, sessionId, roomState.track, roomState.isPlaying]);
 
     const voteSkip = useCallback(() => {
         const socket = getSocket();
@@ -729,10 +755,11 @@ export default function MusicSessionPage() {
                         className="h-[72px] sm:h-20 bg-[#0a0c18] border-t border-white/5 flex items-center justify-between px-3 sm:px-6 flex-shrink-0 z-50 relative">
 
                         {/* Progress Bar (Absolute Top) */}
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-white/5">
-                            <motion.div className="h-full bg-pink-500 relative"
+                        <div className={`absolute top-0 left-0 right-0 h-1 bg-white/5 ${amIHostOrOwner ? 'cursor-pointer group' : ''}`}
+                             onClick={handleSeek}>
+                            <motion.div className={`h-full bg-pink-500 relative ${amIHostOrOwner ? 'group-hover:bg-pink-400' : ''}`}
                                 style={{ width: `${duration ? (progress / duration) * 100 : 0}%` }}>
-                                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg" />
+                                <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg ${amIHostOrOwner ? 'scale-0 group-hover:scale-100 transition-transform' : ''}`} />
                             </motion.div>
                         </div>
 
