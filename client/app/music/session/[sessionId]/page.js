@@ -117,7 +117,16 @@ export default function MusicSessionPage() {
     // ── Join socket room + set up listeners ──
     useEffect(() => {
         if (!sessionId || !user?._id) return;
-        const socket = getSocket();
+
+        // Try to get existing socket, or connect one
+        let socket = getSocket();
+        if (!socket) {
+            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+            if (token) {
+                const { connectSocket } = require('../../../../services/socket');
+                socket = connectSocket(token);
+            }
+        }
         if (!socket) return;
 
         const handleSync = (data) => {
@@ -168,12 +177,22 @@ export default function MusicSessionPage() {
         socket.on('music:queue-updated', handleQueueUpdated);
         socket.on('music:error', handleError);
 
-        // NOW join the room (server will respond to the listeners above)
-        socket.emit('stream:join', { roomId: sessionId });
-        setConnected(true);
+        // Join room — if socket is already connected, emit immediately.
+        // If not connected yet (e.g. second device still handshaking), wait for 'connect' event.
+        const joinRoom = () => {
+            socket.emit('stream:join', { roomId: sessionId });
+            setConnected(true);
+        };
+
+        if (socket.connected) {
+            joinRoom();
+        } else {
+            socket.once('connect', joinRoom);
+        }
 
         return () => {
             socket.emit('stream:leave', { roomId: sessionId });
+            socket.off('connect', joinRoom);
             socket.off('music:sync', handleSync);
             socket.off('music:host-changed', handleHostChanged);
             socket.off('stream:user-joined', handleUserJoined);
