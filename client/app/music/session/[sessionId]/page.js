@@ -16,7 +16,12 @@ export default function MusicSessionPage() {
     const { sessionId } = useParams();
     const { user } = useAuth();
     const { currentServer } = useSelector(s => s.server);
-    const { playSong: globalPlay, togglePlay, currentTrack, isPlaying: globalIsPlaying } = useMusicPlayer();
+    const { playSong: globalPlay, togglePlay, currentTrack, isPlaying: globalIsPlaying, stopMusic, setActiveSessionId } = useMusicPlayer();
+
+    // Ensure mini player knows about this session
+    useEffect(() => {
+        if (sessionId) setActiveSessionId(sessionId);
+    }, [sessionId, setActiveSessionId]);
 
     const [mounted, setMounted] = useState(false);
     const [session, setSession] = useState(null);
@@ -233,6 +238,7 @@ export default function MusicSessionPage() {
             setShowHostTransfer(true);
             return;
         }
+        stopMusic();
         router.push(session?.server ? `/music?serverId=${session.server._id || session.server}` : '/music');
     };
 
@@ -240,6 +246,7 @@ export default function MusicSessionPage() {
         try {
             await api.put(`/music/sessions/${sessionId}/end`);
             toast.success('Session ended');
+            stopMusic();
             router.push(session?.server ? `/music?serverId=${session.server._id || session.server}` : '/music');
         } catch (e) { toast.error('Failed to end session'); }
     };
@@ -253,6 +260,7 @@ export default function MusicSessionPage() {
 
     const transferAndLeave = (newHostUserId) => {
         transferHost(newHostUserId);
+        stopMusic();
         setTimeout(() => router.push(session?.server ? `/music?serverId=${session.server._id || session.server}` : '/music'), 500);
     };
 

@@ -19,6 +19,7 @@ export default function MusicPlayerProvider({ children }) {
     const [muted, setMuted] = useState(false);
     const [queue, setQueue] = useState([]);
     const [repeatMode, setRepeatMode] = useState('off'); // 'off' | 'one' | 'all'
+    const [activeSessionId, setActiveSessionId] = useState(null);
     const audioRef = useRef(null);
     const repeatRef = useRef(repeatMode);
 
@@ -122,6 +123,7 @@ export default function MusicPlayerProvider({ children }) {
         setIsPlaying(false);
         setProgress(0);
         setDuration(0);
+        setActiveSessionId(null);
     }, []);
 
     const toggleRepeat = useCallback(() => {
@@ -129,8 +131,8 @@ export default function MusicPlayerProvider({ children }) {
     }, []);
 
     const value = {
-        currentTrack, isPlaying, progress, duration, volume, muted, queue, repeatMode,
-        playSong, togglePlay, playNext, playPrev, seekTo, stopMusic, toggleRepeat,
+        currentTrack, isPlaying, progress, duration, volume, muted, queue, repeatMode, activeSessionId,
+        playSong, togglePlay, playNext, playPrev, seekTo, stopMusic, toggleRepeat, setActiveSessionId,
         setVolume, setMuted, setQueue,
     };
 

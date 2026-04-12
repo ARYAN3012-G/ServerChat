@@ -9,11 +9,11 @@ import { useMusicPlayer } from './MusicPlayerProvider';
 export default function MiniPlayer() {
     const pathname = usePathname();
     const router = useRouter();
-    const { currentTrack, isPlaying, progress, duration, togglePlay, playNext, playPrev, seekTo, stopMusic } = useMusicPlayer();
+    const { currentTrack, isPlaying, progress, duration, togglePlay, playNext, playPrev, seekTo, stopMusic, activeSessionId } = useMusicPlayer();
     const [expanded, setExpanded] = useState(false);
 
-    // Don't show on music page (it has its own player)
-    if (pathname === '/music') return null;
+    // Only hide if currently looking at the fullscreen music room itself
+    if (pathname.startsWith('/music/session')) return null;
     if (!currentTrack) return null;
 
     const pct = duration ? (progress / duration) * 100 : 0;
@@ -44,8 +44,8 @@ export default function MiniPlayer() {
 
                     {/* Main row */}
                     <div className="flex items-center gap-2.5 px-3 py-2.5">
-                        {/* Thumbnail + Track info — click to go to music page */}
-                        <div className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer" onClick={() => router.push('/music')}>
+                        {/* Thumbnail + Track info — click to return safely to active room if exists */}
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer" onClick={() => router.push(activeSessionId ? `/music/session/${activeSessionId}` : '/music')}>
                             <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/5 flex-shrink-0 relative">
                                 {(currentTrack.thumbnail || currentTrack.image) ?
                                     <img src={currentTrack.thumbnail || currentTrack.image} alt="" className="w-full h-full object-cover" /> :
