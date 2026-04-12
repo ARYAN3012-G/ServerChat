@@ -638,9 +638,11 @@ export default function MusicSessionPage() {
                                 <p className="text-[10px] text-white/30 mt-0.5">Pick someone to become the new host</p>
                             </div>
                             <div className="p-2 max-h-48 overflow-y-auto">
-                                {roomState.users.filter(u => u.userId !== user?._id).map((u, i) => (
+                                {roomState.users.filter(u => u.userId !== roomState.hostUserId).map((u, i) => (
                                     <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/5">
-                                        <span className="text-xs text-white/70">{u.username || 'User'}</span>
+                                        <span className="text-xs text-white/70">
+                                            {u.username || 'User'} {u.userId === user?._id && <span className="text-white/30 ml-1">(Take Host)</span>}
+                                        </span>
                                         <div className="flex gap-1.5">
                                             <button onClick={() => transferHost(u.userId)}
                                                 className="px-2.5 py-1 bg-amber-500/20 text-amber-400 rounded-lg text-[10px] hover:bg-amber-500/30">Make Host</button>

@@ -61,15 +61,11 @@ module.exports = (io, socket) => {
             room.ownerUserId = socket.userId;
         }
 
-        // Host priority: server owner > original creator > first joiner
+        // Assign host strictly to the session creator
         if (!room.hostUserId) {
-            room.hostUserId = socket.userId;
-        }
-        if (isServerOwner) {
-            room.hostUserId = socket.userId;
-        }
-        // Original session creator reclaims host if current host is not server owner
-        if (socket.userId === room.sessionCreatorId && room.hostUserId !== room.ownerUserId) {
+            room.hostUserId = room.sessionCreatorId || socket.userId;
+        } else if (socket.userId === room.sessionCreatorId && !room.users.some(u => u.userId === room.hostUserId && u.userId !== socket.userId)) {
+            // Reclaim host if original creator returns and the temporary host left
             room.hostUserId = socket.userId;
         }
 
