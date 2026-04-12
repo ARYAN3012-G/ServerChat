@@ -381,7 +381,7 @@ export default function MusicPage() {
     };
 
     const tabs = [
-        { id: 'favorites', label: '❤️ My Music', count: favorites.length },
+        ...(!serverId ? [{ id: 'favorites', label: '❤️ My Music', count: favorites.length }] : []),
         { id: 'explore', label: '🌍 Explore', count: trendingSongs.length },
         ...(serverId ? [{ id: 'sessions', label: '🎧 Sessions', count: musicSessions.length }] : []),
         { id: 'search', label: '🔍 Search', count: searchResults.length },
@@ -400,7 +400,7 @@ export default function MusicPage() {
                 <FiMusic className="w-5 h-5 sm:w-6 sm:h-6 text-pink-400 flex-shrink-0" />
                 <div className="min-w-0 flex-1">
                     <h1 className="text-sm sm:text-lg font-bold truncate">{serverId ? 'Server Music' : 'My Music'}</h1>
-                    <p className="text-[10px] sm:text-xs text-white/30">{favorites.length} favorites{serverId ? ` • ${musicSessions.length} sessions` : ''}</p>
+                    <p className="text-[10px] sm:text-xs text-white/30">{serverId ? `${musicSessions.length} sessions` : `${favorites.length} favorites`}</p>
                 </div>
             </div>
 
