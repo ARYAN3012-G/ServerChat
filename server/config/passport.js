@@ -2,6 +2,7 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const GitHubStrategy = require('passport-github2').Strategy;
 const User = require('../models/User');
+const createDefaultServer = require('../utils/createDefaultServer');
 
 // Admin email - only this account gets admin role
 const ADMIN_EMAIL = 'aryanrajeshgadam.3012@gmail.com';
@@ -63,6 +64,10 @@ const handleOAuthLogin = async (profile, provider, done) => {
         });
 
         await user.save();
+
+        // Create default server for newly registered OAuth user
+        createDefaultServer(user._id, user.username).catch(() => {});
+
         done(null, user);
     } catch (err) {
         done(err, null);

@@ -7,6 +7,7 @@ const ActivityLog = require('../models/ActivityLog');
 const { logger } = require('../config/logger');
 const { sendPasswordResetEmail } = require('../services/emailService');
 const fetch = require('node-fetch');
+const createDefaultServer = require('../utils/createDefaultServer');
 
 // Generate tokens
 const generateTokens = (user) => {
@@ -49,6 +50,9 @@ exports.register = async (req, res, next) => {
             ipAddress: req.ip,
             userAgent: req.get('user-agent'),
         });
+
+        // Create default server for the new user (non-blocking)
+        createDefaultServer(user._id, user.username).catch(() => {});
 
         res.status(201).json({
             user: user.toJSON(),
