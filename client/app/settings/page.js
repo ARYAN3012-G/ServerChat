@@ -442,7 +442,7 @@ export default function SettingsPage() {
                                 {/* Face ID Registration */}
                                 <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8">
                                     <h4 className="text-lg font-semibold mb-2 flex items-center gap-2"><FiCamera className="w-5 h-5 text-violet-400" /> Face ID</h4>
-                                    <p className="text-sm text-white/30 mb-5">Register your face to enable Face ID login. Uses Azure Face API for secure recognition.</p>
+                                    <p className="text-sm text-white/30 mb-5">Register your face to enable Face ID login. Secure server-side verification powered by Face++.</p>
 
                                     {/* ── REGISTERED STATE ── */}
                                     {faceRegistered && !cameraActive ? (
