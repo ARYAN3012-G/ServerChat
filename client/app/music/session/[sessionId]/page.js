@@ -247,32 +247,54 @@ export default function MusicSessionPage() {
         }
     }, [roomState.isPlaying, roomState.syncedBy, amIHostOrOwner, roomState.track, globalIsPlaying, togglePlay, user?._id]);
 
-    // ── Time Sync for Listeners (seek when too far behind) ──
+    // ── Time Sync for Listeners (seek when host heartbeat shows drift) ──
     useEffect(() => {
         if (!amIHostOrOwner && roomState.track && roomState.syncTimestamp && duration) {
-            if (Math.abs(progress - roomState.serverTime) > 2) {
+            // Only seek if drift > 3 seconds (was 2s — too aggressive, caused jitter)
+            if (Math.abs(progress - roomState.serverTime) > 3) {
                 seekTo(roomState.serverTime / duration);
             }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [roomState.syncTimestamp, amIHostOrOwner]);
 
-    // ── Periodic sync broadcast from Host (every 5 seconds) ──
+    // ── Listen for lightweight time-update from host heartbeats ──
+    useEffect(() => {
+        if (!sessionId || !user?._id) return;
+        const socket = getSocket();
+        if (!socket) return;
+
+        const handleTimeUpdate = (data) => {
+            if (amIHostOrOwner) return; // Host doesn't need to sync with itself
+            setRoomState(prev => ({
+                ...prev,
+                serverTime: data.currentTime,
+                syncTimestamp: Date.now(),
+            }));
+        };
+
+        socket.on('music:time-update', handleTimeUpdate);
+        return () => socket.off('music:time-update', handleTimeUpdate);
+    }, [sessionId, user?._id, amIHostOrOwner]);
+
+    // ── Host heartbeat — send current time every 3 seconds ──
+    // Uses useRef for progress to avoid stale closure + dependency churn
+    const progressRef = useRef(progress);
+    useEffect(() => { progressRef.current = progress; }, [progress]);
+
     useEffect(() => {
         if (!amIHostOrOwner || !roomState.track) return;
         const interval = setInterval(() => {
             const socket = getSocket();
             if (socket && globalIsPlaying) {
-                socket.emit('music:sync', {
+                socket.emit('music:heartbeat', {
                     roomId: sessionId,
-                    track: roomState.track,
-                    currentTime: progress,
-                    isPlaying: true,
+                    currentTime: progressRef.current,
                 });
             }
-        }, 5000);
+        }, 3000);
         return () => clearInterval(interval);
-    }, [amIHostOrOwner, roomState.track, sessionId, globalIsPlaying, progress]);
+    }, [amIHostOrOwner, roomState.track, sessionId, globalIsPlaying]);
 
     // ── Music Controls ──
     const playSong = useCallback((song) => {

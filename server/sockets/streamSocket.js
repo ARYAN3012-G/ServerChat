@@ -154,6 +154,27 @@ module.exports = (io, socket) => {
         });
     });
 
+    // Lightweight heartbeat — host sends current time every few seconds.
+    // Server relays as 'music:time-update' (NOT 'music:sync') so listeners
+    // only adjust seek position without re-evaluating track/play state.
+    socket.on('music:heartbeat', (data) => {
+        const { roomId, currentTime } = data;
+        if (!musicRooms.has(roomId)) return;
+        const room = musicRooms.get(roomId);
+
+        // Only host or owner can send heartbeats
+        if (socket.userId !== room.hostUserId && socket.userId !== room.ownerUserId) return;
+
+        // Update server-side time (no track/isPlaying change)
+        room.currentTime = currentTime || 0;
+
+        // Relay to everyone EXCEPT sender
+        socket.to(`stream:${roomId}`).emit('music:time-update', {
+            currentTime: room.currentTime,
+            senderId: socket.userId,
+        });
+    });
+
     // ── DJ Queue: Request a song ──
     socket.on('music:queue-request', (data) => {
         const { roomId, track } = data;
