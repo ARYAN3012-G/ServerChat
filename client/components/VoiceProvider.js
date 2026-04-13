@@ -471,191 +471,197 @@ export default function VoiceProvider({ children }) {
         });
     }, []);
 
-    // ─── Socket event handlers ───
+    // ─── Socket event handlers — wait for socket to be available ───
     useEffect(() => {
-        const socket = getSocket();
-        if (!socket) return;
+        let socket = null;
+        let pollInterval = null;
+        let registered = false;
 
-        // Existing users in channel when we join — we (the joiner) initiate offers to all
-        const handleExistingUsers = async ({ channelId, users }) => {
-            if (channelId !== channelIdRef.current) return;
-            const myId = userIdRef.current;
-            console.log(`[VP] existing-users in ${channelId}: ${users.length} users. My ID: ${myId}`);
+        const registerHandlers = (s) => {
+            if (registered) return;
+            registered = true;
+            socket = s;
+            console.log('[VP] Registering socket handlers on', s.id);
 
-            // Add to voiceUsers list
-            setVoiceUsers(prev => {
-                const next = [...prev];
-                users.forEach(u => {
-                    if (u.userId !== myId && !next.find(e => e.userId === u.userId)) {
-                        next.push({ userId: u.userId, username: u.username, isMuted: false, isVideoOn: false, isScreenSharing: false });
-                    }
+            // Existing users in channel when we join — we (the joiner) initiate offers to all
+            const handleExistingUsers = async ({ channelId, users }) => {
+                if (channelId !== channelIdRef.current) return;
+                const myId = userIdRef.current;
+                console.log(`[VP] existing-users in ${channelId}: ${users.length}, myId=${myId}`);
+
+                setVoiceUsers(prev => {
+                    const next = [...prev];
+                    users.forEach(u => {
+                        if (u.userId !== myId && !next.find(e => e.userId === u.userId)) {
+                            next.push({ userId: u.userId, username: u.username, isMuted: false, isVideoOn: false, isScreenSharing: false });
+                        }
+                    });
+                    return next;
                 });
-                return next;
-            });
 
-            // Wait a moment for the socket room join to propagate server-side
-            await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 500));
 
-            for (const u of users) {
-                if (u.userId === myId) continue; // Don't connect to self
-
-                const pc = createPeer(u.userId, u.socketId, true);
-                if (!pc) continue;
-
-                try {
-                    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-                    await pc.setLocalDescription(offer);
-                    console.log(`[VP] Sending offer to ${u.userId} (socket ${u.socketId})`);
-                    socket.emit('voice:offer', {
-                        targetSocketId: u.socketId,
-                        offer,
-                        channelId,
-                        from: myId,
-                    });
-                } catch (err) {
-                    console.error(`[VP] Offer error for ${u.userId}:`, err);
-                }
-            }
-        };
-
-        // A new user joined — they will initiate the offer to us, we wait
-        const handleUserJoined = ({ userId, username, socketId }) => {
-            if (!channelIdRef.current) return;
-            const myId = userIdRef.current;
-            if (userId === myId) return;
-            console.log(`[VP] User joined: ${username} (${userId})`);
-            setVoiceUsers(prev => {
-                if (prev.find(u => u.userId === userId)) return prev;
-                return [...prev, { userId, username, isMuted: false, isVideoOn: false, isScreenSharing: false }];
-            });
-        };
-
-        // Received WebRTC offer from a peer — answer it
-        const handleVoiceOffer = async ({ offer, from, fromSocketId, channelId }) => {
-            const myId = userIdRef.current;
-            if (from === myId) return;
-            console.log(`[VP] Got offer from ${from}`);
-
-            // Glare handling: if both sides sent offers simultaneously
-            const existingPeer = peersRef.current[from];
-            if (existingPeer && existingPeer.pc.signalingState === 'have-local-offer') {
-                const iAmPolite = (myId || '') < from;
-                if (iAmPolite) {
+                for (const u of users) {
+                    if (u.userId === myId) continue;
+                    const pc = createPeer(u.userId, u.socketId, true);
+                    if (!pc) continue;
                     try {
-                        await existingPeer.pc.setLocalDescription({ type: 'rollback' });
-                        await existingPeer.pc.setRemoteDescription(new RTCSessionDescription(offer));
-                        const answer = await existingPeer.pc.createAnswer();
-                        await existingPeer.pc.setLocalDescription(answer);
-                        socket.emit('voice:answer', { targetSocketId: fromSocketId, answer, channelId, from: myId });
+                        const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+                        await pc.setLocalDescription(offer);
+                        console.log(`[VP] Sending offer to ${u.userId}`);
+                        s.emit('voice:offer', { targetSocketId: u.socketId, offer, channelId, from: myId });
                     } catch (err) {
-                        console.error('[VP] Glare rollback error:', err);
+                        console.error(`[VP] Offer error for ${u.userId}:`, err);
                     }
                 }
-                // impolite: ignore their offer, let them process our offer
-                return;
-            }
+            };
 
-            const pc = createPeer(from, fromSocketId, false);
-            if (!pc) return;
+            const handleUserJoined = ({ userId, username, socketId }) => {
+                if (!channelIdRef.current) return;
+                if (userId === userIdRef.current) return;
+                console.log(`[VP] User joined: ${username} (${userId})`);
+                setVoiceUsers(prev => {
+                    if (prev.find(u => u.userId === userId)) return prev;
+                    return [...prev, { userId, username, isMuted: false, isVideoOn: false, isScreenSharing: false }];
+                });
+            };
 
-            try {
-                await pc.setRemoteDescription(new RTCSessionDescription(offer));
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                socket.emit('voice:answer', { targetSocketId: fromSocketId, answer, channelId, from: myId });
-            } catch (err) {
-                console.error(`[VP] Error answering offer from ${from}:`, err);
-            }
-        };
-
-        // Received answer to our offer
-        const handleVoiceAnswer = async ({ answer, from }) => {
-            const myId = userIdRef.current;
-            if (from === myId) return;
-            console.log(`[VP] Got answer from ${from}`);
-            const peer = peersRef.current[from];
-            if (peer && peer.pc.signalingState === 'have-local-offer') {
+            const handleVoiceOffer = async ({ offer, from, fromSocketId, channelId }) => {
+                const myId = userIdRef.current;
+                if (from === myId) return;
+                console.log(`[VP] Got offer from ${from}`);
+                const existingPeer = peersRef.current[from];
+                if (existingPeer && existingPeer.pc.signalingState === 'have-local-offer') {
+                    const iAmPolite = (myId || '') < from;
+                    if (iAmPolite) {
+                        try {
+                            await existingPeer.pc.setLocalDescription({ type: 'rollback' });
+                            await existingPeer.pc.setRemoteDescription(new RTCSessionDescription(offer));
+                            const answer = await existingPeer.pc.createAnswer();
+                            await existingPeer.pc.setLocalDescription(answer);
+                            s.emit('voice:answer', { targetSocketId: fromSocketId, answer, channelId, from: myId });
+                        } catch (err) { console.error('[VP] Glare rollback:', err); }
+                    }
+                    return;
+                }
+                const pc = createPeer(from, fromSocketId, false);
+                if (!pc) return;
                 try {
-                    await peer.pc.setRemoteDescription(new RTCSessionDescription(answer));
+                    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    s.emit('voice:answer', { targetSocketId: fromSocketId, answer, channelId, from: myId });
                 } catch (err) {
-                    console.error(`[VP] Error setting answer from ${from}:`, err);
+                    console.error(`[VP] Error answering from ${from}:`, err);
                 }
-            } else {
-                console.warn(`[VP] Ignored answer from ${from} — state: ${peer?.pc.signalingState}`);
+            };
+
+            const handleVoiceAnswer = async ({ answer, from }) => {
+                if (from === userIdRef.current) return;
+                const peer = peersRef.current[from];
+                if (peer && peer.pc.signalingState === 'have-local-offer') {
+                    try { await peer.pc.setRemoteDescription(new RTCSessionDescription(answer)); }
+                    catch (err) { console.error(`[VP] Answer error from ${from}:`, err); }
+                }
+            };
+
+            const handleIceCandidate = async ({ candidate, from }) => {
+                const peer = peersRef.current[from];
+                if (peer && candidate) {
+                    try { await peer.pc.addIceCandidate(new RTCIceCandidate(candidate)); }
+                    catch (e) { /* ignore late candidates */ }
+                }
+            };
+
+            const handlePeerLeft = ({ userId }) => {
+                console.log(`[VP] Peer left: ${userId}`);
+                removePeer(userId);
+            };
+
+            const handleUserState = ({ userId, isMuted: muted, isVideoOn: video, isScreenSharing: screen }) => {
+                setVoiceUsers(prev => prev.map(u => {
+                    if (u.userId !== userId) return u;
+                    const upd = {};
+                    if (muted !== undefined) upd.isMuted = muted;
+                    if (video !== undefined) upd.isVideoOn = video;
+                    if (screen !== undefined) upd.isScreenSharing = screen;
+                    return { ...u, ...upd };
+                }));
+            };
+
+            const handleAdminMuted = ({ type }) => {
+                if (type === 'audio') {
+                    setIsMuted(true);
+                    localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = false; });
+                    toast('🔇 Mic muted by host', { icon: '⚠️' });
+                } else if (type === 'video') {
+                    if (videoTrackRef.current) {
+                        videoTrackRef.current.stop();
+                        Object.values(peersRef.current).forEach(({ pc }) => {
+                            const sender = pc.getSenders().find(s2 => s2.track === videoTrackRef.current);
+                            if (sender) pc.removeTrack(sender);
+                        });
+                        videoTrackRef.current = null;
+                    }
+                    setLocalVideoStream(null);
+                    setIsVideoOn(false);
+                    toast('📹 Camera off by host', { icon: '⚠️' });
+                }
+            };
+
+            s.on('voice:existing-users', handleExistingUsers);
+            s.on('voice:user-joined', handleUserJoined);
+            s.on('voice:offer', handleVoiceOffer);
+            s.on('voice:answer', handleVoiceAnswer);
+            s.on('voice:ice-candidate', handleIceCandidate);
+            s.on('voice:peer-left', handlePeerLeft);
+            s.on('voice:user-state', handleUserState);
+            s.on('voice:admin-muted', handleAdminMuted);
+
+            // On reconnect, re-join the channel if we were connected
+            s.on('connect', () => {
+                console.log('[VP] Socket reconnected:', s.id);
+                if (channelIdRef.current) {
+                    console.log('[VP] Re-joining channel after reconnect:', channelIdRef.current);
+                    s.emit('voice:join', { channelId: channelIdRef.current });
+                }
+            });
+
+            // Store cleanup function
+            s._voiceCleanup = () => {
+                s.off('voice:existing-users', handleExistingUsers);
+                s.off('voice:user-joined', handleUserJoined);
+                s.off('voice:offer', handleVoiceOffer);
+                s.off('voice:answer', handleVoiceAnswer);
+                s.off('voice:ice-candidate', handleIceCandidate);
+                s.off('voice:peer-left', handlePeerLeft);
+                s.off('voice:user-state', handleUserState);
+                s.off('voice:admin-muted', handleAdminMuted);
+            };
+        };
+
+        // Poll until socket is available (it may not exist yet on mount)
+        const tryRegister = () => {
+            const s = getSocket();
+            if (s) {
+                clearInterval(pollInterval);
+                registerHandlers(s);
             }
         };
 
-        // ICE candidate from peer
-        const handleIceCandidate = async ({ candidate, from }) => {
-            const peer = peersRef.current[from];
-            if (peer && candidate) {
-                try {
-                    await peer.pc.addIceCandidate(new RTCIceCandidate(candidate));
-                } catch (err) {
-                    // Ignore late ICE candidates
-                }
-            }
-        };
-
-        // Peer left the channel
-        const handlePeerLeft = ({ userId }) => {
-            console.log(`[VP] Peer left: ${userId}`);
-            removePeer(userId);
-        };
-
-        // User state changed (mute/video/screen)
-        const handleUserState = ({ userId, isMuted: muted, isVideoOn: video, isScreenSharing: screen }) => {
-            setVoiceUsers(prev => prev.map(u => {
-                if (u.userId !== userId) return u;
-                const updates = {};
-                if (muted !== undefined) updates.isMuted = muted;
-                if (video !== undefined) updates.isVideoOn = video;
-                if (screen !== undefined) updates.isScreenSharing = screen;
-                return { ...u, ...updates };
-            }));
-        };
-
-        // Admin force-muted us
-        const handleAdminMuted = ({ type }) => {
-            if (type === 'audio') {
-                setIsMuted(true);
-                localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = false; });
-                toast('🔇 Your mic was muted by the host', { icon: '⚠️' });
-            } else if (type === 'video') {
-                if (videoTrackRef.current) {
-                    videoTrackRef.current.stop();
-                    Object.values(peersRef.current).forEach(({ pc }) => {
-                        const sender = pc.getSenders().find(s => s.track === videoTrackRef.current);
-                        if (sender) pc.removeTrack(sender);
-                    });
-                    videoTrackRef.current = null;
-                }
-                setLocalVideoStream(null);
-                setIsVideoOn(false);
-                toast('📹 Camera turned off by the host', { icon: '⚠️' });
-            }
-        };
-
-        socket.on('voice:existing-users', handleExistingUsers);
-        socket.on('voice:user-joined', handleUserJoined);
-        socket.on('voice:offer', handleVoiceOffer);
-        socket.on('voice:answer', handleVoiceAnswer);
-        socket.on('voice:ice-candidate', handleIceCandidate);
-        socket.on('voice:peer-left', handlePeerLeft);
-        socket.on('voice:user-state', handleUserState);
-        socket.on('voice:admin-muted', handleAdminMuted);
+        tryRegister();
+        if (!registered) {
+            pollInterval = setInterval(tryRegister, 300);
+        }
 
         return () => {
-            socket.off('voice:existing-users', handleExistingUsers);
-            socket.off('voice:user-joined', handleUserJoined);
-            socket.off('voice:offer', handleVoiceOffer);
-            socket.off('voice:answer', handleVoiceAnswer);
-            socket.off('voice:ice-candidate', handleIceCandidate);
-            socket.off('voice:peer-left', handlePeerLeft);
-            socket.off('voice:user-state', handleUserState);
-            socket.off('voice:admin-muted', handleAdminMuted);
+            clearInterval(pollInterval);
+            if (socket?._voiceCleanup) {
+                socket._voiceCleanup();
+                delete socket._voiceCleanup;
+            }
         };
-    }, [createPeer, removePeer]); // stable refs — no user dependency needed
+    }, [createPeer, removePeer]); // stable — deps never change
 
     // Hidden audio players for peer audio streams
     const audioElements = Object.entries(peerStreams).map(([userId, stream]) => (

@@ -44,10 +44,13 @@ export default function CallPage() {
         (async () => {
             try {
                 const { data } = await api.get(`/channels/${channelId}`);
-                setChannelInfo(data);
-                if (data.server) {
-                    const { data: server } = await api.get(`/servers/${data.server._id || data.server}`);
-                    setServerInfo(server);
+                // API returns { channel: {...} }
+                const ch = data.channel || data;
+                setChannelInfo(ch);
+                if (ch.server) {
+                    const serverId = ch.server._id || ch.server;
+                    const { data: srv } = await api.get(`/servers/${serverId}`);
+                    setServerInfo(srv);
                 }
             } catch (e) {
                 console.error('Failed to fetch channel info:', e);
