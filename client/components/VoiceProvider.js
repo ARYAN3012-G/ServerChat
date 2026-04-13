@@ -35,19 +35,28 @@ const ICE_SERVERS = {
 };
 
 export default function VoiceProvider({ children }) {
-    const peersRef = useRef({});
+    const peersRef = useRef({});       // { userId: { pc, socketId } }
     const localStreamRef = useRef(null);
     const channelIdRef = useRef(null);
     const videoTrackRef = useRef(null);
     const screenTrackRef = useRef(null);
     const myUserIdRef = useRef(null);
 
+    // Use a ref for user._id to avoid stale closures in socket handlers
+    const userIdRef = useRef(null);
     const user = useSelector(state => state.auth.user);
+
+    useEffect(() => {
+        if (user?._id) {
+            userIdRef.current = user._id;
+            myUserIdRef.current = user._id;
+        }
+    }, [user?._id]);
 
     const [isMuted, setIsMuted] = useState(false);
     const [isDeafened, setIsDeafened] = useState(false);
     const [connectedChannel, setConnectedChannel] = useState(null);
-    const [peerStreams, setPeerStreams] = useState({});
+    const [peerStreams, setPeerStreams] = useState({});       // audio streams
     const [voiceUsers, setVoiceUsers] = useState([]);
     const [isVideoOn, setIsVideoOn] = useState(false);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -57,144 +66,181 @@ export default function VoiceProvider({ children }) {
     const [localScreenStream, setLocalScreenStream] = useState(null);
     const [facingMode, setFacingMode] = useState('user');
 
-    // Track my userId
-    useEffect(() => {
-        if (user?._id) myUserIdRef.current = user._id;
-    }, [user?._id]);
-
-    // Get local audio stream
+    // Get local audio stream (retry on failure)
     const getLocalAudio = useCallback(async () => {
         if (localStreamRef.current) {
             const tracks = localStreamRef.current.getAudioTracks();
             if (tracks.length > 0 && tracks.some(t => t.readyState === 'live')) {
                 return localStreamRef.current;
             }
+            // Stale stream — clean up
+            localStreamRef.current.getTracks().forEach(t => t.stop());
+            localStreamRef.current = null;
         }
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             localStreamRef.current = stream;
             return stream;
         } catch (err) {
-            console.error('[VoiceProvider] Failed to get audio:', err);
-            toast.error('Microphone access denied');
+            console.warn('[VoiceProvider] Mic access denied:', err.name);
             return null;
         }
     }, []);
 
-    // Create a peer connection for a specific user
-    const createPeer = useCallback((targetUserId, targetSocketId, isInitiator) => {
-        const socket = getSocket();
-        if (!socket) return null;
-
-        // IMPORTANT: Don't create duplicate peers
-        if (peersRef.current[targetUserId]) {
-            console.log(`[VoiceProvider] Peer already exists for ${targetUserId}, closing old one`);
-            peersRef.current[targetUserId].pc.close();
-            delete peersRef.current[targetUserId];
-        }
-
-        console.log(`[VoiceProvider] Creating peer for ${targetUserId} (initiator=${isInitiator})`);
-
-        const pc = new RTCPeerConnection(ICE_SERVERS);
-
-        pc.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit('voice:ice-candidate', {
-                    targetSocketId,
-                    candidate: event.candidate,
-                    channelId: channelIdRef.current,
-                });
-            }
-        };
-
-        pc.ontrack = (event) => {
-            const track = event.track;
-            console.log(`[VoiceProvider] Got remote track from ${targetUserId}: ${track.kind}`);
-
-            if (track.kind === 'audio') {
-                const remoteStream = event.streams[0] || new MediaStream([track]);
-                setPeerStreams(prev => ({ ...prev, [targetUserId]: remoteStream }));
-            } else if (track.kind === 'video') {
-                const videoStream = new MediaStream([track]);
-                setPeerVideoStreams(prev => ({ ...prev, [targetUserId]: videoStream }));
-            }
-        };
-
-        pc.oniceconnectionstatechange = () => {
-            console.log(`[VoiceProvider] ICE state for ${targetUserId}:`, pc.iceConnectionState);
-            if (pc.iceConnectionState === 'failed') {
-                // Try ICE restart once before giving up
-                console.log(`[VoiceProvider] ICE failed for ${targetUserId}, attempting restart...`);
-                try {
-                    pc.restartIce();
-                    // Create a new offer with ICE restart
-                    pc.createOffer({ iceRestart: true }).then(offer => {
-                        return pc.setLocalDescription(offer);
-                    }).then(() => {
-                        socket.emit('voice:offer', {
-                            targetSocketId,
-                            offer: pc.localDescription,
-                            channelId: channelIdRef.current,
-                        });
-                    }).catch(err => {
-                        console.error(`[VoiceProvider] ICE restart failed for ${targetUserId}:`, err);
-                        removePeer(targetUserId);
-                    });
-                } catch (e) {
-                    removePeer(targetUserId);
-                }
-            } else if (pc.iceConnectionState === 'closed') {
-                removePeer(targetUserId);
-            }
-        };
-
-        // Add local audio tracks
-        const stream = localStreamRef.current;
-        if (stream) {
-            stream.getAudioTracks().forEach(track => {
-                pc.addTrack(track, stream);
-            });
-        }
-
-        // If we have a video track active, add it
-        if (videoTrackRef.current) {
-            const videoStream = new MediaStream([videoTrackRef.current]);
-            pc.addTrack(videoTrackRef.current, videoStream);
-        }
-
-        // If we have a screen track active, add it
-        if (screenTrackRef.current) {
-            const screenStream = new MediaStream([screenTrackRef.current]);
-            pc.addTrack(screenTrackRef.current, screenStream);
-        }
-
-        peersRef.current[targetUserId] = { pc, socketId: targetSocketId };
-        return pc;
-    }, []);
-
+    // Remove a peer and clean up
     const removePeer = useCallback((userId) => {
         const peer = peersRef.current[userId];
         if (peer) {
             try { peer.pc.close(); } catch (e) {}
             delete peersRef.current[userId];
         }
-        setPeerStreams(prev => { const next = { ...prev }; delete next[userId]; return next; });
-        setPeerVideoStreams(prev => { const next = { ...prev }; delete next[userId]; return next; });
-        setPeerScreenStreams(prev => { const next = { ...prev }; delete next[userId]; return next; });
+        setPeerStreams(prev => { const n = { ...prev }; delete n[userId]; return n; });
+        setPeerVideoStreams(prev => { const n = { ...prev }; delete n[userId]; return n; });
+        setPeerScreenStreams(prev => { const n = { ...prev }; delete n[userId]; return n; });
         setVoiceUsers(prev => prev.filter(u => u.userId !== userId));
     }, []);
 
-    // Join a voice channel (auto-leave previous)
-    const joinVoice = useCallback(async (channelId) => {
+    // Create a peer connection
+    const createPeer = useCallback((targetUserId, targetSocketId, isInitiator) => {
+        const socket = getSocket();
+        if (!socket) return null;
+
+        // Close any existing peer for this user
+        if (peersRef.current[targetUserId]) {
+            try { peersRef.current[targetUserId].pc.close(); } catch (e) {}
+            delete peersRef.current[targetUserId];
+        }
+
+        console.log(`[VP] Creating peer for ${targetUserId} (initiator=${isInitiator})`);
+        const pc = new RTCPeerConnection(ICE_SERVERS);
+
+        // ICE candidates
+        pc.onicecandidate = ({ candidate }) => {
+            if (candidate) {
+                socket.emit('voice:ice-candidate', {
+                    targetSocketId,
+                    candidate,
+                    channelId: channelIdRef.current,
+                });
+            }
+        };
+
+        // ─── CRITICAL: ontrack — handle incoming audio & video ───
+        pc.ontrack = ({ track, streams }) => {
+            console.log(`[VP] ontrack from ${targetUserId}: kind=${track.kind}, streams=${streams.length}`);
+
+            if (track.kind === 'audio') {
+                // Use the stream from the event if available, else wrap the track
+                const audioStream = streams[0] || new MediaStream([track]);
+                setPeerStreams(prev => ({ ...prev, [targetUserId]: audioStream }));
+            } else if (track.kind === 'video') {
+                // Create a dedicated MediaStream for this video track
+                // This ensures React re-renders when the video stream changes
+                const videoStream = new MediaStream([track]);
+                setPeerVideoStreams(prev => ({ ...prev, [targetUserId]: videoStream }));
+
+                // Listen for track end (remote user turned off video)
+                track.onended = () => {
+                    setPeerVideoStreams(prev => {
+                        const n = { ...prev };
+                        delete n[targetUserId];
+                        return n;
+                    });
+                };
+            }
+        };
+
+        // ICE state changes
+        pc.oniceconnectionstatechange = () => {
+            const state = pc.iceConnectionState;
+            console.log(`[VP] ICE ${targetUserId}: ${state}`);
+            if (state === 'failed') {
+                console.log(`[VP] ICE failed for ${targetUserId}, restarting...`);
+                try {
+                    pc.restartIce();
+                    pc.createOffer({ iceRestart: true })
+                        .then(o => pc.setLocalDescription(o))
+                        .then(() => {
+                            socket.emit('voice:offer', {
+                                targetSocketId,
+                                offer: pc.localDescription,
+                                channelId: channelIdRef.current,
+                                from: userIdRef.current,
+                            });
+                        })
+                        .catch(() => removePeer(targetUserId));
+                } catch (e) { removePeer(targetUserId); }
+            } else if (state === 'closed') {
+                removePeer(targetUserId);
+            }
+        };
+
+        // Add local audio tracks
+        if (localStreamRef.current) {
+            localStreamRef.current.getAudioTracks().forEach(track => {
+                pc.addTrack(track, localStreamRef.current);
+            });
+        }
+        // Add active video track
+        if (videoTrackRef.current) {
+            const vs = new MediaStream([videoTrackRef.current]);
+            pc.addTrack(videoTrackRef.current, vs);
+        }
+        // Add active screen track
+        if (screenTrackRef.current) {
+            const ss = new MediaStream([screenTrackRef.current]);
+            pc.addTrack(screenTrackRef.current, ss);
+        }
+
+        peersRef.current[targetUserId] = { pc, socketId: targetSocketId };
+        return pc;
+    }, [removePeer]);
+
+    // Renegotiate with all existing peers (after adding/removing tracks)
+    const renegotiateAll = useCallback(async () => {
         const socket = getSocket();
         if (!socket) return;
+        for (const [userId, { pc, socketId }] of Object.entries(peersRef.current)) {
+            try {
+                if (pc.signalingState === 'closed') continue;
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                socket.emit('voice:offer', {
+                    targetSocketId: socketId,
+                    offer,
+                    channelId: channelIdRef.current,
+                    from: userIdRef.current,
+                });
+            } catch (err) {
+                console.error(`[VP] Renegotiation error for ${userId}:`, err);
+            }
+        }
+    }, []);
 
-        // Auto-leave previous channel if different
+    // ─── Join a voice channel ───
+    const joinVoice = useCallback(async (channelId) => {
+        const socket = getSocket();
+        if (!socket) {
+            console.error('[VP] No socket!');
+            toast.error('Not connected to server. Please refresh.');
+            return;
+        }
+
+        // Wait for socket to actually be connected
+        if (!socket.connected) {
+            console.log('[VP] Socket not connected, waiting...');
+            await new Promise(resolve => {
+                const timeout = setTimeout(() => resolve(), 5000);
+                socket.once('connect', () => { clearTimeout(timeout); resolve(); });
+            });
+        }
+
+        // Auto-leave previous channel
         if (channelIdRef.current && channelIdRef.current !== channelId) {
-            console.log(`[VoiceProvider] Auto-leaving channel ${channelIdRef.current} before joining ${channelId}`);
+            console.log(`[VP] Auto-leaving ${channelIdRef.current}`);
             socket.emit('voice:leave', { channelId: channelIdRef.current });
-            Object.keys(peersRef.current).forEach(userId => {
-                try { peersRef.current[userId].pc.close(); } catch (e) {}
+            Object.keys(peersRef.current).forEach(uid => {
+                try { peersRef.current[uid].pc.close(); } catch (e) {}
             });
             peersRef.current = {};
             setPeerStreams({});
@@ -203,31 +249,31 @@ export default function VoiceProvider({ children }) {
             setVoiceUsers([]);
         }
 
-        // Try to get audio, but join even if mic is denied (listen-only)
+        // Get audio (join even without mic)
         const stream = await getLocalAudio();
         if (!stream) {
-            console.warn('[VoiceProvider] No audio stream — joining in listen-only mode');
-            toast('Microphone unavailable — joined as listener', { icon: '🔇', duration: 4000 });
+            toast('🔇 No microphone — joined as listener', { duration: 4000 });
         }
 
+        // Set state BEFORE emitting so socket handlers see correct channelId
         channelIdRef.current = channelId;
-        myUserIdRef.current = user?._id;
+        myUserIdRef.current = userIdRef.current || user?._id;
         setConnectedChannel(channelId);
-        setIsMuted(!stream); // auto-mute if no mic
+        setIsMuted(!stream);
         setIsDeafened(false);
-        console.log(`[VoiceProvider] Emitting voice:join for channel ${channelId}, userId=${user?._id}`);
+
+        console.log(`[VP] Emitting voice:join — channel=${channelId} user=${userIdRef.current || user?._id}`);
         socket.emit('voice:join', { channelId });
     }, [getLocalAudio, user?._id]);
 
-    // Leave voice channel
+    // ─── Leave a voice channel ───
     const leaveVoice = useCallback((channelId) => {
         const socket = getSocket();
         if (socket) {
             socket.emit('voice:leave', { channelId: channelId || channelIdRef.current });
         }
-
-        Object.keys(peersRef.current).forEach(userId => {
-            try { peersRef.current[userId].pc.close(); } catch (e) {}
+        Object.keys(peersRef.current).forEach(uid => {
+            try { peersRef.current[uid].pc.close(); } catch (e) {}
         });
         peersRef.current = {};
         setPeerStreams({});
@@ -235,7 +281,6 @@ export default function VoiceProvider({ children }) {
         setPeerScreenStreams({});
         setVoiceUsers([]);
 
-        // Stop local media
         localStreamRef.current?.getTracks().forEach(t => t.stop());
         localStreamRef.current = null;
         if (videoTrackRef.current) { videoTrackRef.current.stop(); videoTrackRef.current = null; }
@@ -244,7 +289,6 @@ export default function VoiceProvider({ children }) {
         setLocalScreenStream(null);
         setIsVideoOn(false);
         setIsScreenSharing(false);
-
         channelIdRef.current = null;
         setConnectedChannel(null);
         setIsMuted(false);
@@ -254,67 +298,43 @@ export default function VoiceProvider({ children }) {
     // Toggle mute
     const toggleMute = useCallback(() => {
         setIsMuted(prev => {
-            const newMuted = !prev;
-            localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = !newMuted; });
+            const muted = !prev;
+            localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = !muted; });
             const socket = getSocket();
-            if (socket) socket.emit('voice:user-state', { channelId: channelIdRef.current, isMuted: newMuted });
-            return newMuted;
+            if (socket) socket.emit('voice:user-state', { channelId: channelIdRef.current, isMuted: muted });
+            return muted;
         });
     }, []);
 
     // Toggle deafen
     const toggleDeafen = useCallback(() => {
         setIsDeafened(prev => {
-            const newDeafened = !prev;
-            document.querySelectorAll('.voice-remote-audio').forEach(el => {
-                el.muted = newDeafened;
-            });
-            return newDeafened;
+            const deafened = !prev;
+            document.querySelectorAll('.voice-remote-audio').forEach(el => { el.muted = deafened; });
+            return deafened;
         });
-    }, []);
-
-    // Renegotiate with all peers
-    const renegotiateAll = useCallback(async () => {
-        const socket = getSocket();
-        if (!socket) return;
-        for (const [userId, { pc, socketId }] of Object.entries(peersRef.current)) {
-            try {
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                socket.emit('voice:offer', {
-                    targetSocketId: socketId,
-                    offer,
-                    channelId: channelIdRef.current,
-                });
-            } catch (err) {
-                console.error(`[VoiceProvider] Renegotiation error for ${userId}:`, err);
-            }
-        }
     }, []);
 
     // Start video
     const startVideo = useCallback(async (facing = 'user') => {
         try {
-            // Pre-check camera permission
             if (navigator.permissions) {
                 try {
                     const perm = await navigator.permissions.query({ name: 'camera' });
                     if (perm.state === 'denied') {
-                        toast.error('Camera is blocked. Click the lock icon 🔒 in the address bar → Allow Camera → Refresh', { duration: 6000 });
+                        toast.error('Camera is blocked. Click 🔒 in address bar → Allow Camera → Refresh', { duration: 6000 });
                         return;
                     }
-                } catch (e) {
-                    // permissions.query not supported for camera in some browsers, continue
-                }
+                } catch (e) { /* Not all browsers support this */ }
             }
 
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 } }
+                video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }
             });
             const videoTrack = stream.getVideoTracks()[0];
-            
+
             if (!videoTrack || videoTrack.readyState !== 'live') {
-                toast.error('Camera track is not available. Another app may be using it.');
+                toast.error('Camera not available. Another app may be using it.');
                 return;
             }
 
@@ -323,42 +343,37 @@ export default function VoiceProvider({ children }) {
             setIsVideoOn(true);
             setFacingMode(facing);
 
-            // Handle track ending unexpectedly
             videoTrack.onended = () => {
-                console.log('[VoiceProvider] Video track ended unexpectedly');
                 setIsVideoOn(false);
                 setLocalVideoStream(null);
                 videoTrackRef.current = null;
-                const s = getSocket();
-                if (s) s.emit('voice:user-state', { channelId: channelIdRef.current, isVideoOn: false });
+                getSocket()?.emit('voice:user-state', { channelId: channelIdRef.current, isVideoOn: false });
             };
 
-            // Add track to all existing peer connections
-            Object.values(peersRef.current).forEach(({ pc }) => {
-                const existingSenders = pc.getSenders();
-                const videoSender = existingSenders.find(s => s.track?.kind === 'video' && !s._isScreen);
-                if (videoSender) {
-                    videoSender.replaceTrack(videoTrack);
+            // Add video track to all existing peer connections
+            for (const { pc } of Object.values(peersRef.current)) {
+                const senders = pc.getSenders();
+                const existing = senders.find(s => s.track?.kind === 'video' && !s._isScreen);
+                if (existing) {
+                    await existing.replaceTrack(videoTrack);
                 } else {
                     const sender = pc.addTrack(videoTrack, stream);
                     sender._isScreen = false;
                 }
-            });
+            }
 
-            const socket = getSocket();
-            if (socket) socket.emit('voice:user-state', { channelId: channelIdRef.current, isVideoOn: true });
-
+            getSocket()?.emit('voice:user-state', { channelId: channelIdRef.current, isVideoOn: true });
             await renegotiateAll();
         } catch (err) {
-            console.error('[VoiceProvider] Video error:', err);
+            console.error('[VP] Video error:', err);
             setIsVideoOn(false);
             setLocalVideoStream(null);
             if (err.name === 'NotAllowedError') {
-                toast.error('Camera access denied. Click 🔒 in the address bar → Allow Camera → Refresh', { duration: 6000 });
+                toast.error('Camera denied. Click 🔒 in address bar → Allow Camera → Refresh', { duration: 6000 });
             } else if (err.name === 'NotFoundError') {
                 toast.error('No camera found on this device.');
             } else if (err.name === 'NotReadableError') {
-                toast.error('Camera is in use by another app. Close other apps using the camera.');
+                toast.error('Camera is in use by another app. Close it and retry.');
             } else {
                 toast.error('Failed to start camera: ' + err.message);
             }
@@ -370,130 +385,119 @@ export default function VoiceProvider({ children }) {
         if (videoTrackRef.current) {
             videoTrackRef.current.stop();
             Object.values(peersRef.current).forEach(({ pc }) => {
-                const senders = pc.getSenders();
-                const videoSender = senders.find(s => s.track === videoTrackRef.current);
-                if (videoSender) pc.removeTrack(videoSender);
+                const sender = pc.getSenders().find(s => s.track === videoTrackRef.current);
+                if (sender) pc.removeTrack(sender);
             });
             videoTrackRef.current = null;
         }
         setLocalVideoStream(null);
         setIsVideoOn(false);
-        const socket = getSocket();
-        if (socket) socket.emit('voice:user-state', { channelId: channelIdRef.current, isVideoOn: false });
+        getSocket()?.emit('voice:user-state', { channelId: channelIdRef.current, isVideoOn: false });
         renegotiateAll();
     }, [renegotiateAll]);
 
     // Switch camera
     const switchCamera = useCallback(async () => {
         const newFacing = facingMode === 'user' ? 'environment' : 'user';
-        if (isVideoOn) {
-            if (videoTrackRef.current) videoTrackRef.current.stop();
+        if (isVideoOn && videoTrackRef.current) {
+            videoTrackRef.current.stop();
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: newFacing, width: { ideal: 640 }, height: { ideal: 480 } }
+                    video: { facingMode: newFacing, width: { ideal: 1280 }, height: { ideal: 720 } }
                 });
                 const newTrack = stream.getVideoTracks()[0];
                 videoTrackRef.current = newTrack;
                 setLocalVideoStream(stream);
-                setFacingMode(newFacing);
-
                 Object.values(peersRef.current).forEach(({ pc }) => {
-                    const senders = pc.getSenders();
-                    const videoSender = senders.find(s => s.track?.kind === 'video' && !s._isScreen);
-                    if (videoSender) videoSender.replaceTrack(newTrack);
+                    const sender = pc.getSenders().find(s => s.track?.kind === 'video' && !s._isScreen);
+                    if (sender) sender.replaceTrack(newTrack);
                 });
             } catch (err) {
-                console.error('[VoiceProvider] Camera switch error:', err);
                 toast.error('Failed to switch camera.');
             }
         }
         setFacingMode(newFacing);
     }, [facingMode, isVideoOn]);
 
-    // Start screen sharing
+    // Start screen share
     const startScreenShare = useCallback(async () => {
         try {
             if (!navigator.mediaDevices?.getDisplayMedia) {
                 toast.error('Screen sharing not supported on this browser.');
                 return;
             }
-            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
             const screenTrack = stream.getVideoTracks()[0];
             screenTrackRef.current = screenTrack;
             setLocalScreenStream(stream);
             setIsScreenSharing(true);
 
-            screenTrack.onended = () => { stopScreenShare(); };
+            screenTrack.onended = () => stopScreenShare();
 
             Object.values(peersRef.current).forEach(({ pc }) => {
                 const sender = pc.addTrack(screenTrack, stream);
                 sender._isScreen = true;
             });
 
-            const socket = getSocket();
-            if (socket) socket.emit('voice:user-state', { channelId: channelIdRef.current, isScreenSharing: true });
-
+            getSocket()?.emit('voice:user-state', { channelId: channelIdRef.current, isScreenSharing: true });
             await renegotiateAll();
         } catch (err) {
-            console.error('[VoiceProvider] Screen share error:', err);
             if (err.name !== 'NotAllowedError') toast.error('Failed to start screen share.');
         }
     }, [renegotiateAll]);
 
-    // Stop screen sharing
+    // Stop screen share
     const stopScreenShare = useCallback(() => {
         if (screenTrackRef.current) {
             screenTrackRef.current.stop();
             Object.values(peersRef.current).forEach(({ pc }) => {
-                const senders = pc.getSenders();
-                const screenSender = senders.find(s => s.track === screenTrackRef.current);
-                if (screenSender) pc.removeTrack(screenSender);
+                const sender = pc.getSenders().find(s => s.track === screenTrackRef.current);
+                if (sender) pc.removeTrack(sender);
             });
             screenTrackRef.current = null;
         }
         setLocalScreenStream(null);
         setIsScreenSharing(false);
-        const socket = getSocket();
-        if (socket) socket.emit('voice:user-state', { channelId: channelIdRef.current, isScreenSharing: false });
+        getSocket()?.emit('voice:user-state', { channelId: channelIdRef.current, isScreenSharing: false });
         renegotiateAll();
     }, [renegotiateAll]);
 
     // Admin: force mute another user
     const adminMuteUser = useCallback((targetUserId, type = 'audio') => {
-        const socket = getSocket();
-        if (socket) {
-            socket.emit('voice:admin-mute', {
-                channelId: channelIdRef.current,
-                targetUserId,
-                type, // 'audio' or 'video'
-            });
-        }
+        getSocket()?.emit('voice:admin-mute', {
+            channelId: channelIdRef.current,
+            targetUserId,
+            type,
+        });
     }, []);
 
-    // Socket event handlers
+    // ─── Socket event handlers ───
     useEffect(() => {
         const socket = getSocket();
         if (!socket) return;
 
+        // Existing users in channel when we join — we (the joiner) initiate offers to all
         const handleExistingUsers = async ({ channelId, users }) => {
             if (channelId !== channelIdRef.current) return;
-            console.log(`[VoiceProvider] Existing users in ${channelId}:`, users.length);
+            const myId = userIdRef.current;
+            console.log(`[VP] existing-users in ${channelId}: ${users.length} users. My ID: ${myId}`);
 
+            // Add to voiceUsers list
             setVoiceUsers(prev => {
-                const existing = [...prev];
+                const next = [...prev];
                 users.forEach(u => {
-                    if (!existing.find(e => e.userId === u.userId)) {
-                        existing.push({ userId: u.userId, username: u.username, isMuted: false, isVideoOn: false, isScreenSharing: false });
+                    if (u.userId !== myId && !next.find(e => e.userId === u.userId)) {
+                        next.push({ userId: u.userId, username: u.username, isMuted: false, isVideoOn: false, isScreenSharing: false });
                     }
                 });
-                return existing;
+                return next;
             });
 
-            // Small delay to ensure socket room join has propagated
-            await new Promise(r => setTimeout(r, 300));
+            // Wait a moment for the socket room join to propagate server-side
+            await new Promise(r => setTimeout(r, 500));
 
             for (const u of users) {
-                if (u.userId === user?._id) continue; // Don't create peer to self
+                if (u.userId === myId) continue; // Don't connect to self
 
                 const pc = createPeer(u.userId, u.socketId, true);
                 if (!pc) continue;
@@ -501,52 +505,54 @@ export default function VoiceProvider({ children }) {
                 try {
                     const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
                     await pc.setLocalDescription(offer);
+                    console.log(`[VP] Sending offer to ${u.userId} (socket ${u.socketId})`);
                     socket.emit('voice:offer', {
                         targetSocketId: u.socketId,
                         offer,
                         channelId,
+                        from: myId,
                     });
                 } catch (err) {
-                    console.error(`[VoiceProvider] Error creating offer for ${u.userId}:`, err);
+                    console.error(`[VP] Offer error for ${u.userId}:`, err);
                 }
             }
         };
 
+        // A new user joined — they will initiate the offer to us, we wait
         const handleUserJoined = ({ userId, username, socketId }) => {
             if (!channelIdRef.current) return;
-            if (userId === user?._id) return; // Skip self
-            console.log(`[VoiceProvider] User joined: ${username} (${userId})`);
+            const myId = userIdRef.current;
+            if (userId === myId) return;
+            console.log(`[VP] User joined: ${username} (${userId})`);
             setVoiceUsers(prev => {
                 if (prev.find(u => u.userId === userId)) return prev;
                 return [...prev, { userId, username, isMuted: false, isVideoOn: false, isScreenSharing: false }];
             });
         };
 
+        // Received WebRTC offer from a peer — answer it
         const handleVoiceOffer = async ({ offer, from, fromSocketId, channelId }) => {
-            if (from === user?._id) return; // Ignore own offers
-            console.log(`[VoiceProvider] Received offer from ${from}`);
+            const myId = userIdRef.current;
+            if (from === myId) return;
+            console.log(`[VP] Got offer from ${from}`);
 
-            // Handle renegotiation glare: lower userId is "polite" (drops its offer)
+            // Glare handling: if both sides sent offers simultaneously
             const existingPeer = peersRef.current[from];
             if (existingPeer && existingPeer.pc.signalingState === 'have-local-offer') {
-                // Both sides sent offers simultaneously
-                const iAmPolite = user?._id < from;
+                const iAmPolite = (myId || '') < from;
                 if (iAmPolite) {
-                    console.log(`[VoiceProvider] Glare detected, I'm polite — rolling back my offer`);
                     try {
                         await existingPeer.pc.setLocalDescription({ type: 'rollback' });
                         await existingPeer.pc.setRemoteDescription(new RTCSessionDescription(offer));
                         const answer = await existingPeer.pc.createAnswer();
                         await existingPeer.pc.setLocalDescription(answer);
-                        socket.emit('voice:answer', { targetSocketId: fromSocketId, answer, channelId });
+                        socket.emit('voice:answer', { targetSocketId: fromSocketId, answer, channelId, from: myId });
                     } catch (err) {
-                        console.error(`[VoiceProvider] Glare rollback error:`, err);
+                        console.error('[VP] Glare rollback error:', err);
                     }
-                    return;
-                } else {
-                    console.log(`[VoiceProvider] Glare detected, I'm impolite — ignoring their offer`);
-                    return;
                 }
+                // impolite: ignore their offer, let them process our offer
+                return;
             }
 
             const pc = createPeer(from, fromSocketId, false);
@@ -556,30 +562,30 @@ export default function VoiceProvider({ children }) {
                 await pc.setRemoteDescription(new RTCSessionDescription(offer));
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
-
-                socket.emit('voice:answer', {
-                    targetSocketId: fromSocketId,
-                    answer,
-                    channelId,
-                });
+                socket.emit('voice:answer', { targetSocketId: fromSocketId, answer, channelId, from: myId });
             } catch (err) {
-                console.error(`[VoiceProvider] Error handling offer from ${from}:`, err);
+                console.error(`[VP] Error answering offer from ${from}:`, err);
             }
         };
 
+        // Received answer to our offer
         const handleVoiceAnswer = async ({ answer, from }) => {
-            if (from === user?._id) return;
-            console.log(`[VoiceProvider] Received answer from ${from}`);
+            const myId = userIdRef.current;
+            if (from === myId) return;
+            console.log(`[VP] Got answer from ${from}`);
             const peer = peersRef.current[from];
             if (peer && peer.pc.signalingState === 'have-local-offer') {
                 try {
                     await peer.pc.setRemoteDescription(new RTCSessionDescription(answer));
                 } catch (err) {
-                    console.error(`[VoiceProvider] Error setting answer from ${from}:`, err);
+                    console.error(`[VP] Error setting answer from ${from}:`, err);
                 }
+            } else {
+                console.warn(`[VP] Ignored answer from ${from} — state: ${peer?.pc.signalingState}`);
             }
         };
 
+        // ICE candidate from peer
         const handleIceCandidate = async ({ candidate, from }) => {
             const peer = peersRef.current[from];
             if (peer && candidate) {
@@ -591,11 +597,13 @@ export default function VoiceProvider({ children }) {
             }
         };
 
+        // Peer left the channel
         const handlePeerLeft = ({ userId }) => {
-            console.log(`[VoiceProvider] Peer left: ${userId}`);
+            console.log(`[VP] Peer left: ${userId}`);
             removePeer(userId);
         };
 
+        // User state changed (mute/video/screen)
         const handleUserState = ({ userId, isMuted: muted, isVideoOn: video, isScreenSharing: screen }) => {
             setVoiceUsers(prev => prev.map(u => {
                 if (u.userId !== userId) return u;
@@ -607,25 +615,24 @@ export default function VoiceProvider({ children }) {
             }));
         };
 
-        // Admin force mute: server tells us we were muted
+        // Admin force-muted us
         const handleAdminMuted = ({ type }) => {
             if (type === 'audio') {
                 setIsMuted(true);
                 localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = false; });
-                toast('🔇 Your microphone was muted by the host', { icon: '⚠️' });
+                toast('🔇 Your mic was muted by the host', { icon: '⚠️' });
             } else if (type === 'video') {
                 if (videoTrackRef.current) {
                     videoTrackRef.current.stop();
                     Object.values(peersRef.current).forEach(({ pc }) => {
-                        const senders = pc.getSenders();
-                        const videoSender = senders.find(s => s.track === videoTrackRef.current);
-                        if (videoSender) pc.removeTrack(videoSender);
+                        const sender = pc.getSenders().find(s => s.track === videoTrackRef.current);
+                        if (sender) pc.removeTrack(sender);
                     });
                     videoTrackRef.current = null;
                 }
                 setLocalVideoStream(null);
                 setIsVideoOn(false);
-                toast('📹 Your camera was turned off by the host', { icon: '⚠️' });
+                toast('📹 Camera turned off by the host', { icon: '⚠️' });
             }
         };
 
@@ -648,42 +655,30 @@ export default function VoiceProvider({ children }) {
             socket.off('voice:user-state', handleUserState);
             socket.off('voice:admin-muted', handleAdminMuted);
         };
-    }, [createPeer, removePeer]);
+    }, [createPeer, removePeer]); // stable refs — no user dependency needed
 
-    // Render hidden audio elements for all peer streams
+    // Hidden audio players for peer audio streams
     const audioElements = Object.entries(peerStreams).map(([userId, stream]) => (
         <audio
             key={userId}
             className="voice-remote-audio"
             autoPlay
             playsInline
-            ref={(el) => { if (el && el.srcObject !== stream) el.srcObject = stream; }}
+            ref={(el) => { if (el && el.srcObject !== stream) { el.srcObject = stream; el.play().catch(() => {}); } }}
             muted={isDeafened}
         />
     ));
 
     const value = {
-        joinVoice,
-        leaveVoice,
-        toggleMute,
-        toggleDeafen,
-        isMuted,
-        isDeafened,
+        joinVoice, leaveVoice,
+        toggleMute, toggleDeafen,
+        isMuted, isDeafened,
         connectedChannel,
-        peerStreams,
-        voiceUsers,
-        isVideoOn,
-        localVideoStream,
-        peerVideoStreams,
-        startVideo,
-        stopVideo,
-        switchCamera,
-        facingMode,
-        isScreenSharing,
-        localScreenStream,
-        peerScreenStreams,
-        startScreenShare,
-        stopScreenShare,
+        peerStreams, voiceUsers,
+        isVideoOn, localVideoStream, peerVideoStreams,
+        startVideo, stopVideo, switchCamera, facingMode,
+        isScreenSharing, localScreenStream, peerScreenStreams,
+        startScreenShare, stopScreenShare,
         adminMuteUser,
     };
 

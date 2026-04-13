@@ -36,6 +36,7 @@ export default function CallPage() {
     const [spotlightUser, setSpotlightUser] = useState(null);
     const joinedRef = useRef(false);
     const timerRef = useRef(null);
+    const videoRefs = useRef({}); // { userId: HTMLVideoElement }
 
     // Fetch channel and server info
     useEffect(() => {
@@ -54,24 +55,21 @@ export default function CallPage() {
         })();
     }, [channelId]);
 
-    // Auto-join on mount (only use VoiceProvider's joinVoice — it handles socket emit)
+    // Auto-join: wait for user to be ready, then joinVoice
     useEffect(() => {
         if (!channelId || joinedRef.current) return;
-        // If already connected to this channel, skip
+        if (!user?._id) return; // Wait for auth to hydrate
         if (connectedChannel === channelId) {
             joinedRef.current = true;
             return;
         }
         joinedRef.current = true;
-
-        const doJoin = async () => {
-            console.log('[CallPage] Joining voice channel:', channelId);
+        const t = setTimeout(async () => {
+            console.log('[CallPage] Joining:', channelId, 'as', user._id);
             await joinVoice?.(channelId);
-        };
-        // Small delay to ensure socket is ready
-        const t = setTimeout(doJoin, 500);
+        }, 600);
         return () => clearTimeout(t);
-    }, [channelId, connectedChannel]);
+    }, [channelId, user?._id]); // Re-run when user hydrates
 
     // Call timer
     useEffect(() => {
@@ -110,7 +108,19 @@ export default function CallPage() {
         return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
     };
 
-    const isOwner = serverInfo?.owner?._id === user?._id || serverInfo?.owner === user?._id;
+    const isOwner = serverInfo?.owner?._id === user?._id ||
+        serverInfo?.owner === user?._id ||
+        serverInfo?.members?.find(m => m.user?._id === user?._id || m.user === user?._id)?.role === 'owner';
+
+    // Document title
+    useEffect(() => {
+        if (channelInfo?.name && serverInfo?.name) {
+            document.title = `${channelInfo.name} — ${serverInfo.name} | Voice`;
+        } else if (channelInfo?.name) {
+            document.title = `${channelInfo.name} | Voice`;
+        }
+        return () => { document.title = 'ServerChat'; };
+    }, [channelInfo?.name, serverInfo?.name]);
 
     // Build participant list
     const allParticipants = [
@@ -135,13 +145,17 @@ export default function CallPage() {
         return 'grid-cols-3 sm:grid-cols-4';
     };
 
-    // Video ref callback
-    const createVideoRef = useCallback((stream) => (el) => {
-        if (el && stream && el.srcObject !== stream) {
+    // Attach stream to video element reliably
+    const attachVideoRef = useCallback((userId) => (el) => {
+        if (!el) return;
+        const stream = allParticipants.find(p => p.userId === userId)?.isMe
+            ? localVideoStream
+            : peerVideoStreams?.[userId];
+        if (stream && el.srcObject !== stream) {
             el.srcObject = stream;
             el.play().catch(() => {});
         }
-    }, []);
+    }, [localVideoStream, peerVideoStreams]); // eslint-disable-line
 
     // Render a single participant tile
     const renderParticipant = (p, isSmall = false) => {
@@ -159,9 +173,9 @@ export default function CallPage() {
                 onClick={() => !isSmall && setSpotlightUser(spotlightUser === p.userId ? null : p.userId)}
                 className={`relative rounded-2xl overflow-hidden bg-dark-800 border border-white/5 cursor-pointer hover:border-white/15 transition-all group ${isSmall ? 'w-40 h-28 flex-shrink-0' : 'w-full aspect-video'}`}
             >
-                {hasVideo && stream ? (
+                {hasVideo ? (
                     <video
-                        ref={createVideoRef(stream)}
+                        ref={attachVideoRef(p.userId)}
                         autoPlay
                         playsInline
                         muted={p.isMe}
@@ -278,7 +292,7 @@ export default function CallPage() {
                                     return (
                                         <div className="relative rounded-2xl overflow-hidden bg-dark-800 border border-white/5 w-full h-full">
                                             {stream ? (
-                                                <video ref={createVideoRef(stream)} autoPlay playsInline muted={p.isMe}
+                                                <video ref={attachVideoRef(p.userId)} autoPlay playsInline muted={p.isMe}
                                                     className={`w-full h-full object-contain bg-black ${p.isMe && !p.isScreenSharing ? 'scale-x-[-1]' : ''}`} />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center">
