@@ -291,14 +291,43 @@ export default function VoiceProvider({ children }) {
     // Start video
     const startVideo = useCallback(async (facing = 'user') => {
         try {
+            // Pre-check camera permission
+            if (navigator.permissions) {
+                try {
+                    const perm = await navigator.permissions.query({ name: 'camera' });
+                    if (perm.state === 'denied') {
+                        toast.error('Camera is blocked. Click the lock icon 🔒 in the address bar → Allow Camera → Refresh', { duration: 6000 });
+                        return;
+                    }
+                } catch (e) {
+                    // permissions.query not supported for camera in some browsers, continue
+                }
+            }
+
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 } }
             });
             const videoTrack = stream.getVideoTracks()[0];
+            
+            if (!videoTrack || videoTrack.readyState !== 'live') {
+                toast.error('Camera track is not available. Another app may be using it.');
+                return;
+            }
+
             videoTrackRef.current = videoTrack;
             setLocalVideoStream(stream);
             setIsVideoOn(true);
             setFacingMode(facing);
+
+            // Handle track ending unexpectedly
+            videoTrack.onended = () => {
+                console.log('[VoiceProvider] Video track ended unexpectedly');
+                setIsVideoOn(false);
+                setLocalVideoStream(null);
+                videoTrackRef.current = null;
+                const s = getSocket();
+                if (s) s.emit('voice:user-state', { channelId: channelIdRef.current, isVideoOn: false });
+            };
 
             // Add track to all existing peer connections
             Object.values(peersRef.current).forEach(({ pc }) => {
@@ -318,9 +347,17 @@ export default function VoiceProvider({ children }) {
             await renegotiateAll();
         } catch (err) {
             console.error('[VoiceProvider] Video error:', err);
-            if (err.name === 'NotAllowedError') toast.error('Camera access denied.');
-            else if (err.name === 'NotFoundError') toast.error('No camera found.');
-            else toast.error('Failed to start camera.');
+            setIsVideoOn(false);
+            setLocalVideoStream(null);
+            if (err.name === 'NotAllowedError') {
+                toast.error('Camera access denied. Click 🔒 in the address bar → Allow Camera → Refresh', { duration: 6000 });
+            } else if (err.name === 'NotFoundError') {
+                toast.error('No camera found on this device.');
+            } else if (err.name === 'NotReadableError') {
+                toast.error('Camera is in use by another app. Close other apps using the camera.');
+            } else {
+                toast.error('Failed to start camera: ' + err.message);
+            }
         }
     }, [renegotiateAll]);
 
