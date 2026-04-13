@@ -2,12 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMic, FiMicOff, FiVideo, FiVideoOff, FiMonitor, FiPhoneOff, FiMinimize2, FiMaximize2, FiUsers, FiMoreVertical, FiVolume2, FiVolumeX, FiChevronDown } from 'react-icons/fi';
+import { FiMic, FiMicOff, FiVideo, FiVideoOff, FiMonitor, FiPhoneOff, FiMinimize2, FiUsers, FiMoreVertical, FiVolume2, FiVolumeX } from 'react-icons/fi';
 import { useVoice } from '../../../components/VoiceProvider';
 import { useAuth } from '../../../hooks/useAuth';
-import { useSocket } from '../../../hooks/useSocket';
 import api from '../../../services/api';
 import toast from 'react-hot-toast';
 
@@ -16,7 +14,6 @@ export default function CallPage() {
     const router = useRouter();
     const channelId = params.channelId;
     const { user } = useAuth();
-    const { joinVoiceChannel, leaveVoiceChannel } = useSocket();
 
     const voice = useVoice() || {};
     const {
@@ -57,34 +54,38 @@ export default function CallPage() {
         })();
     }, [channelId]);
 
-    // Auto-join on mount
+    // Auto-join on mount (only use VoiceProvider's joinVoice — it handles socket emit)
     useEffect(() => {
         if (!channelId || joinedRef.current) return;
+        // If already connected to this channel, skip
+        if (connectedChannel === channelId) {
+            joinedRef.current = true;
+            return;
+        }
         joinedRef.current = true;
 
         const doJoin = async () => {
+            console.log('[CallPage] Joining voice channel:', channelId);
             await joinVoice?.(channelId);
-            joinVoiceChannel?.(channelId);
         };
         // Small delay to ensure socket is ready
-        const t = setTimeout(doJoin, 300);
+        const t = setTimeout(doJoin, 500);
         return () => clearTimeout(t);
-    }, [channelId]);
+    }, [channelId, connectedChannel]);
 
     // Call timer
     useEffect(() => {
-        if (connectedChannel) {
+        if (connectedChannel === channelId) {
             setCallDuration(0);
             timerRef.current = setInterval(() => setCallDuration(d => d + 1), 1000);
         }
         return () => clearInterval(timerRef.current);
-    }, [connectedChannel]);
+    }, [connectedChannel, channelId]);
 
-    // Auto-leave on page unload
+    // Auto-leave on page unload (tab close)
     useEffect(() => {
         const handleUnload = () => {
             leaveVoice?.(channelId);
-            leaveVoiceChannel?.(channelId);
         };
         window.addEventListener('beforeunload', handleUnload);
         return () => {
@@ -94,7 +95,6 @@ export default function CallPage() {
 
     const handleLeave = () => {
         leaveVoice?.(channelId);
-        leaveVoiceChannel?.(channelId);
         joinedRef.current = false;
         router.push('/channels');
     };
@@ -118,15 +118,15 @@ export default function CallPage() {
         ...(voiceUsers || []).map(u => ({ ...u, isMe: false })),
     ];
 
-    // Determine who's being spotlighted (screen share or pinned user)
+    // Determine who's being spotlighted
     const screenSharer = allParticipants.find(p => p.isScreenSharing && !p.isMe);
     const localScreenSharer = isScreenSharing ? allParticipants[0] : null;
     const activeSpotlight = spotlightUser || screenSharer?.userId || (localScreenSharer ? user?._id : null);
 
-    // Grid layout based on participant count
+    // Grid layout
     const participantCount = allParticipants.length;
     const getGridClass = () => {
-        if (activeSpotlight) return 'grid-cols-1'; // spotlight mode
+        if (activeSpotlight) return 'grid-cols-1';
         if (participantCount <= 1) return 'grid-cols-1';
         if (participantCount === 2) return 'grid-cols-1 sm:grid-cols-2';
         if (participantCount <= 4) return 'grid-cols-2';
@@ -146,7 +146,6 @@ export default function CallPage() {
     // Render a single participant tile
     const renderParticipant = (p, isSmall = false) => {
         const stream = p.isMe ? localVideoStream : peerVideoStreams?.[p.userId];
-        const screenStream = p.isMe ? localScreenStream : peerScreenStreams?.[p.userId];
         const hasVideo = p.isMe ? isVideoOn : p.isVideoOn;
         const hasMuted = p.isMe ? isMuted : p.isMuted;
 
@@ -160,7 +159,6 @@ export default function CallPage() {
                 onClick={() => !isSmall && setSpotlightUser(spotlightUser === p.userId ? null : p.userId)}
                 className={`relative rounded-2xl overflow-hidden bg-dark-800 border border-white/5 cursor-pointer hover:border-white/15 transition-all group ${isSmall ? 'w-40 h-28 flex-shrink-0' : 'w-full aspect-video'}`}
             >
-                {/* Video */}
                 {hasVideo && stream ? (
                     <video
                         ref={createVideoRef(stream)}
@@ -177,7 +175,7 @@ export default function CallPage() {
                     </div>
                 )}
 
-                {/* Name + Status overlay */}
+                {/* Name + Status */}
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 flex items-end justify-between">
                     <div className="flex items-center gap-1.5">
                         <span className={`font-medium truncate ${isSmall ? 'text-[10px]' : 'text-xs'} text-white`}>
@@ -250,7 +248,12 @@ export default function CallPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <span className="text-xs text-white/40 font-mono tabular-nums">{formatTime(callDuration)}</span>
+                    {connectedChannel === channelId && (
+                        <span className="text-xs text-emerald-400 font-mono tabular-nums">{formatTime(callDuration)}</span>
+                    )}
+                    {!connectedChannel && (
+                        <span className="text-xs text-amber-400 animate-pulse">Connecting...</span>
+                    )}
                     <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/5">
                         <FiUsers className="w-3 h-3 text-white/40" />
                         <span className="text-xs text-white/60">{allParticipants.length}</span>
@@ -264,12 +267,9 @@ export default function CallPage() {
 
             {/* Main Content */}
             <div className="flex-1 flex overflow-hidden relative">
-                {/* Video Grid */}
                 <div className="flex-1 p-3 sm:p-6 overflow-y-auto flex items-center justify-center">
                     {activeSpotlight ? (
-                        // Spotlight mode: one big + small sidebar
                         <div className="w-full h-full flex flex-col sm:flex-row gap-3">
-                            {/* Main spotlight */}
                             <div className="flex-1 min-h-0">
                                 {(() => {
                                     const p = allParticipants.find(p => p.userId === activeSpotlight);
@@ -295,13 +295,11 @@ export default function CallPage() {
                                     );
                                 })()}
                             </div>
-                            {/* Side filmstrip */}
                             <div className="flex sm:flex-col gap-2 overflow-x-auto sm:overflow-y-auto sm:w-44 flex-shrink-0">
                                 {allParticipants.filter(p => p.userId !== activeSpotlight).map(p => renderParticipant(p, true))}
                             </div>
                         </div>
                     ) : (
-                        // Normal grid
                         <div className={`grid ${getGridClass()} gap-3 w-full max-w-5xl mx-auto`}>
                             <AnimatePresence mode="popLayout">
                                 {allParticipants.map(p => renderParticipant(p))}
@@ -340,7 +338,6 @@ export default function CallPage() {
                                                 {p.isScreenSharing && <FiMonitor className="w-2.5 h-2.5 text-blue-400" />}
                                             </div>
                                         </div>
-                                        {/* Admin controls */}
                                         {isOwner && !p.isMe && (
                                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button onClick={() => adminMuteUser?.(p.userId, 'audio')}
@@ -364,36 +361,28 @@ export default function CallPage() {
             {/* Bottom Toolbar */}
             <div className="h-20 sm:h-24 flex items-center justify-center px-4 border-t border-white/5 bg-dark-900/50 backdrop-blur-xl flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-2 sm:gap-3">
-                    {/* Mic */}
                     <button onClick={toggleMute}
                         className={`p-3 sm:p-4 rounded-2xl transition-all duration-200 ${isMuted ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 ring-1 ring-red-500/30' : 'bg-white/5 text-white hover:bg-white/10'}`}>
                         {isMuted ? <FiMicOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <FiMic className="w-5 h-5 sm:w-6 sm:h-6" />}
                     </button>
 
-                    {/* Camera */}
                     <button onClick={() => isVideoOn ? stopVideo?.() : startVideo?.('user')}
                         className={`p-3 sm:p-4 rounded-2xl transition-all duration-200 ${isVideoOn ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 ring-1 ring-emerald-500/30' : 'bg-white/5 text-white hover:bg-white/10'}`}>
                         {isVideoOn ? <FiVideo className="w-5 h-5 sm:w-6 sm:h-6" /> : <FiVideoOff className="w-5 h-5 sm:w-6 sm:h-6" />}
                     </button>
 
-                    {/* Screen Share */}
                     <button onClick={() => isScreenSharing ? stopScreenShare?.() : startScreenShare?.()}
                         className={`hidden sm:block p-3 sm:p-4 rounded-2xl transition-all duration-200 ${isScreenSharing ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 ring-1 ring-blue-500/30' : 'bg-white/5 text-white hover:bg-white/10'}`}>
                         <FiMonitor className="w-5 h-5 sm:w-6 sm:h-6" />
                     </button>
 
-                    {/* Switch Camera (mobile) */}
                     {isVideoOn && (
                         <button onClick={() => switchCamera?.()}
                             className="sm:hidden p-3 rounded-2xl bg-white/5 text-white hover:bg-white/10 transition-all">
-                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/><polygon points="23 19 16 12 23 5"/><path d="M16 5v14"/>
-                                <path d="M7 9l3 3-3 3"/>
-                            </svg>
+                            🔄
                         </button>
                     )}
 
-                    {/* Deafen */}
                     <button onClick={toggleDeafen}
                         className={`p-3 sm:p-4 rounded-2xl transition-all duration-200 ${isDeafened ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 ring-1 ring-amber-500/30' : 'bg-white/5 text-white hover:bg-white/10'}`}>
                         {isDeafened ? <FiVolumeX className="w-5 h-5 sm:w-6 sm:h-6" /> : <FiVolume2 className="w-5 h-5 sm:w-6 sm:h-6" />}
@@ -401,13 +390,11 @@ export default function CallPage() {
 
                     <div className="w-px h-8 bg-white/10 mx-1" />
 
-                    {/* Minimize */}
                     <button onClick={handleMinimize}
                         className="p-3 sm:p-4 rounded-2xl bg-white/5 text-white hover:bg-white/10 transition-all duration-200" title="Minimize — stay connected">
                         <FiMinimize2 className="w-5 h-5 sm:w-6 sm:h-6" />
                     </button>
 
-                    {/* Leave */}
                     <button onClick={handleLeave}
                         className="p-3 sm:p-4 rounded-2xl bg-red-500 hover:bg-red-600 text-white transition-all duration-200 shadow-lg shadow-red-500/20">
                         <FiPhoneOff className="w-5 h-5 sm:w-6 sm:h-6" />

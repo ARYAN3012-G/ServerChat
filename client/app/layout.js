@@ -10,6 +10,7 @@ import BackgroundRenderer from '../components/BackgroundRenderer';
 import VoiceProvider from '../components/VoiceProvider';
 import MusicPlayerProvider from '../components/MusicPlayerProvider';
 import MiniPlayer from '../components/MiniPlayer';
+import VoiceCallMini from '../components/VoiceCallMini';
 import './globals.css';
 
 export default function RootLayout({ children }) {
@@ -68,6 +69,7 @@ export default function RootLayout({ children }) {
                                 <NotificationProvider />
                                 {children}
                                 <MiniPlayer />
+                                <VoiceCallMini />
                             </MusicPlayerProvider>
                         </VoiceProvider>
                     </CallProvider>
