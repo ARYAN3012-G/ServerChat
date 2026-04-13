@@ -717,15 +717,16 @@ export default function ChannelsPage() {
                                         {!collapsedCats[`voice-${cat}`] && chs.map((ch) => (
                                             <motion.div key={ch._id} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
                                                 <div onClick={() => {
-                                                    if (connectedVoice === ch._id) {
-                                                        leaveVoice(ch._id); leaveVoiceChannel(ch._id); setConnectedVoice(null);
+                                                    if (voiceConnectedChannel === ch._id) {
+                                                        // Already connected — open the call page
+                                                        router.push(`/call/${ch._id}`);
                                                     } else {
-                                                        if (connectedVoice) { leaveVoice(connectedVoice); leaveVoiceChannel(connectedVoice); }
-                                                        joinVoice(ch._id); joinVoiceChannel(ch._id); setConnectedVoice(ch._id);
+                                                        // Navigate to call page (VoiceProvider auto-leaves old channel)
+                                                        router.push(`/call/${ch._id}`);
                                                     }
                                                 }}
-                                                    className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-all duration-150 group ${connectedVoice === ch._id ? 'bg-emerald-500/10 text-emerald-400' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
-                                                    <FiVolume2 className={`w-4 h-4 flex-shrink-0 ${connectedVoice === ch._id ? 'text-emerald-400' : 'text-white/20'}`} />
+                                                    className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-all duration-150 group ${voiceConnectedChannel === ch._id ? 'bg-emerald-500/10 text-emerald-400' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
+                                                    <FiVolume2 className={`w-4 h-4 flex-shrink-0 ${voiceConnectedChannel === ch._id ? 'text-emerald-400' : 'text-white/20'}`} />
                                                     <span className="text-sm truncate flex-1">{ch.name}</span>
                                                     <FiTrash2 onClick={(e) => { e.stopPropagation(); handleDeleteChannel(ch._id); }}
                                                         className="w-3.5 h-3.5 text-white/10 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" />
@@ -777,7 +778,7 @@ export default function ChannelsPage() {
                 </div>
 
                 {/* Voice Connected Panel */}
-                {connectedVoice && (
+                {voiceConnectedChannel && (
                     <div className="px-2 py-2 border-t border-white/5 bg-dark-950/30">
                         <div className="flex items-center gap-2 mb-2">
                             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -785,8 +786,7 @@ export default function ChannelsPage() {
                             <span className="text-[9px] text-white/20 ml-auto">{(vcUsers || []).length + 1} users</span>
                         </div>
                         {/* Connected Users List */}
-                        <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
-                            {/* Self */}
+                        <div className="space-y-1 mb-2 max-h-20 overflow-y-auto">
                             <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-white/5">
                                 <div className="w-5 h-5 rounded-full bg-indigo-500/60 flex items-center justify-center text-[8px] font-bold">
                                     {(user?.username?.[0] || 'U').toUpperCase()}
@@ -795,58 +795,27 @@ export default function ChannelsPage() {
                                 <div className="flex gap-0.5">
                                     {isMuted && <span className="text-[8px]">🔇</span>}
                                     {isVideoOn && <span className="text-[8px]">📹</span>}
-                                    {isScreenSharing && <span className="text-[8px]">🖥️</span>}
                                 </div>
                             </div>
-                            {/* Peers */}
                             {(vcUsers || []).map(u => (
                                 <div key={u.userId} className="flex items-center gap-2 px-2 py-1 rounded-lg bg-white/[0.02]">
                                     <div className="w-5 h-5 rounded-full bg-emerald-500/40 flex items-center justify-center text-[8px] font-bold">
                                         {(u.username?.[0] || 'U').toUpperCase()}
                                     </div>
                                     <span className="text-[10px] text-white/50 flex-1 truncate">{u.username}</span>
-                                    <div className="flex gap-0.5">
-                                        {u.isMuted && <span className="text-[8px]">🔇</span>}
-                                        {u.isVideoOn && <span className="text-[8px]">📹</span>}
-                                        {u.isScreenSharing && <span className="text-[8px]">🖥️</span>}
-                                    </div>
                                 </div>
                             ))}
                         </div>
-                        <div className="grid grid-cols-4 gap-1 mb-1">
-                            <button onClick={() => voiceToggleMute()}
-                                className={`p-1.5 rounded-lg text-xs transition-colors flex flex-col items-center gap-0.5 ${isMuted ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
-                                {isMuted ? '🔇' : '🎤'}
-                                <span className="text-[9px]">{isMuted ? 'Muted' : 'Mic'}</span>
+                        <div className="flex gap-1">
+                            <button onClick={() => router.push(`/call/${voiceConnectedChannel}`)}
+                                className="flex-1 p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs transition-colors flex items-center justify-center gap-1">
+                                🖥️ Open Call
                             </button>
-                            <button onClick={() => voiceToggleDeafen()}
-                                className={`p-1.5 rounded-lg text-xs transition-colors flex flex-col items-center gap-0.5 ${isDeafened ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
-                                {isDeafened ? '🔇' : '🎧'}
-                                <span className="text-[9px]">{isDeafened ? 'Deaf' : 'Audio'}</span>
-                            </button>
-                            <button onClick={() => isVideoOn ? stopVideo() : startVideo(facingMode || 'user')}
-                                onContextMenu={(e) => { e.preventDefault(); if (switchCamera) switchCamera(); }}
-                                className={`p-1.5 rounded-lg text-xs transition-colors flex flex-col items-center gap-0.5 ${isVideoOn ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
-                                📹
-                                <span className="text-[9px]">{isVideoOn ? 'On' : 'Video'}</span>
-                            </button>
-                            <button onClick={() => isScreenSharing ? stopScreenShare() : startScreenShare()}
-                                className={`p-1.5 rounded-lg text-xs transition-colors flex flex-col items-center gap-0.5 ${isScreenSharing ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/40 hover:text-white'}`}>
-                                🖥️
-                                <span className="text-[9px]">{isScreenSharing ? 'Stop' : 'Share'}</span>
+                            <button onClick={() => { leaveVoice?.(voiceConnectedChannel); leaveVoiceChannel?.(voiceConnectedChannel); }}
+                                className="flex-1 p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs transition-colors flex items-center justify-center gap-1">
+                                📞 Disconnect
                             </button>
                         </div>
-                        {/* Camera switch button (visible when video is on) */}
-                        {isVideoOn && (
-                            <button onClick={() => switchCamera && switchCamera()}
-                                className="w-full p-1 rounded-lg bg-white/5 text-white/40 hover:text-white text-[9px] mb-1 transition-colors">
-                                🔄 Switch Camera ({facingMode === 'user' ? 'Front' : 'Back'})
-                            </button>
-                        )}
-                        <button onClick={() => { leaveVoice(connectedVoice); leaveVoiceChannel(connectedVoice); setConnectedVoice(null); }}
-                            className="w-full p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs transition-colors flex items-center justify-center gap-1">
-                            📞 Disconnect
-                        </button>
                     </div>
                 )}
 

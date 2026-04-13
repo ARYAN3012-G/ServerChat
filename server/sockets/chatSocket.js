@@ -121,6 +121,46 @@ module.exports = (io, socket) => {
         }
     });
 
+    // Admin force mute: server owner can mute others' audio/video
+    socket.on('voice:admin-mute', async ({ channelId, targetUserId, type }) => {
+        try {
+            const channel = await Channel.findById(channelId).populate('server');
+            if (!channel) return;
+
+            const Server = require('../models/Server');
+            const serverId = channel.server?._id || channel.server;
+            const server = await Server.findById(serverId);
+            if (!server) return;
+
+            // Check if requester is the server owner
+            if (server.owner.toString() !== socket.userId) {
+                socket.emit('error', { message: 'Only the server owner can mute others' });
+                return;
+            }
+
+            // Find target user's socket and send mute command
+            const room = io.sockets.adapter.rooms.get(`voice:${channelId}`);
+            if (room) {
+                for (const socketId of room) {
+                    const memberSocket = io.sockets.sockets.get(socketId);
+                    if (memberSocket && memberSocket.userId === targetUserId) {
+                        memberSocket.emit('voice:admin-muted', { type });
+                        // Broadcast state change to all peers
+                        io.to(`voice:${channelId}`).emit('voice:user-state', {
+                            userId: targetUserId,
+                            ...(type === 'audio' ? { isMuted: true } : { isVideoOn: false }),
+                        });
+                        break;
+                    }
+                }
+            }
+            logger.debug(`${socket.username} admin-muted ${targetUserId} (${type}) in channel ${channelId}`);
+        } catch (error) {
+            logger.error(`Admin mute error: ${error.message}`);
+        }
+    });
+
+
     // Send a message
     socket.on('message:send', async (data) => {
         try {
