@@ -322,32 +322,35 @@ exports.updatePhone = async (req, res, next) => {
     }
 };
 
-// Face login - store face image (Azure Face API)
+// Face login - store face image (Face++ API)
 exports.storeFaceDescriptor = async (req, res, next) => {
     try {
         const { image } = req.body; // base64 image
         if (!image) return res.status(400).json({ message: 'No image provided' });
 
-        // Verify Azure Face API can detect a face in this image
-        const azureKey = process.env.AZURE_FACE_KEY;
-        const azureEndpoint = process.env.AZURE_FACE_ENDPOINT;
-        if (!azureKey || !azureEndpoint) {
-            return res.status(500).json({ message: 'Azure Face API not configured' });
+        const apiKey = process.env.FACEPP_API_KEY;
+        const apiSecret = process.env.FACEPP_API_SECRET;
+        if (!apiKey || !apiSecret) {
+            return res.status(500).json({ message: 'Face++ API not configured' });
         }
 
-        // Convert base64 to buffer
+        // Convert base64 to raw base64 (without data URI prefix)
         const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
-        const imageBuffer = Buffer.from(base64Data, 'base64');
 
-        // Call Azure Face Detect to verify a face exists
-        const detectRes = await fetch(`${azureEndpoint}/face/v1.0/detect?returnFaceId=true&detectionModel=detection_03&recognitionModel=recognition_04`, {
+        // Call Face++ Detect to verify a face exists
+        const FormData = require('form-data');
+        const detectForm = new FormData();
+        detectForm.append('api_key', apiKey);
+        detectForm.append('api_secret', apiSecret);
+        detectForm.append('image_base64', base64Data);
+
+        const detectRes = await fetch('https://api-us.faceplusplus.com/facepp/v3/detect', {
             method: 'POST',
-            headers: { 'Ocp-Apim-Subscription-Key': azureKey, 'Content-Type': 'application/octet-stream' },
-            body: imageBuffer,
+            body: detectForm,
         });
-        const faces = await detectRes.json();
+        const detectResult = await detectRes.json();
 
-        if (!Array.isArray(faces) || faces.length === 0) {
+        if (!detectResult.faces || detectResult.faces.length === 0) {
             return res.status(400).json({ message: 'No face detected in the image. Try better lighting.' });
         }
 
@@ -373,7 +376,6 @@ exports.storeFaceDescriptor = async (req, res, next) => {
 // Face login - delete face image
 exports.deleteFaceDescriptor = async (req, res, next) => {
     try {
-        // Delete from Cloudinary
         try {
             const cloudinary = require('cloudinary').v2;
             await cloudinary.uploader.destroy(`face-id/face_${req.user._id}`);
@@ -386,7 +388,7 @@ exports.deleteFaceDescriptor = async (req, res, next) => {
     }
 };
 
-// Face login - verify via Azure Face API
+// Face login - verify via Face++ Compare API
 exports.faceLogin = async (req, res, next) => {
     try {
         const { image, email } = req.body;
@@ -397,51 +399,35 @@ exports.faceLogin = async (req, res, next) => {
             return res.status(400).json({ message: 'Face login not set up for this account' });
         }
 
-        const azureKey = process.env.AZURE_FACE_KEY;
-        const azureEndpoint = process.env.AZURE_FACE_ENDPOINT;
-        if (!azureKey || !azureEndpoint) {
-            return res.status(500).json({ message: 'Azure Face API not configured' });
+        const apiKey = process.env.FACEPP_API_KEY;
+        const apiSecret = process.env.FACEPP_API_SECRET;
+        if (!apiKey || !apiSecret) {
+            return res.status(500).json({ message: 'Face++ API not configured' });
         }
 
-
-        // Detect face in submitted login photo
         const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
-        const loginBuffer = Buffer.from(base64Data, 'base64');
 
-        const loginDetect = await fetch(`${azureEndpoint}/face/v1.0/detect?returnFaceId=true&detectionModel=detection_03&recognitionModel=recognition_04`, {
+        // Face++ Compare: send login photo (base64) vs stored photo (URL) in one call
+        const FormData = require('form-data');
+        const compareForm = new FormData();
+        compareForm.append('api_key', apiKey);
+        compareForm.append('api_secret', apiSecret);
+        compareForm.append('image_base64_1', base64Data);
+        compareForm.append('image_url_2', user.faceImageUrl);
+
+        const compareRes = await fetch('https://api-us.faceplusplus.com/facepp/v3/compare', {
             method: 'POST',
-            headers: { 'Ocp-Apim-Subscription-Key': azureKey, 'Content-Type': 'application/octet-stream' },
-            body: loginBuffer,
+            body: compareForm,
         });
-        const loginFaces = await loginDetect.json();
+        const compareResult = await compareRes.json();
 
-        if (!Array.isArray(loginFaces) || loginFaces.length === 0) {
-            return res.status(400).json({ message: 'No face detected. Look at the camera.' });
+        if (compareResult.error_message) {
+            logger.error(`Face++ compare error: ${compareResult.error_message}`);
+            return res.status(400).json({ message: compareResult.error_message.includes('No face') ? 'No face detected. Look at the camera.' : 'Face verification failed' });
         }
-        const loginFaceId = loginFaces[0].faceId;
 
-        // Detect face in stored registration photo (from URL)
-        const storedDetect = await fetch(`${azureEndpoint}/face/v1.0/detect?returnFaceId=true&detectionModel=detection_03&recognitionModel=recognition_04`, {
-            method: 'POST',
-            headers: { 'Ocp-Apim-Subscription-Key': azureKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: user.faceImageUrl }),
-        });
-        const storedFaces = await storedDetect.json();
-
-        if (!Array.isArray(storedFaces) || storedFaces.length === 0) {
-            return res.status(500).json({ message: 'Stored face image could not be processed. Please re-register Face ID.' });
-        }
-        const storedFaceId = storedFaces[0].faceId;
-
-        // Verify the two faces match
-        const verifyRes = await fetch(`${azureEndpoint}/face/v1.0/verify`, {
-            method: 'POST',
-            headers: { 'Ocp-Apim-Subscription-Key': azureKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ faceId1: loginFaceId, faceId2: storedFaceId }),
-        });
-        const verifyResult = await verifyRes.json();
-
-        if (!verifyResult.isIdentical || verifyResult.confidence < 0.5) {
+        // Face++ returns confidence 0-100 (threshold ~70+ is a good match)
+        if (!compareResult.confidence || compareResult.confidence < 70) {
             return res.status(401).json({ message: 'Face not recognized' });
         }
 
