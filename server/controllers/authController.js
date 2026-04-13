@@ -322,39 +322,16 @@ exports.updatePhone = async (req, res, next) => {
     }
 };
 
-// Face login - store face image (Face++ API)
+// Face login - store face image (skip detection, user confirms preview on client)
 exports.storeFaceDescriptor = async (req, res, next) => {
     try {
         const { image } = req.body; // base64 image
         if (!image) return res.status(400).json({ message: 'No image provided' });
 
-        const apiKey = process.env.FACEPP_API_KEY;
-        const apiSecret = process.env.FACEPP_API_SECRET;
-        if (!apiKey || !apiSecret) {
-            return res.status(500).json({ message: 'Face++ API not configured' });
-        }
-
         // Convert base64 to raw base64 (without data URI prefix)
         const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
 
-        // Call Face++ Detect to verify a face exists
-        const FormData = require('form-data');
-        const detectForm = new FormData();
-        detectForm.append('api_key', apiKey);
-        detectForm.append('api_secret', apiSecret);
-        detectForm.append('image_base64', base64Data);
-
-        const detectRes = await fetch('https://api-us.faceplusplus.com/facepp/v3/detect', {
-            method: 'POST',
-            body: detectForm,
-        });
-        const detectResult = await detectRes.json();
-
-        if (!detectResult.faces || detectResult.faces.length === 0) {
-            return res.status(400).json({ message: 'No face detected in the image. Try better lighting.' });
-        }
-
-        // Upload to Cloudinary
+        // Upload directly to Cloudinary (user already confirmed the preview)
         const cloudinary = require('cloudinary').v2;
         const uploadResult = await new Promise((resolve, reject) => {
             cloudinary.uploader.upload(`data:image/jpeg;base64,${base64Data}`, {

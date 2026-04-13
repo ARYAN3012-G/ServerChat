@@ -99,6 +99,9 @@ export default function SettingsPage() {
         }
     };
 
+    // Captured preview for confirm step
+    const [capturedPreview, setCapturedPreview] = useState(null);
+
     // Capture photo from video as base64
     const captureFacePhoto = () => {
         const video = faceVideoRef.current;
@@ -114,6 +117,7 @@ export default function SettingsPage() {
 
     const startFaceCamera = async () => {
         setCameraActive(true);
+        setCapturedPreview(null);
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } } });
             faceStreamRef.current = stream;
@@ -124,17 +128,28 @@ export default function SettingsPage() {
     const stopFaceCamera = () => {
         if (faceStreamRef.current) faceStreamRef.current.getTracks().forEach(t => t.stop());
         setCameraActive(false);
+        setCapturedPreview(null);
     };
 
+    // Step 1: Capture a frame and show preview
+    const captureFaceFrame = () => {
+        const image = captureFacePhoto();
+        if (!image) { toast.error('Could not capture photo'); return; }
+        setCapturedPreview(image);
+        // Stop live camera since we have the frame
+        if (faceStreamRef.current) faceStreamRef.current.getTracks().forEach(t => t.stop());
+    };
+
+    // Step 2: User confirmed the preview → upload
     const registerFace = async () => {
+        if (!capturedPreview) return;
         setFaceScanning(true);
         try {
-            const image = captureFacePhoto();
-            if (!image) { toast.error('Could not capture photo'); setFaceScanning(false); return; }
-            await api.post('/auth/face-descriptor', { image });
+            await api.post('/auth/face-descriptor', { image: capturedPreview });
             setFaceRegistered(true);
             toast.success('Face ID registered successfully!');
-            stopFaceCamera();
+            setCameraActive(false);
+            setCapturedPreview(null);
         } catch (e) {
             toast.error(e.response?.data?.message || 'Failed to register face');
         }
@@ -478,24 +493,51 @@ export default function SettingsPage() {
                                     ) : cameraActive ? (
                                         <>
                                             <div className="relative rounded-2xl overflow-hidden bg-dark-800 border border-white/10 aspect-[4/3] mb-4 max-w-sm">
-                                                <video ref={setFaceVideoElement} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
+                                                {capturedPreview ? (
+                                                    /* Show captured frame as static preview */
+                                                    <img src={capturedPreview} alt="Captured face" className="w-full h-full object-cover scale-x-[-1]" />
+                                                ) : (
+                                                    /* Show live camera feed */
+                                                    <video ref={setFaceVideoElement} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
+                                                )}
                                                 <div className="absolute inset-0 flex items-center justify-center">
-                                                    <div className={`w-36 h-36 rounded-full border-2 ${faceScanning ? 'border-violet-400 animate-pulse' : 'border-white/20'} transition-colors`} />
+                                                    <div className={`w-36 h-36 rounded-full border-2 ${faceScanning ? 'border-violet-400 animate-pulse' : capturedPreview ? 'border-emerald-400' : 'border-white/20'} transition-colors`} />
                                                 </div>
                                                 <div className="absolute bottom-2 left-0 right-0 text-center">
-                                                    <span className={`text-xs px-3 py-1 rounded-full ${faceScanning ? 'bg-violet-500/20 text-violet-400' : 'bg-white/5 text-white/40'}`}>
-                                                        {faceScanning ? '🔍 Scanning...' : '📸 Ready — click Register'}
+                                                    <span className={`text-xs px-3 py-1 rounded-full ${
+                                                        faceScanning ? 'bg-violet-500/20 text-violet-400' :
+                                                        capturedPreview ? 'bg-emerald-500/20 text-emerald-400' :
+                                                        'bg-white/5 text-white/40'
+                                                    }`}>
+                                                        {faceScanning ? '⏳ Uploading...' : capturedPreview ? '✅ Preview — Confirm or Retake' : '📸 Click Capture'}
                                                     </span>
                                                 </div>
                                             </div>
                                             <div className="flex gap-3">
-                                                <button onClick={registerFace} disabled={faceScanning}
-                                                    className="flex items-center gap-2 px-6 py-2.5 bg-violet-500 text-white rounded-xl text-sm font-semibold hover:bg-violet-600 transition-colors disabled:opacity-50">
-                                                    {faceScanning ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><FiShield className="w-4 h-4" /> Register Face</>}
-                                                </button>
-                                                <button onClick={stopFaceCamera} className="px-4 py-2.5 rounded-xl text-sm text-white/40 border border-white/10 hover:border-white/20 transition-colors">
-                                                    Cancel
-                                                </button>
+                                                {capturedPreview ? (
+                                                    /* Preview: Confirm or Retake */
+                                                    <>
+                                                        <button onClick={registerFace} disabled={faceScanning}
+                                                            className="flex items-center gap-2 px-6 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50">
+                                                            {faceScanning ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><FiShield className="w-4 h-4" /> Confirm &amp; Register</>}
+                                                        </button>
+                                                        <button onClick={startFaceCamera} disabled={faceScanning}
+                                                            className="px-4 py-2.5 rounded-xl text-sm text-white/40 border border-white/10 hover:border-white/20 transition-colors">
+                                                            Retake
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    /* Live camera: Capture button */
+                                                    <>
+                                                        <button onClick={captureFaceFrame}
+                                                            className="flex items-center gap-2 px-6 py-2.5 bg-violet-500 text-white rounded-xl text-sm font-semibold hover:bg-violet-600 transition-colors">
+                                                            <FiCamera className="w-4 h-4" /> Capture
+                                                        </button>
+                                                        <button onClick={stopFaceCamera} className="px-4 py-2.5 rounded-xl text-sm text-white/40 border border-white/10 hover:border-white/20 transition-colors">
+                                                            Cancel
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </>
 

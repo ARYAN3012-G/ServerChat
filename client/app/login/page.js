@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { FiMail, FiLock, FiEye, FiEyeOff, FiMessageSquare, FiSmartphone, FiCamera, FiShield, FiArrowRight, FiSettings } from 'react-icons/fi';
+import { FiMail, FiLock, FiEye, FiEyeOff, FiMessageSquare, FiSmartphone, FiCamera, FiShield, FiArrowRight, FiSettings, FiRefreshCw, FiCheck } from 'react-icons/fi';
 import { FaGoogle, FaGithub } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
@@ -32,6 +32,7 @@ export default function LoginPage() {
     // Face ID tab
     const [faceEmail, setFaceEmail] = useState('');
     const [scanning, setScanning] = useState(false);
+    const [capturedPreview, setCapturedPreview] = useState(null);
     const videoRef = useRef(null);
     const streamRef = useRef(null);
     const canvasRef = useRef(null);
@@ -135,6 +136,7 @@ export default function LoginPage() {
     }, [loginMethod]);
 
     const startCamera = async () => {
+        setCapturedPreview(null);
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } } });
             streamRef.current = stream;
@@ -146,26 +148,32 @@ export default function LoginPage() {
             streamRef.current.getTracks().forEach(t => t.stop());
             streamRef.current = null;
         }
+        setCapturedPreview(null);
     };
-    // Callback ref to bind stream as soon as video element mounts
     const setVideoElement = (el) => {
         videoRef.current = el;
-        if (el && streamRef.current) {
-            el.srcObject = streamRef.current;
-        }
+        if (el && streamRef.current) el.srcObject = streamRef.current;
     };
 
-    // Capture photo from video as base64
-    const capturePhoto = () => {
+    // Step 1: Capture one frame → show preview
+    const captureFrame = () => {
         const video = videoRef.current;
-        if (!video) return null;
+        if (!video) return;
         const canvas = canvasRef.current || document.createElement('canvas');
         canvasRef.current = canvas;
         canvas.width = video.videoWidth || 320;
         canvas.height = video.videoHeight || 240;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        return canvas.toDataURL('image/jpeg', 0.85);
+        const image = canvas.toDataURL('image/jpeg', 0.85);
+        setCapturedPreview(image);
+        if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    };
+
+    // Retake
+    const retake = () => {
+        setCapturedPreview(null);
+        startCamera();
     };
 
     // ─── Handlers ───
@@ -225,15 +233,14 @@ export default function LoginPage() {
         }
     };
 
+    // Step 2: User confirmed preview → send to server for Face++ Compare
     const handleFaceLogin = async () => {
         if (!faceEmail) { toast.error('Please enter your email first'); return; }
+        if (!capturedPreview) { toast.error('Please capture a photo first'); return; }
 
         setScanning(true);
         try {
-            const image = capturePhoto();
-            if (!image) { toast.error('Could not capture photo'); setScanning(false); return; }
-
-            const { data } = await api.post('/auth/face-login', { email: faceEmail, image });
+            const { data } = await api.post('/auth/face-login', { email: faceEmail, image: capturedPreview });
             localStorage.setItem('token', data.accessToken);
             localStorage.setItem('refreshToken', data.refreshToken);
             dispatch(setCredentials(data));
@@ -377,30 +384,51 @@ export default function LoginPage() {
                                         </div>
                                     </div>
 
-                                    {/* Webcam Feed */}
+                                    {/* Camera / Preview */}
                                     <div className="relative rounded-2xl overflow-hidden bg-dark-800 border border-white/10 aspect-[4/3]">
-                                        <video ref={setVideoElement} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
-
-                                        {/* Scanning overlay */}
+                                        {capturedPreview ? (
+                                            <img src={capturedPreview} alt="Preview" className="w-full h-full object-cover scale-x-[-1]" />
+                                        ) : (
+                                            <video ref={setVideoElement} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
+                                        )}
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className={`w-44 h-44 rounded-full border-2 ${scanning ? 'border-emerald-400 animate-pulse' : 'border-white/20'} transition-colors`} />
+                                            <div className={`w-44 h-44 rounded-full border-2 transition-colors ${
+                                                scanning ? 'border-emerald-400 animate-pulse' :
+                                                capturedPreview ? 'border-emerald-400' : 'border-white/20'
+                                            }`} />
                                         </div>
-
-                                        {/* Status */}
                                         <div className="absolute bottom-3 left-0 right-0 text-center">
-                                            <span className={`text-xs px-3 py-1 rounded-full ${scanning ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/40'}`}>
-                                                {scanning ? '🔍 Scanning...' : '📸 Ready — click Scan & Login'}
+                                            <span className={`text-xs px-3 py-1.5 rounded-full backdrop-blur-sm ${
+                                                scanning ? 'bg-emerald-500/30 text-emerald-300' :
+                                                capturedPreview ? 'bg-emerald-500/30 text-emerald-300' :
+                                                'bg-black/30 text-white/60'
+                                            }`}>
+                                                {scanning ? '⏳ Verifying...' : capturedPreview ? '✅ Confirm to login' : '📸 Click Capture'}
                                             </span>
                                         </div>
                                     </div>
 
-                                    <p className="text-[10px] text-white/20 text-center">Register your face in Settings &gt; Security first to enable Face ID login</p>
+                                    <p className="text-[10px] text-white/20 text-center">Register your face during sign-up or in Settings &gt; Security</p>
 
-                                    <motion.button whileTap={{ scale: 0.98 }} onClick={handleFaceLogin}
-                                        disabled={loading || scanning}
-                                        className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
-                                        {scanning ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><FiCamera className="w-4 h-4" /> Scan &amp; Login</>}
-                                    </motion.button>
+                                    {capturedPreview ? (
+                                        <div className="flex gap-3">
+                                            <motion.button whileTap={{ scale: 0.98 }} onClick={handleFaceLogin}
+                                                disabled={scanning}
+                                                className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
+                                                {scanning ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><FiCheck className="w-4 h-4" /> Confirm &amp; Login</>}
+                                            </motion.button>
+                                            <motion.button whileTap={{ scale: 0.98 }} onClick={retake} disabled={scanning}
+                                                className="px-5 py-3 rounded-lg text-sm text-white/50 border border-white/10 hover:border-white/20 hover:text-white transition-all flex items-center gap-2">
+                                                <FiRefreshCw className="w-4 h-4" /> Retake
+                                            </motion.button>
+                                        </div>
+                                    ) : (
+                                        <motion.button whileTap={{ scale: 0.98 }} onClick={captureFrame}
+                                            disabled={loading}
+                                            className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
+                                            <FiCamera className="w-4 h-4" /> Capture Photo
+                                        </motion.button>
+                                    )}
                                 </div>
                             )}
 

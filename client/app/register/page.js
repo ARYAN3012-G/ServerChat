@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { FiUser, FiMail, FiLock, FiEye, FiEyeOff, FiMessageSquare, FiCamera, FiCheck, FiArrowRight, FiShield } from 'react-icons/fi';
+import { FiUser, FiMail, FiLock, FiEye, FiEyeOff, FiMessageSquare, FiCamera, FiCheck, FiArrowRight, FiShield, FiRefreshCw } from 'react-icons/fi';
 import { FaGoogle, FaGithub } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
@@ -18,10 +18,11 @@ export default function RegisterPage() {
     const [loading, setLoading] = useState(false);
     const [agreeToTerms, setAgreeToTerms] = useState(false);
 
-    // Face ID step (shown after successful registration)
+    // Face ID step
     const [step, setStep] = useState('register'); // 'register' | 'faceSetup'
     const [cameraActive, setCameraActive] = useState(false);
-    const [faceScanning, setFaceScanning] = useState(false);
+    const [capturedPreview, setCapturedPreview] = useState(null);
+    const [uploading, setUploading] = useState(false);
     const [faceRegistered, setFaceRegistered] = useState(false);
     const videoRef = useRef(null);
     const streamRef = useRef(null);
@@ -31,9 +32,10 @@ export default function RegisterPage() {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // ── Camera helpers ──
+    // ── Camera ──
     const startCamera = async () => {
         setCameraActive(true);
+        setCapturedPreview(null);
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 360 } }
@@ -52,6 +54,7 @@ export default function RegisterPage() {
             streamRef.current = null;
         }
         setCameraActive(false);
+        setCapturedPreview(null);
     };
 
     const setVideoElement = (el) => {
@@ -59,54 +62,56 @@ export default function RegisterPage() {
         if (el && streamRef.current) el.srcObject = streamRef.current;
     };
 
-    const capturePhoto = () => {
+    // Step 1: Capture one frame → show preview
+    const captureFrame = () => {
         const video = videoRef.current;
-        if (!video) return null;
+        if (!video) return;
         const canvas = canvasRef.current || document.createElement('canvas');
         canvasRef.current = canvas;
         canvas.width = video.videoWidth || 480;
         canvas.height = video.videoHeight || 360;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        return canvas.toDataURL('image/jpeg', 0.85);
+        const image = canvas.toDataURL('image/jpeg', 0.85);
+        setCapturedPreview(image);
+        // Stop live camera
+        if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
     };
 
-    const registerFace = async () => {
-        setFaceScanning(true);
+    // Step 2: User confirmed → upload to server
+    const confirmAndUpload = async () => {
+        if (!capturedPreview) return;
+        setUploading(true);
         try {
-            const image = capturePhoto();
-            if (!image) { toast.error('Could not capture photo'); setFaceScanning(false); return; }
-            await api.post('/auth/face-descriptor', { image });
+            await api.post('/auth/face-descriptor', { image: capturedPreview });
             setFaceRegistered(true);
-            stopCamera();
+            setCameraActive(false);
+            setCapturedPreview(null);
             toast.success('Face ID registered! 🎉');
         } catch (e) {
-            toast.error(e.response?.data?.message || 'Face registration failed. Try better lighting.');
+            toast.error(e.response?.data?.message || 'Failed to register face');
         }
-        setFaceScanning(false);
+        setUploading(false);
+    };
+
+    // Retake: restart camera
+    const retake = () => {
+        setCapturedPreview(null);
+        startCamera();
     };
 
     // ── Registration submit ──
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        if (formData.password !== formData.confirmPassword) {
-            return toast.error('Passwords do not match');
-        }
-        if (formData.password.length < 6) {
-            return toast.error('Password must be at least 6 characters');
-        }
-        if (!agreeToTerms) {
-            return toast.error('Please agree to the terms');
-        }
+        if (formData.password !== formData.confirmPassword) return toast.error('Passwords do not match');
+        if (formData.password.length < 6) return toast.error('Password must be at least 6 characters');
+        if (!agreeToTerms) return toast.error('Please agree to the terms');
 
         setLoading(true);
         try {
             await register(formData.username, formData.email, formData.password);
             toast.success('Account created! 🎉');
-            // Move to Face ID setup step instead of redirecting
             setStep('faceSetup');
-            // Auto-start camera after a short delay
             setTimeout(() => startCamera(), 500);
         } catch (error) {
             toast.error(error.response?.data?.message || 'Registration failed');
@@ -115,7 +120,7 @@ export default function RegisterPage() {
         }
     };
 
-    const handleSkipFace = () => {
+    const handleFinish = () => {
         stopCamera();
         const pendingInvite = localStorage.getItem('pendingInvite');
         if (pendingInvite) {
@@ -131,7 +136,6 @@ export default function RegisterPage() {
         window.location.href = `${apiUrl}/api/auth/${provider}`;
     };
 
-    // Password strength
     const getPasswordStrength = () => {
         const { password } = formData;
         if (!password) return { strength: 0, label: '', color: '' };
@@ -141,7 +145,6 @@ export default function RegisterPage() {
         if (/[A-Z]/.test(password)) score++;
         if (/[0-9]/.test(password)) score++;
         if (/[^A-Za-z0-9]/.test(password)) score++;
-
         const levels = [
             { strength: 20, label: 'Very Weak', color: 'bg-red-500' },
             { strength: 40, label: 'Weak', color: 'bg-orange-500' },
@@ -151,7 +154,6 @@ export default function RegisterPage() {
         ];
         return levels[Math.min(score, 4)];
     };
-
     const pwStrength = getPasswordStrength();
 
     return (
@@ -161,16 +163,9 @@ export default function RegisterPage() {
             <div className="fixed bottom-0 left-1/3 w-[600px] h-[600px] bg-white/[0.03] rounded-full blur-3xl" />
 
             <AnimatePresence mode="wait">
-                {/* ═══════════ STEP 1: REGISTRATION FORM ═══════════ */}
+                {/* ═══ STEP 1: REGISTRATION FORM ═══ */}
                 {step === 'register' && (
-                    <motion.div
-                        key="register"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, x: -50 }}
-                        transition={{ duration: 0.4 }}
-                        className="relative z-10 w-full max-w-md"
-                    >
+                    <motion.div key="register" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -50 }} transition={{ duration: 0.4 }} className="relative z-10 w-full max-w-md">
                         <div className="text-center mb-8">
                             <Link href="/" className="inline-flex items-center gap-3">
                                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-white/90 to-silver-300/90 flex items-center justify-center">
@@ -193,7 +188,6 @@ export default function RegisterPage() {
                                         <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-dark-400 w-4 h-4" />
                                     </div>
                                 </div>
-
                                 <div>
                                     <label className="text-xs font-semibold text-dark-300 uppercase tracking-wider mb-1.5 block">Email</label>
                                     <div className="relative">
@@ -202,15 +196,13 @@ export default function RegisterPage() {
                                         <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-dark-400 w-4 h-4" />
                                     </div>
                                 </div>
-
                                 <div>
                                     <label className="text-xs font-semibold text-dark-300 uppercase tracking-wider mb-1.5 block">Password</label>
                                     <div className="relative">
                                         <input type={showPassword ? 'text' : 'password'} name="password" value={formData.password} onChange={handleChange}
                                             className="input-field pl-11 pr-11" placeholder="••••••••" required />
                                         <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-dark-400 w-4 h-4" />
-                                        <button type="button" onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-dark-400 hover:text-white transition-colors">
+                                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-dark-400 hover:text-white transition-colors">
                                             {showPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
                                         </button>
                                     </div>
@@ -225,7 +217,6 @@ export default function RegisterPage() {
                                         </div>
                                     )}
                                 </div>
-
                                 <div>
                                     <label className="text-xs font-semibold text-dark-300 uppercase tracking-wider mb-1.5 block">Confirm Password</label>
                                     <div className="relative">
@@ -276,16 +267,9 @@ export default function RegisterPage() {
                     </motion.div>
                 )}
 
-                {/* ═══════════ STEP 2: FACE ID SETUP ═══════════ */}
+                {/* ═══ STEP 2: FACE ID SETUP ═══ */}
                 {step === 'faceSetup' && (
-                    <motion.div
-                        key="faceSetup"
-                        initial={{ opacity: 0, x: 50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.4 }}
-                        className="relative z-10 w-full max-w-md"
-                    >
+                    <motion.div key="faceSetup" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className="relative z-10 w-full max-w-md">
                         <div className="text-center mb-8">
                             <Link href="/" className="inline-flex items-center gap-3">
                                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-white/90 to-silver-300/90 flex items-center justify-center">
@@ -296,11 +280,9 @@ export default function RegisterPage() {
                         </div>
 
                         <div className="glass p-5 sm:p-8">
-                            {/* Progress indicator */}
+                            {/* Progress */}
                             <div className="flex items-center justify-center gap-2 mb-6">
-                                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center">
-                                    <FiCheck className="w-4 h-4 text-white" />
-                                </div>
+                                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center"><FiCheck className="w-4 h-4 text-white" /></div>
                                 <div className="w-12 h-0.5 bg-emerald-500" />
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${faceRegistered ? 'bg-emerald-500' : 'bg-violet-500 animate-pulse'}`}>
                                     {faceRegistered ? <FiCheck className="w-4 h-4 text-white" /> : <FiCamera className="w-4 h-4 text-white" />}
@@ -310,47 +292,46 @@ export default function RegisterPage() {
                             {!faceRegistered ? (
                                 <>
                                     <h2 className="text-2xl font-bold text-white text-center mb-2">Set Up Face ID</h2>
-                                    <p className="text-dark-400 text-center mb-6 text-sm">
-                                        Register your face for quick, secure login next time. You can also do this later in Settings.
-                                    </p>
+                                    <p className="text-dark-400 text-center mb-6 text-sm">Take a photo for secure Face ID login. You can skip and do this later in Settings.</p>
 
-                                    {/* Camera feed */}
                                     {cameraActive ? (
                                         <div className="space-y-4">
+                                            {/* Camera / Preview */}
                                             <div className="relative rounded-2xl overflow-hidden bg-dark-800 border border-white/10 aspect-[4/3]">
-                                                <video ref={setVideoElement} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
-
-                                                {/* Face guide circle */}
+                                                {capturedPreview ? (
+                                                    <img src={capturedPreview} alt="Preview" className="w-full h-full object-cover scale-x-[-1]" />
+                                                ) : (
+                                                    <video ref={setVideoElement} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
+                                                )}
+                                                {/* Face guide */}
                                                 <div className="absolute inset-0 flex items-center justify-center">
-                                                    <div className={`w-44 h-44 rounded-full border-2 transition-all duration-300 ${
-                                                        faceScanning ? 'border-violet-400 animate-pulse shadow-[0_0_30px_rgba(139,92,246,0.3)]' : 'border-white/20'
-                                                    }`} />
+                                                    <div className={`w-44 h-44 rounded-full border-2 transition-all duration-300 ${capturedPreview ? 'border-emerald-400' : 'border-white/20'}`} />
                                                 </div>
-
-                                                {/* Corner guides */}
-                                                <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-violet-400/50 rounded-tl-lg" />
-                                                <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-violet-400/50 rounded-tr-lg" />
-                                                <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-violet-400/50 rounded-bl-lg" />
-                                                <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-violet-400/50 rounded-br-lg" />
-
-                                                {/* Status badge */}
                                                 <div className="absolute bottom-3 left-0 right-0 text-center">
-                                                    <span className={`text-xs px-3 py-1.5 rounded-full backdrop-blur-sm ${
-                                                        faceScanning ? 'bg-violet-500/30 text-violet-300' : 'bg-black/30 text-white/60'
-                                                    }`}>
-                                                        {faceScanning ? '🔍 Analyzing face...' : '📸 Position your face in the circle'}
+                                                    <span className={`text-xs px-3 py-1.5 rounded-full backdrop-blur-sm ${capturedPreview ? 'bg-emerald-500/30 text-emerald-300' : 'bg-black/30 text-white/60'}`}>
+                                                        {uploading ? '⏳ Uploading...' : capturedPreview ? '✅ Does this look good?' : '📸 Position your face and click Capture'}
                                                     </span>
                                                 </div>
                                             </div>
 
-                                            <motion.button whileTap={{ scale: 0.98 }} onClick={registerFace} disabled={faceScanning}
-                                                className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20">
-                                                {faceScanning ? (
-                                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                ) : (
-                                                    <><FiShield className="w-4 h-4" /> Capture &amp; Register Face</>
-                                                )}
-                                            </motion.button>
+                                            {/* Buttons */}
+                                            {capturedPreview ? (
+                                                <div className="flex gap-3">
+                                                    <motion.button whileTap={{ scale: 0.98 }} onClick={confirmAndUpload} disabled={uploading}
+                                                        className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
+                                                        {uploading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><FiCheck className="w-4 h-4" /> Use This Photo</>}
+                                                    </motion.button>
+                                                    <motion.button whileTap={{ scale: 0.98 }} onClick={retake} disabled={uploading}
+                                                        className="px-5 py-3 rounded-lg text-sm text-white/50 border border-white/10 hover:border-white/20 hover:text-white transition-all flex items-center gap-2">
+                                                        <FiRefreshCw className="w-4 h-4" /> Retake
+                                                    </motion.button>
+                                                </div>
+                                            ) : (
+                                                <motion.button whileTap={{ scale: 0.98 }} onClick={captureFrame}
+                                                    className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20">
+                                                    <FiCamera className="w-4 h-4" /> Capture Photo
+                                                </motion.button>
+                                            )}
                                         </div>
                                     ) : (
                                         <motion.button whileTap={{ scale: 0.98 }} onClick={startCamera}
@@ -359,23 +340,19 @@ export default function RegisterPage() {
                                         </motion.button>
                                     )}
 
-                                    <button onClick={handleSkipFace}
-                                        className="w-full mt-3 py-3 text-sm text-white/40 hover:text-white/60 transition-colors font-medium">
+                                    <button onClick={handleFinish} className="w-full mt-3 py-3 text-sm text-white/40 hover:text-white/60 transition-colors font-medium">
                                         Skip for now &rarr;
                                     </button>
                                 </>
                             ) : (
-                                /* Success state */
                                 <div className="text-center py-4">
                                     <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200 }}
                                         className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
                                         <FiCheck className="w-10 h-10 text-emerald-400" />
                                     </motion.div>
                                     <h2 className="text-2xl font-bold text-white mb-2">You&apos;re All Set! 🎉</h2>
-                                    <p className="text-dark-400 text-sm mb-6">
-                                        Your account is created and Face ID is registered. You can now log in with your email or just your face!
-                                    </p>
-                                    <motion.button whileTap={{ scale: 0.98 }} onClick={handleSkipFace}
+                                    <p className="text-dark-400 text-sm mb-6">Account created and Face ID registered. Log in with email or face next time!</p>
+                                    <motion.button whileTap={{ scale: 0.98 }} onClick={handleFinish}
                                         className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20">
                                         <FiArrowRight className="w-4 h-4" /> Enter ServerChat
                                     </motion.button>
