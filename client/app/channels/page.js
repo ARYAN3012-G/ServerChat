@@ -228,7 +228,7 @@ export default function ChannelsPage() {
         if (!newServerName.trim()) return;
         setServerError('');
         try {
-            const { data } = await api.post('/servers', { name: newServerName, description: newServerDesc });
+            const { data } = await api.post('/servers', { name: newServerName, description: newServerDesc, isPublic: true });
             dispatch(addServer(data));
             dispatch(setCurrentServer(data));
             setShowCreateServer(false); setNewServerName(''); setNewServerDesc('');
@@ -240,6 +240,12 @@ export default function ChannelsPage() {
         setServerError('');
         try {
             const { data } = await api.post(`/servers/join/${joinCode.trim()}`);
+            if (data.pending) {
+                toast.success('Join request sent! Waiting for admin approval.');
+                setShowJoinServer(false); 
+                setJoinCode('');
+                return;
+            }
             dispatch(addServer(data));
             dispatch(setCurrentServer(data));
             setShowJoinServer(false); setJoinCode('');
