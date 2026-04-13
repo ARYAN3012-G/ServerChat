@@ -12,8 +12,8 @@ export default function MiniPlayer() {
     const { currentTrack, isPlaying, progress, duration, togglePlay, playNext, playPrev, seekTo, stopMusic, activeSessionId } = useMusicPlayer();
     const [expanded, setExpanded] = useState(false);
 
-    // Only hide if currently looking at the fullscreen music room itself
-    if (pathname.startsWith('/music/session')) return null;
+    // Hide when on any music page (they have their own full player bar)
+    if (pathname.startsWith('/music')) return null;
     if (!currentTrack) return null;
 
     const pct = duration ? (progress / duration) * 100 : 0;
