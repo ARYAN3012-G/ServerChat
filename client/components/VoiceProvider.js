@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { getSocket } from '../services/socket';
 import toast from 'react-hot-toast';
 
@@ -41,6 +42,8 @@ export default function VoiceProvider({ children }) {
     const screenTrackRef = useRef(null);
     const myUserIdRef = useRef(null);
 
+    const user = useSelector(state => state.auth.user);
+
     const [isMuted, setIsMuted] = useState(false);
     const [isDeafened, setIsDeafened] = useState(false);
     const [connectedChannel, setConnectedChannel] = useState(null);
@@ -54,11 +57,10 @@ export default function VoiceProvider({ children }) {
     const [localScreenStream, setLocalScreenStream] = useState(null);
     const [facingMode, setFacingMode] = useState('user');
 
-    // Track my userId from socket
+    // Track my userId
     useEffect(() => {
-        const socket = getSocket();
-        if (socket) myUserIdRef.current = socket.userId;
-    }, []);
+        if (user?._id) myUserIdRef.current = user._id;
+    }, [user?._id]);
 
     // Get local audio stream
     const getLocalAudio = useCallback(async () => {
@@ -201,19 +203,21 @@ export default function VoiceProvider({ children }) {
             setVoiceUsers([]);
         }
 
+        // Try to get audio, but join even if mic is denied (listen-only)
         const stream = await getLocalAudio();
         if (!stream) {
-            console.error('[VoiceProvider] No audio stream available');
-            return;
+            console.warn('[VoiceProvider] No audio stream — joining in listen-only mode');
+            toast('Microphone unavailable — joined as listener', { icon: '🔇', duration: 4000 });
         }
 
         channelIdRef.current = channelId;
-        myUserIdRef.current = socket.userId;
+        myUserIdRef.current = user?._id;
         setConnectedChannel(channelId);
-        setIsMuted(false);
+        setIsMuted(!stream); // auto-mute if no mic
         setIsDeafened(false);
+        console.log(`[VoiceProvider] Emitting voice:join for channel ${channelId}, userId=${user?._id}`);
         socket.emit('voice:join', { channelId });
-    }, [getLocalAudio]);
+    }, [getLocalAudio, user?._id]);
 
     // Leave voice channel
     const leaveVoice = useCallback((channelId) => {
@@ -489,7 +493,7 @@ export default function VoiceProvider({ children }) {
             await new Promise(r => setTimeout(r, 300));
 
             for (const u of users) {
-                if (u.userId === socket.userId) continue; // Don't create peer to self
+                if (u.userId === user?._id) continue; // Don't create peer to self
 
                 const pc = createPeer(u.userId, u.socketId, true);
                 if (!pc) continue;
@@ -510,7 +514,7 @@ export default function VoiceProvider({ children }) {
 
         const handleUserJoined = ({ userId, username, socketId }) => {
             if (!channelIdRef.current) return;
-            if (userId === socket.userId) return; // Skip self
+            if (userId === user?._id) return; // Skip self
             console.log(`[VoiceProvider] User joined: ${username} (${userId})`);
             setVoiceUsers(prev => {
                 if (prev.find(u => u.userId === userId)) return prev;
@@ -519,14 +523,14 @@ export default function VoiceProvider({ children }) {
         };
 
         const handleVoiceOffer = async ({ offer, from, fromSocketId, channelId }) => {
-            if (from === socket.userId) return; // Ignore own offers
+            if (from === user?._id) return; // Ignore own offers
             console.log(`[VoiceProvider] Received offer from ${from}`);
 
             // Handle renegotiation glare: lower userId is "polite" (drops its offer)
             const existingPeer = peersRef.current[from];
             if (existingPeer && existingPeer.pc.signalingState === 'have-local-offer') {
                 // Both sides sent offers simultaneously
-                const iAmPolite = socket.userId < from;
+                const iAmPolite = user?._id < from;
                 if (iAmPolite) {
                     console.log(`[VoiceProvider] Glare detected, I'm polite — rolling back my offer`);
                     try {
@@ -564,7 +568,7 @@ export default function VoiceProvider({ children }) {
         };
 
         const handleVoiceAnswer = async ({ answer, from }) => {
-            if (from === socket.userId) return;
+            if (from === user?._id) return;
             console.log(`[VoiceProvider] Received answer from ${from}`);
             const peer = peersRef.current[from];
             if (peer && peer.pc.signalingState === 'have-local-offer') {
