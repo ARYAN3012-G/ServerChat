@@ -6,6 +6,7 @@ const User = require('../models/User');
 const ActivityLog = require('../models/ActivityLog');
 const { logger } = require('../config/logger');
 const { sendPasswordResetEmail } = require('../services/emailService');
+const fetch = require('node-fetch');
 
 // Generate tokens
 const generateTokens = (user) => {
@@ -277,7 +278,7 @@ exports.resetPassword = async (req, res, next) => {
 
 // Get current user
 exports.getMe = async (req, res) => {
-    const user = await User.findById(req.user._id).select('+faceDescriptor +password');
+    const user = await User.findById(req.user._id).select('+faceImageUrl +password');
     res.json({ user });
 };
 
@@ -321,49 +322,137 @@ exports.updatePhone = async (req, res, next) => {
     }
 };
 
-// Face login - store descriptor
+// Face login - store face image (Azure Face API)
 exports.storeFaceDescriptor = async (req, res, next) => {
     try {
-        const { descriptor } = req.body;
-        await User.findByIdAndUpdate(req.user._id, { faceDescriptor: descriptor });
-        res.json({ message: 'Face data stored successfully' });
+        const { image } = req.body; // base64 image
+        if (!image) return res.status(400).json({ message: 'No image provided' });
+
+        // Verify Azure Face API can detect a face in this image
+        const azureKey = process.env.AZURE_FACE_KEY;
+        const azureEndpoint = process.env.AZURE_FACE_ENDPOINT;
+        if (!azureKey || !azureEndpoint) {
+            return res.status(500).json({ message: 'Azure Face API not configured' });
+        }
+
+        // Convert base64 to buffer
+        const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+
+        // Call Azure Face Detect to verify a face exists
+        const detectRes = await fetch(`${azureEndpoint}/face/v1.0/detect?returnFaceId=true&detectionModel=detection_03&recognitionModel=recognition_04`, {
+            method: 'POST',
+            headers: { 'Ocp-Apim-Subscription-Key': azureKey, 'Content-Type': 'application/octet-stream' },
+            body: imageBuffer,
+        });
+        const faces = await detectRes.json();
+
+        if (!Array.isArray(faces) || faces.length === 0) {
+            return res.status(400).json({ message: 'No face detected in the image. Try better lighting.' });
+        }
+
+        // Upload to Cloudinary
+        const cloudinary = require('cloudinary').v2;
+        const uploadResult = await new Promise((resolve, reject) => {
+            cloudinary.uploader.upload(`data:image/jpeg;base64,${base64Data}`, {
+                folder: 'face-id',
+                public_id: `face_${req.user._id}`,
+                overwrite: true,
+                transformation: [{ width: 480, height: 480, crop: 'limit', quality: 'auto' }],
+            }, (err, result) => err ? reject(err) : resolve(result));
+        });
+
+        await User.findByIdAndUpdate(req.user._id, { faceImageUrl: uploadResult.secure_url });
+        res.json({ message: 'Face ID registered successfully' });
     } catch (error) {
+        logger.error(`storeFaceDescriptor error: ${error.message}`);
         next(error);
     }
 };
 
-// Face login - delete descriptor
+// Face login - delete face image
 exports.deleteFaceDescriptor = async (req, res, next) => {
     try {
-        await User.findByIdAndUpdate(req.user._id, { $unset: { faceDescriptor: 1 } });
-        res.json({ message: 'Face data deleted successfully' });
+        // Delete from Cloudinary
+        try {
+            const cloudinary = require('cloudinary').v2;
+            await cloudinary.uploader.destroy(`face-id/face_${req.user._id}`);
+        } catch (e) { /* ignore cleanup errors */ }
+
+        await User.findByIdAndUpdate(req.user._id, { $unset: { faceImageUrl: 1 } });
+        res.json({ message: 'Face ID deleted successfully' });
     } catch (error) {
         next(error);
     }
 };
 
-// Face login - verify
+// Face login - verify via Azure Face API
 exports.faceLogin = async (req, res, next) => {
     try {
-        const { descriptor, email } = req.body;
-        const user = await User.findOne({ email }).select('+faceDescriptor');
+        const { image, email } = req.body;
+        if (!image || !email) return res.status(400).json({ message: 'Email and face image required' });
 
-        if (!user || !user.faceDescriptor || user.faceDescriptor.length === 0) {
+        const user = await User.findOne({ email }).select('+faceImageUrl');
+        if (!user || !user.faceImageUrl) {
             return res.status(400).json({ message: 'Face login not set up for this account' });
         }
 
-        // Calculate euclidean distance
-        const distance = Math.sqrt(
-            user.faceDescriptor.reduce((sum, val, i) => sum + Math.pow(val - descriptor[i], 2), 0)
-        );
+        const azureKey = process.env.AZURE_FACE_KEY;
+        const azureEndpoint = process.env.AZURE_FACE_ENDPOINT;
+        if (!azureKey || !azureEndpoint) {
+            return res.status(500).json({ message: 'Azure Face API not configured' });
+        }
 
-        if (distance > 0.6) {
+
+        // Detect face in submitted login photo
+        const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+        const loginBuffer = Buffer.from(base64Data, 'base64');
+
+        const loginDetect = await fetch(`${azureEndpoint}/face/v1.0/detect?returnFaceId=true&detectionModel=detection_03&recognitionModel=recognition_04`, {
+            method: 'POST',
+            headers: { 'Ocp-Apim-Subscription-Key': azureKey, 'Content-Type': 'application/octet-stream' },
+            body: loginBuffer,
+        });
+        const loginFaces = await loginDetect.json();
+
+        if (!Array.isArray(loginFaces) || loginFaces.length === 0) {
+            return res.status(400).json({ message: 'No face detected. Look at the camera.' });
+        }
+        const loginFaceId = loginFaces[0].faceId;
+
+        // Detect face in stored registration photo (from URL)
+        const storedDetect = await fetch(`${azureEndpoint}/face/v1.0/detect?returnFaceId=true&detectionModel=detection_03&recognitionModel=recognition_04`, {
+            method: 'POST',
+            headers: { 'Ocp-Apim-Subscription-Key': azureKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: user.faceImageUrl }),
+        });
+        const storedFaces = await storedDetect.json();
+
+        if (!Array.isArray(storedFaces) || storedFaces.length === 0) {
+            return res.status(500).json({ message: 'Stored face image could not be processed. Please re-register Face ID.' });
+        }
+        const storedFaceId = storedFaces[0].faceId;
+
+        // Verify the two faces match
+        const verifyRes = await fetch(`${azureEndpoint}/face/v1.0/verify`, {
+            method: 'POST',
+            headers: { 'Ocp-Apim-Subscription-Key': azureKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ faceId1: loginFaceId, faceId2: storedFaceId }),
+        });
+        const verifyResult = await verifyRes.json();
+
+        if (!verifyResult.isIdentical || verifyResult.confidence < 0.5) {
             return res.status(401).json({ message: 'Face not recognized' });
+        }
+
+        if (user.isBanned) {
+            return res.status(403).json({ message: 'Account suspended', reason: user.banReason });
         }
 
         const tokens = generateTokens(user);
         res.json({ user: user.toJSON(), ...tokens });
     } catch (error) {
+        logger.error(`faceLogin error: ${error.message}`);
         next(error);
     }
 };

@@ -87,9 +87,9 @@ const userSchema = new mongoose.Schema({
         select: false,
     },
 
-    // Face recognition
-    faceDescriptor: {
-        type: [Number],
+    // Face recognition (Azure Face API)
+    faceImageUrl: {
+        type: String,
         select: false,
     },
 
@@ -178,8 +178,8 @@ userSchema.methods.toJSON = function () {
     obj.hasPassword = !!obj.password;
     delete obj.password;
     delete obj.twoFactorSecret;
-    obj.hasFaceId = !!(obj.faceDescriptor && obj.faceDescriptor.length > 0);
-    delete obj.faceDescriptor;
+    obj.hasFaceId = !!obj.faceImageUrl;
+    delete obj.faceImageUrl;
     delete obj.resetPasswordToken;
     delete obj.resetPasswordExpires;
     return obj;

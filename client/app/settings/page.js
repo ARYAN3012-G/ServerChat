@@ -39,10 +39,9 @@ export default function SettingsPage() {
     const [phoneEditing, setPhoneEditing] = useState(false);
     const [faceRegistered, setFaceRegistered] = useState(false);
     const [faceScanning, setFaceScanning] = useState(false);
-    const [faceApiLoaded, setFaceApiLoaded] = useState(false);
     const faceVideoRef = useRef(null);
     const faceStreamRef = useRef(null);
-    const faceApiRef = useRef(null);
+    const faceCanvasRef = useRef(null);
     const [cameraActive, setCameraActive] = useState(false);
     const [faceDeleting, setFaceDeleting] = useState(false);
     const [blockedUsers, setBlockedUsers] = useState([]);
@@ -92,30 +91,54 @@ export default function SettingsPage() {
         setTimeout(() => router.push('/login'), 100);
     };
 
-    // Load face-api — let it use its default backend (WebGL if available, WASM fallback)
-    // Do NOT override the backend: face-api bundles its own TF.js with WebGL kernels already
-    // registered. Calling tf.setBackend('cpu') after that causes "kernel already registered"
-    // conflicts and makes detection hang indefinitely.
-    const loadFaceApi = async () => {
-        if (faceApiRef.current) { setFaceApiLoaded(true); return; }
-        try {
-            const faceapi = await import('@vladmandic/face-api');
-            // Ensure TF backend is fully ready before loading models
-            await faceapi.tf.ready();
-            await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-            await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-            await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
-            faceApiRef.current = faceapi;
-            setFaceApiLoaded(true);
-        } catch (e) { console.error('Face API load error:', e); toast.error('Failed to load face models'); }
-    };
-
     // Callback ref for video element — binds stream immediately when element mounts
     const setFaceVideoElement = (el) => {
         faceVideoRef.current = el;
         if (el && faceStreamRef.current) {
             el.srcObject = faceStreamRef.current;
         }
+    };
+
+    // Capture photo from video as base64
+    const captureFacePhoto = () => {
+        const video = faceVideoRef.current;
+        if (!video) return null;
+        const canvas = faceCanvasRef.current || document.createElement('canvas');
+        faceCanvasRef.current = canvas;
+        canvas.width = video.videoWidth || 320;
+        canvas.height = video.videoHeight || 240;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL('image/jpeg', 0.85);
+    };
+
+    const startFaceCamera = async () => {
+        setCameraActive(true);
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } } });
+            faceStreamRef.current = stream;
+            if (faceVideoRef.current) faceVideoRef.current.srcObject = stream;
+        } catch (e) { toast.error('Camera access denied'); setCameraActive(false); }
+    };
+
+    const stopFaceCamera = () => {
+        if (faceStreamRef.current) faceStreamRef.current.getTracks().forEach(t => t.stop());
+        setCameraActive(false);
+    };
+
+    const registerFace = async () => {
+        setFaceScanning(true);
+        try {
+            const image = captureFacePhoto();
+            if (!image) { toast.error('Could not capture photo'); setFaceScanning(false); return; }
+            await api.post('/auth/face-descriptor', { image });
+            setFaceRegistered(true);
+            toast.success('Face ID registered successfully!');
+            stopFaceCamera();
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to register face');
+        }
+        setFaceScanning(false);
     };
 
     const fetchSubscription = async () => { try { const { data } = await api.get('/payments/subscription'); setSubscription(data.subscription || { tier: 'free', status: 'inactive' }); } catch (e) { setSubscription({ tier: 'free', status: 'inactive' }); } };
@@ -419,7 +442,7 @@ export default function SettingsPage() {
                                 {/* Face ID Registration */}
                                 <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8">
                                     <h4 className="text-lg font-semibold mb-2 flex items-center gap-2"><FiCamera className="w-5 h-5 text-violet-400" /> Face ID</h4>
-                                    <p className="text-sm text-white/30 mb-5">Register your face to enable Face ID login. Look directly at the camera.</p>
+                                    <p className="text-sm text-white/30 mb-5">Register your face to enable Face ID login. Uses Azure Face API for secure recognition.</p>
 
                                     {/* ── REGISTERED STATE ── */}
                                     {faceRegistered && !cameraActive ? (
@@ -432,15 +455,7 @@ export default function SettingsPage() {
                                                 </div>
                                             </div>
                                             <div className="flex gap-3">
-                                                <button onClick={async () => {
-                                                    setCameraActive(true);
-                                                    loadFaceApi();
-                                                    try {
-                                                        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } } });
-                                                        faceStreamRef.current = stream;
-                                                        if (faceVideoRef.current) faceVideoRef.current.srcObject = stream;
-                                                    } catch (e) { toast.error('Camera access denied'); setCameraActive(false); }
-                                                }}
+                                                <button onClick={startFaceCamera}
                                                     className="flex items-center gap-2 px-4 py-2.5 bg-violet-500/20 text-violet-300 rounded-xl text-sm font-semibold hover:bg-violet-500/30 transition-colors border border-violet-500/20">
                                                     <FiCamera className="w-4 h-4" /> Update Face
                                                 </button>
@@ -468,47 +483,17 @@ export default function SettingsPage() {
                                                     <div className={`w-36 h-36 rounded-full border-2 ${faceScanning ? 'border-violet-400 animate-pulse' : 'border-white/20'} transition-colors`} />
                                                 </div>
                                                 <div className="absolute bottom-2 left-0 right-0 text-center">
-                                                    <span className={`text-xs px-3 py-1 rounded-full ${faceScanning ? 'bg-violet-500/20 text-violet-400' : faceApiLoaded ? 'bg-white/5 text-white/40' : 'bg-amber-500/20 text-amber-400'}`}>
-                                                        {faceScanning ? '🔍 Scanning...' : faceApiLoaded ? '📸 Ready — click Register' : '⏳ Loading models...'}
+                                                    <span className={`text-xs px-3 py-1 rounded-full ${faceScanning ? 'bg-violet-500/20 text-violet-400' : 'bg-white/5 text-white/40'}`}>
+                                                        {faceScanning ? '🔍 Scanning...' : '📸 Ready — click Register'}
                                                     </span>
                                                 </div>
                                             </div>
                                             <div className="flex gap-3">
-                                                <button onClick={async () => {
-                                                    if (!faceApiLoaded || !faceVideoRef.current || !faceApiRef.current) { toast.error('Models still loading...'); return; }
-                                                    setFaceScanning(true);
-                                                    try {
-                                                        const faceapi = faceApiRef.current;
-                                                        const detection = await Promise.race([
-                                                            faceapi
-                                                                .detectSingleFace(faceVideoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 }))
-                                                                .withFaceLandmarks()
-                                                                .withFaceDescriptor(),
-                                                            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000))
-                                                        ]);
-                                                        if (!detection) { toast.error('No face detected. Look directly at the camera.'); setFaceScanning(false); return; }
-                                                        const descriptor = Array.from(detection.descriptor);
-                                                        await api.post('/auth/face-descriptor', { descriptor });
-                                                        setFaceRegistered(true);
-                                                        toast.success('Face ID registered successfully!');
-                                                        if (faceStreamRef.current) faceStreamRef.current.getTracks().forEach(t => t.stop());
-                                                        setCameraActive(false);
-                                                    } catch (e) {
-                                                        if (e.message === 'timeout') {
-                                                            toast.error('Detection timed out. Try better lighting or move closer to the camera.');
-                                                        } else {
-                                                            toast.error('Failed to register face');
-                                                        }
-                                                    }
-                                                    setFaceScanning(false);
-                                                }} disabled={faceScanning || !faceApiLoaded}
+                                                <button onClick={registerFace} disabled={faceScanning}
                                                     className="flex items-center gap-2 px-6 py-2.5 bg-violet-500 text-white rounded-xl text-sm font-semibold hover:bg-violet-600 transition-colors disabled:opacity-50">
                                                     {faceScanning ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><FiShield className="w-4 h-4" /> Register Face</>}
                                                 </button>
-                                                <button onClick={() => {
-                                                    if (faceStreamRef.current) faceStreamRef.current.getTracks().forEach(t => t.stop());
-                                                    setCameraActive(false);
-                                                }} className="px-4 py-2.5 rounded-xl text-sm text-white/40 border border-white/10 hover:border-white/20 transition-colors">
+                                                <button onClick={stopFaceCamera} className="px-4 py-2.5 rounded-xl text-sm text-white/40 border border-white/10 hover:border-white/20 transition-colors">
                                                     Cancel
                                                 </button>
                                             </div>
@@ -516,15 +501,7 @@ export default function SettingsPage() {
 
                                         /* ── NOT REGISTERED ── */
                                     ) : (
-                                        <button onClick={async () => {
-                                            setCameraActive(true);
-                                            loadFaceApi();
-                                            try {
-                                                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } } });
-                                                faceStreamRef.current = stream;
-                                                if (faceVideoRef.current) faceVideoRef.current.srcObject = stream;
-                                            } catch (e) { toast.error('Camera access denied'); setCameraActive(false); }
-                                        }}
+                                        <button onClick={startFaceCamera}
                                             className="flex items-center gap-2 px-6 py-2.5 bg-violet-500 text-white rounded-xl text-sm font-semibold hover:bg-violet-600 transition-colors shadow-lg shadow-violet-500/20">
                                             <FiCamera className="w-4 h-4" /> Open Camera to Register
                                         </button>

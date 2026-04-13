@@ -32,10 +32,9 @@ export default function LoginPage() {
     // Face ID tab
     const [faceEmail, setFaceEmail] = useState('');
     const [scanning, setScanning] = useState(false);
-    const [faceApiLoaded, setFaceApiLoaded] = useState(false);
     const videoRef = useRef(null);
     const streamRef = useRef(null);
-    const faceApiRef = useRef(null);
+    const canvasRef = useRef(null);
 
     // 2FA
     const [require2FA, setRequire2FA] = useState(false);
@@ -125,28 +124,7 @@ export default function LoginPage() {
         router.push(path || getRedirectPath());
     }, [dispatch, router, getRedirectPath]);
 
-    // ─── Face API loading via npm dynamic import ───
-    useEffect(() => {
-        if (loginMethod !== 'face') return;
-        const loadFaceApi = async () => {
-            if (faceApiRef.current) { setFaceApiLoaded(true); return; }
-            try {
-                // Do NOT import TF.js separately or call setBackend('cpu'):
-                // face-api bundles its own TF.js with WebGL already registered.
-                // Overriding the backend causes "kernel already registered" conflicts and hangs.
-                const faceapi = await import('@vladmandic/face-api');
-                await faceapi.tf.ready(); // wait for whatever backend TF chose (WebGL / WASM)
-                await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-                await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-                await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
-                faceApiRef.current = faceapi;
-                setFaceApiLoaded(true);
-            } catch (e) { console.error('Face API load error:', e); }
-        };
-        loadFaceApi();
-    }, [loginMethod]);
-
-    // ─── Webcam ───
+    // ─── Webcam for Face ID ───
     useEffect(() => {
         if (loginMethod === 'face') {
             startCamera();
@@ -175,6 +153,19 @@ export default function LoginPage() {
         if (el && streamRef.current) {
             el.srcObject = streamRef.current;
         }
+    };
+
+    // Capture photo from video as base64
+    const capturePhoto = () => {
+        const video = videoRef.current;
+        if (!video) return null;
+        const canvas = canvasRef.current || document.createElement('canvas');
+        canvasRef.current = canvas;
+        canvas.width = video.videoWidth || 320;
+        canvas.height = video.videoHeight || 240;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL('image/jpeg', 0.85);
     };
 
     // ─── Handlers ───
@@ -236,27 +227,13 @@ export default function LoginPage() {
 
     const handleFaceLogin = async () => {
         if (!faceEmail) { toast.error('Please enter your email first'); return; }
-        if (!faceApiLoaded || !videoRef.current || !faceApiRef.current) { toast.error('Face scanner not ready'); return; }
 
         setScanning(true);
         try {
-            const faceapi = faceApiRef.current;
-            const detection = await Promise.race([
-                faceapi
-                    .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 }))
-                    .withFaceLandmarks()
-                    .withFaceDescriptor(),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000))
-            ]);
+            const image = capturePhoto();
+            if (!image) { toast.error('Could not capture photo'); setScanning(false); return; }
 
-            if (!detection) {
-                toast.error('No face detected. Please look at the camera.');
-                setScanning(false);
-                return;
-            }
-
-            const descriptor = Array.from(detection.descriptor);
-            const { data } = await api.post('/auth/face-login', { email: faceEmail, descriptor });
+            const { data } = await api.post('/auth/face-login', { email: faceEmail, image });
             localStorage.setItem('token', data.accessToken);
             localStorage.setItem('refreshToken', data.refreshToken);
             dispatch(setCredentials(data));
@@ -264,11 +241,7 @@ export default function LoginPage() {
             toast.success('Welcome back!');
             router.push(getRedirectPath());
         } catch (error) {
-            if (error.message === 'timeout') {
-                toast.error('Detection timed out. Try better lighting or move closer.');
-            } else {
-                toast.error(error.response?.data?.message || 'Face recognition failed');
-            }
+            toast.error(error.response?.data?.message || 'Face recognition failed');
         } finally {
             setScanning(false);
         }
@@ -415,8 +388,8 @@ export default function LoginPage() {
 
                                         {/* Status */}
                                         <div className="absolute bottom-3 left-0 right-0 text-center">
-                                            <span className={`text-xs px-3 py-1 rounded-full ${scanning ? 'bg-emerald-500/20 text-emerald-400' : faceApiLoaded ? 'bg-white/5 text-white/40' : 'bg-amber-500/20 text-amber-400'}`}>
-                                                {scanning ? '🔍 Scanning...' : faceApiLoaded ? '📸 Ready — click Scan & Login' : '⏳ Loading face models...'}
+                                            <span className={`text-xs px-3 py-1 rounded-full ${scanning ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/40'}`}>
+                                                {scanning ? '🔍 Scanning...' : '📸 Ready — click Scan & Login'}
                                             </span>
                                         </div>
                                     </div>
@@ -424,7 +397,7 @@ export default function LoginPage() {
                                     <p className="text-[10px] text-white/20 text-center">Register your face in Settings &gt; Security first to enable Face ID login</p>
 
                                     <motion.button whileTap={{ scale: 0.98 }} onClick={handleFaceLogin}
-                                        disabled={loading || scanning || !faceApiLoaded}
+                                        disabled={loading || scanning}
                                         className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
                                         {scanning ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><FiCamera className="w-4 h-4" /> Scan &amp; Login</>}
                                     </motion.button>
