@@ -450,8 +450,12 @@ exports.faceLogin = async (req, res, next) => {
             body: detectForm2,
         });
         const detect2 = await detectRes2.json();
-        logger.info(`Face++ detect stored photo: faces=${detect2.faces?.length || 0}`);
+        logger.info(`Face++ detect stored photo: ${JSON.stringify({ faces: detect2.faces?.length || 0, error: detect2.error_message || 'none' })}`);
 
+        if (detect2.error_message) {
+            logger.error(`Face++ stored image detect error: ${detect2.error_message}`);
+            return res.status(400).json({ message: `Stored face detection error: ${detect2.error_message}. Try re-registering your face.` });
+        }
         if (!detect2.faces || detect2.faces.length === 0) {
             return res.status(400).json({ message: 'Stored face image is invalid. Please re-register your face in Settings > Security.' });
         }
