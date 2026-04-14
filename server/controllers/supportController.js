@@ -84,25 +84,41 @@ exports.sendMessage = async (req, res, next) => {
             return res.json({ ticket, aiResponse: null });
         }
 
-        // Build conversation history for Gemini
-        const history = ticket.messages
+        // Build conversation history for Gemini (must alternate user/model)
+        const rawHistory = ticket.messages
             .filter(m => m.role !== 'admin')
-            .slice(-20) // last 20 messages for context
+            .slice(-20)
             .map(m => ({
                 role: m.role === 'user' ? 'user' : 'model',
                 parts: [{ text: m.content }],
             }));
 
-        // Remove the last user message from history (we'll send it separately)
-        const lastMsg = history.pop();
+        // Remove the last user message (we'll send it via sendMessage)
+        const lastMsg = rawHistory.pop();
+
+        // Ensure alternating roles — merge or skip consecutive same-role messages
+        const cleanHistory = [];
+        for (const msg of rawHistory) {
+            if (cleanHistory.length > 0 && cleanHistory[cleanHistory.length - 1].role === msg.role) {
+                // Merge with previous same-role message
+                cleanHistory[cleanHistory.length - 1].parts[0].text += '\n' + msg.parts[0].text;
+            } else {
+                cleanHistory.push({ ...msg });
+            }
+        }
+
+        // Gemini history must start with 'user' role — if it starts with model, prepend a dummy user
+        if (cleanHistory.length > 0 && cleanHistory[0].role === 'model') {
+            cleanHistory.shift(); // remove leading model message (it's just the welcome)
+        }
 
         try {
             const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             const chat = model.startChat({
                 history: [
-                    { role: 'user', parts: [{ text: 'System context: ' + SYSTEM_PROMPT }] },
-                    { role: 'model', parts: [{ text: 'Understood! I\'m ready to help ServerChat users.' }] },
-                    ...history,
+                    { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
+                    { role: 'model', parts: [{ text: 'Understood! I\'m ServerChat\'s AI support assistant, ready to help users.' }] },
+                    ...cleanHistory,
                 ],
             });
 
@@ -115,6 +131,7 @@ exports.sendMessage = async (req, res, next) => {
             return res.json({ ticket, aiResponse: aiText });
         } catch (aiErr) {
             logger.error(`Gemini AI error: ${aiErr.message}`);
+            logger.error(`Gemini AI stack: ${aiErr.stack}`);
             const fallback = '😅 I\'m having trouble processing that right now. You can click **"Talk to Human"** to connect with an admin who can help!';
             ticket.messages.push({ role: 'ai', content: fallback });
             await ticket.save();

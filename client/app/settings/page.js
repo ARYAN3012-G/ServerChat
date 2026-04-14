@@ -238,14 +238,22 @@ export default function SettingsPage() {
         }
     }, [supportTicket?.messages?.length]);
 
-    // Support: send message
+    // Support: send message (optimistic UI)
     const handleSupportSend = async () => {
         if (!supportMsg.trim() || supportSending) return;
+        const msgText = supportMsg.trim();
+        setSupportMsg('');
+        
+        // Optimistic: show user message immediately
+        setSupportTicket(prev => prev ? {
+            ...prev,
+            messages: [...(prev.messages || []), { role: 'user', content: msgText, timestamp: new Date().toISOString() }]
+        } : prev);
         setSupportSending(true);
+        
         try {
-            const { data } = await api.post('/support/message', { message: supportMsg, ticketId: supportTicket?._id });
+            const { data } = await api.post('/support/message', { message: msgText, ticketId: supportTicket?._id });
             setSupportTicket(data.ticket);
-            setSupportMsg('');
         } catch (e) {
             toast.error('Failed to send message');
         }
@@ -843,8 +851,8 @@ export default function SettingsPage() {
                                     </div>
                                 </div>
 
-                                {/* Ticket status banner */}
-                                {supportTicket && supportTicket.status !== 'ai-chat' && (
+                                {/* Ticket status banner (only for non-admin users) */}
+                                {supportTicket && supportTicket.status !== 'ai-chat' && user?.role !== 'admin' && (
                                     <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl mb-3 text-sm font-medium ${
                                         supportTicket.status === 'escalated' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
                                         supportTicket.status === 'in-progress' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
@@ -889,7 +897,11 @@ export default function SettingsPage() {
                                         <div className="flex items-center justify-center py-12">
                                             <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
                                         </div>
-                                    ) : supportTicket?.messages?.map((msg, i) => (
+                                    ) : supportTicket?.messages?.filter(msg => {
+                                        // For admin users, only show user + ai messages (no admin messages in their own support chat)
+                                        if (user?.role === 'admin') return msg.role === 'user' || msg.role === 'ai';
+                                        return true;
+                                    }).map((msg, i) => (
                                         <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                             <div className={`max-w-[85%] sm:max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
                                                 msg.role === 'user'
@@ -898,7 +910,7 @@ export default function SettingsPage() {
                                                     ? 'bg-amber-500/10 border border-amber-500/20 text-amber-100 rounded-bl-md'
                                                     : 'bg-white/[0.06] text-white/80 rounded-bl-md border border-white/5'
                                             }`}>
-                                                {msg.role === 'admin' && (
+                                                {msg.role === 'admin' && user?.role !== 'admin' && (
                                                     <p className="text-[10px] font-bold text-amber-400/70 uppercase tracking-wider mb-1 flex items-center gap-1">
                                                         <FiShield className="w-3 h-3" /> Admin
                                                     </p>
@@ -942,7 +954,7 @@ export default function SettingsPage() {
                                                 <FiSend className="w-4 h-4" />
                                             </button>
                                         </div>
-                                        {supportTicket.status === 'ai-chat' && (
+                                        {supportTicket.status === 'ai-chat' && user?.role !== 'admin' && (
                                             <button onClick={handleEscalate}
                                                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-amber-400 hover:bg-amber-500/10 border border-amber-500/20 transition-all w-full justify-center">
                                                 <FiAlertTriangle className="w-3.5 h-3.5" /> Not satisfied? Talk to a Human Admin
