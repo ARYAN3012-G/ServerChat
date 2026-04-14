@@ -225,10 +225,8 @@ module.exports = (io, socket) => {
                 // Only broadcast to main channel if NOT a thread reply
                 console.log(`[Socket] Emitting Channel message to channel:${channelId}`);
                 io.to(`channel:${channelId}`).emit('message:new', populated);
-            } else {
-                // For thread replies, emit only to the sender so they see the reply
-                socket.emit('message:new', populated);
             }
+            // Thread replies: don't emit message:new — client refreshes thread panel via openThread()
 
             // --- Bot Integration Logic ---
             if (!threadId && channel.name === 'integration' && type !== 'system' && socket.userId) {
