@@ -8,6 +8,19 @@ const { logger } = require('../config/logger');
 const { sendPasswordResetEmail } = require('../services/emailService');
 const fetch = require('node-fetch');
 const createDefaultServer = require('../utils/createDefaultServer');
+const Server = require('../models/Server');
+
+// Ensure user has a default server — creates one if they don't own any
+const ensureDefaultServer = async (userId, username) => {
+    try {
+        const ownedCount = await Server.countDocuments({ owner: userId });
+        if (ownedCount === 0) {
+            await createDefaultServer(userId, username);
+        }
+    } catch (e) {
+        // Silently fail — don't break login
+    }
+};
 
 // Generate tokens
 const generateTokens = (user) => {
@@ -113,6 +126,9 @@ exports.login = async (req, res, next) => {
             ipAddress: req.ip,
             userAgent: req.get('user-agent'),
         });
+
+        // Ensure existing users get a default server on login
+        ensureDefaultServer(user._id, user.username).catch(() => {});
 
         res.json({ user: user.toJSON(), ...tokens });
     } catch (error) {
@@ -417,6 +433,10 @@ exports.faceLogin = async (req, res, next) => {
         }
 
         const tokens = generateTokens(user);
+
+        // Ensure existing users get a default server on face login
+        ensureDefaultServer(user._id, user.username).catch(() => {});
+
         res.json({ user: user.toJSON(), ...tokens });
     } catch (error) {
         logger.error(`faceLogin error: ${error.message}`);
@@ -445,6 +465,9 @@ exports.oauthCallback = async (req, res, next) => {
             userAgent: req.get('user-agent'),
             details: { method: 'oauth' }
         });
+
+        // Ensure existing OAuth users get a default server
+        ensureDefaultServer(req.user._id, req.user.username).catch(() => {});
 
         // Redirect back to frontend with tokens in URL (frontend will parse and store them)
         let redirectUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/login?token=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`;
