@@ -7,7 +7,7 @@ exports.getMessages = async (req, res, next) => {
         const { channelId } = req.params;
         const { page = 1, limit = 50, before } = req.query;
 
-        const query = { channel: channelId, isDeleted: false, threadId: { $exists: false } };
+        const query = { channel: channelId, isDeleted: false, threadId: null };
         if (before) query.createdAt = { $lt: new Date(before) };
 
         const messages = await Message.find(query)
