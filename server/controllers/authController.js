@@ -416,13 +416,53 @@ exports.faceLogin = async (req, res, next) => {
             return res.status(400).json({ message: 'Could not load stored face. Try re-registering your face in Settings.' });
         }
 
-        // Face++ Compare: send both as base64 (more reliable than URL)
         const FormData = require('form-data');
+
+        // Step 1: Detect face in login photo
+        const detectForm1 = new FormData();
+        detectForm1.append('api_key', apiKey);
+        detectForm1.append('api_secret', apiSecret);
+        detectForm1.append('image_base64', base64Data);
+
+        const detectRes1 = await fetch('https://api-us.faceplusplus.com/facepp/v3/detect', {
+            method: 'POST',
+            body: detectForm1,
+        });
+        const detect1 = await detectRes1.json();
+        logger.info(`Face++ detect login photo: ${JSON.stringify(detect1)}`);
+
+        if (detect1.error_message) {
+            return res.status(400).json({ message: `Face detection error: ${detect1.error_message}` });
+        }
+        if (!detect1.faces || detect1.faces.length === 0) {
+            return res.status(400).json({ message: 'No face detected in your camera. Make sure your face is clearly visible and well-lit.' });
+        }
+        const loginFaceToken = detect1.faces[0].face_token;
+
+        // Step 2: Detect face in stored photo
+        const detectForm2 = new FormData();
+        detectForm2.append('api_key', apiKey);
+        detectForm2.append('api_secret', apiSecret);
+        detectForm2.append('image_base64', storedBase64);
+
+        const detectRes2 = await fetch('https://api-us.faceplusplus.com/facepp/v3/detect', {
+            method: 'POST',
+            body: detectForm2,
+        });
+        const detect2 = await detectRes2.json();
+        logger.info(`Face++ detect stored photo: faces=${detect2.faces?.length || 0}`);
+
+        if (!detect2.faces || detect2.faces.length === 0) {
+            return res.status(400).json({ message: 'Stored face image is invalid. Please re-register your face in Settings > Security.' });
+        }
+        const storedFaceToken = detect2.faces[0].face_token;
+
+        // Step 3: Compare face_tokens (most reliable method)
         const compareForm = new FormData();
         compareForm.append('api_key', apiKey);
         compareForm.append('api_secret', apiSecret);
-        compareForm.append('image_base64_1', base64Data);
-        compareForm.append('image_base64_2', storedBase64);
+        compareForm.append('face_token_1', loginFaceToken);
+        compareForm.append('face_token_2', storedFaceToken);
 
         const compareRes = await fetch('https://api-us.faceplusplus.com/facepp/v3/compare', {
             method: 'POST',
@@ -430,22 +470,19 @@ exports.faceLogin = async (req, res, next) => {
         });
         const compareResult = await compareRes.json();
 
-        logger.info(`Face++ full response: ${JSON.stringify(compareResult)} for user ${user.email}`);
+        logger.info(`Face++ compare result: confidence=${compareResult.confidence}, thresholds=${JSON.stringify(compareResult.thresholds)} for ${user.email}`);
 
         if (compareResult.error_message) {
             logger.error(`Face++ compare error: ${compareResult.error_message}`);
-            const msg = compareResult.error_message.includes('NO_FACE_DETECTED')
-                ? 'No face detected. Make sure your face is clearly visible and well-lit.'
-                : compareResult.error_message.includes('INVALID_IMAGE')
-                ? 'Image quality too low. Try again with better lighting.'
-                : `Face verification failed: ${compareResult.error_message}`;
-            return res.status(400).json({ message: msg });
+            return res.status(400).json({ message: `Face comparison failed: ${compareResult.error_message}` });
         }
 
-        // Face++ returns confidence 0-100 (threshold ~60+ is a good match)
-        logger.info(`Face++ compare confidence: ${compareResult.confidence} for user ${user.email}`);
-        if (!compareResult.confidence || compareResult.confidence < 60) {
-            return res.status(401).json({ message: `Face not recognized (confidence: ${Math.round(compareResult.confidence || 0)}%). Try better lighting or re-register your face.` });
+        // Use Face++ recommended threshold (1e-5 false positive rate) or fallback to 60
+        const threshold = compareResult.thresholds?.['1e-5'] || 60;
+        if (!compareResult.confidence || compareResult.confidence < threshold) {
+            return res.status(401).json({ 
+                message: `Face not recognized (confidence: ${Math.round(compareResult.confidence || 0)}%, needed: ${Math.round(threshold)}%). Try better lighting or re-register your face.` 
+            });
         }
 
         if (user.isBanned) {
