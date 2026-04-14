@@ -423,9 +423,10 @@ exports.faceLogin = async (req, res, next) => {
             return res.status(400).json({ message: compareResult.error_message.includes('No face') ? 'No face detected. Look at the camera.' : 'Face verification failed' });
         }
 
-        // Face++ returns confidence 0-100 (threshold ~70+ is a good match)
-        if (!compareResult.confidence || compareResult.confidence < 70) {
-            return res.status(401).json({ message: 'Face not recognized' });
+        // Face++ returns confidence 0-100 (threshold ~60+ is a good match)
+        logger.info(`Face++ compare confidence: ${compareResult.confidence} for user ${user.email}`);
+        if (!compareResult.confidence || compareResult.confidence < 60) {
+            return res.status(401).json({ message: `Face not recognized (confidence: ${Math.round(compareResult.confidence || 0)}%)` });
         }
 
         if (user.isBanned) {
