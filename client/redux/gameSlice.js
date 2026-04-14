@@ -2,8 +2,8 @@ import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
     currentGame: null,
-    session: null,           // active session user is playing/spectating
-    serverSessions: [],      // all sessions for current server
+    session: null,
+    serverSessions: [],
     leaderboard: [],
     spectatingSessionId: null,
 };
@@ -28,6 +28,7 @@ const gameSlice = createSlice({
         },
         updateServerSession: (state, action) => {
             const updated = action.payload;
+            if (!updated?._id) return;
             const idx = state.serverSessions.findIndex(s => s._id === updated._id);
             if (idx >= 0) {
                 state.serverSessions[idx] = updated;
@@ -37,6 +38,16 @@ const gameSlice = createSlice({
             // Also update active session if it matches
             if (state.session?._id === updated._id) {
                 state.session = updated;
+            }
+        },
+        removeServerSession: (state, action) => {
+            const sessionId = typeof action.payload === 'string' ? action.payload : action.payload?._id;
+            if (!sessionId) return;
+            state.serverSessions = state.serverSessions.filter(s => s._id !== sessionId);
+            // Clear active session if it was cancelled
+            if (state.session?._id === sessionId) {
+                state.session = null;
+                state.spectatingSessionId = null;
             }
         },
         setLeaderboard: (state, action) => {
@@ -53,5 +64,5 @@ const gameSlice = createSlice({
     },
 });
 
-export const { setCurrentGame, setGameSession, updateGameState, setServerSessions, updateServerSession, setLeaderboard, setSpectatingSessionId, clearGame } = gameSlice.actions;
+export const { setCurrentGame, setGameSession, updateGameState, setServerSessions, updateServerSession, removeServerSession, setLeaderboard, setSpectatingSessionId, clearGame } = gameSlice.actions;
 export default gameSlice.reducer;
