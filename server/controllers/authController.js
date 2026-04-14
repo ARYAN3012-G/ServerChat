@@ -481,8 +481,8 @@ exports.faceLogin = async (req, res, next) => {
         const compareForm = new FormData();
         compareForm.append('api_key', apiKey);
         compareForm.append('api_secret', apiSecret);
-        compareForm.append('face_token_1', loginFaceToken);
-        compareForm.append('face_token_2', storedFaceToken);
+        compareForm.append('face_token1', loginFaceToken);
+        compareForm.append('face_token2', storedFaceToken);
 
         const compareRes = await fetch('https://api-us.faceplusplus.com/facepp/v3/compare', {
             method: 'POST',
