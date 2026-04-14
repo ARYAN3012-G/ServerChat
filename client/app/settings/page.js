@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUser, FiLock, FiMoon, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap, FiMenu, FiSmartphone, FiShield, FiSlash, FiLogOut, FiX } from 'react-icons/fi';
+import { FiArrowLeft, FiUser, FiLock, FiMoon, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap, FiMenu, FiSmartphone, FiShield, FiSlash, FiLogOut, FiX, FiHeadphones, FiSend, FiAlertTriangle, FiMessageCircle, FiPlus, FiClock } from 'react-icons/fi';
 import dynamic from 'next/dynamic';
 const AvatarPicker = dynamic(() => import('../../components/AvatarPicker'), { ssr: false });
 import { useAuth } from '../../hooks/useAuth';
@@ -47,6 +47,15 @@ export default function SettingsPage() {
     const [blockedUsers, setBlockedUsers] = useState([]);
     const [blockedLoading, setBlockedLoading] = useState(false);
 
+    // Support chat state
+    const [supportTicket, setSupportTicket] = useState(null);
+    const [supportMsg, setSupportMsg] = useState('');
+    const [supportSending, setSupportSending] = useState(false);
+    const [supportLoading, setSupportLoading] = useState(false);
+    const [supportHistory, setSupportHistory] = useState([]);
+    const [showHistory, setShowHistory] = useState(false);
+    const supportChatEndRef = useRef(null);
+
     // Username availability check
     const [usernameAvailability, setUsernameAvailability] = useState(null);
     const [checkingUsername, setCheckingUsername] = useState(false);
@@ -56,7 +65,7 @@ export default function SettingsPage() {
     const searchParams = useSearchParams();
     useEffect(() => {
         const urlTab = searchParams.get('tab');
-        if (urlTab && ['account', 'security', 'subscription', 'appearance', 'notifications', 'blocked'].includes(urlTab)) {
+        if (urlTab && ['account', 'security', 'subscription', 'appearance', 'notifications', 'blocked', 'support'].includes(urlTab)) {
             setTab(urlTab);
         }
     }, [searchParams]);
@@ -209,7 +218,70 @@ export default function SettingsPage() {
         { id: 'appearance', label: 'Appearance', icon: FiMoon },
         { id: 'notifications', label: 'Notifications', icon: FiBell },
         { id: 'blocked', label: 'Blocked Users', icon: FiSlash },
+        { id: 'support', label: 'Support', icon: FiHeadphones },
     ];
+
+    // Support: load active ticket
+    useEffect(() => {
+        if (tab === 'support' && isAuthenticated && !supportTicket && !supportLoading) {
+            setSupportLoading(true);
+            api.get('/support/active').then(({ data }) => {
+                setSupportTicket(data.ticket);
+            }).catch(() => {}).finally(() => setSupportLoading(false));
+        }
+    }, [tab, isAuthenticated]);
+
+    // Support: scroll to bottom on new message
+    useEffect(() => {
+        if (supportChatEndRef.current) {
+            supportChatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [supportTicket?.messages?.length]);
+
+    // Support: send message
+    const handleSupportSend = async () => {
+        if (!supportMsg.trim() || supportSending) return;
+        setSupportSending(true);
+        try {
+            const { data } = await api.post('/support/message', { message: supportMsg, ticketId: supportTicket?._id });
+            setSupportTicket(data.ticket);
+            setSupportMsg('');
+        } catch (e) {
+            toast.error('Failed to send message');
+        }
+        setSupportSending(false);
+    };
+
+    const handleEscalate = async () => {
+        if (!supportTicket) return;
+        try {
+            const { data } = await api.post('/support/escalate', { ticketId: supportTicket._id });
+            setSupportTicket(data.ticket);
+            toast.success('Escalated to admin!');
+        } catch (e) {
+            toast.error('Failed to escalate');
+        }
+    };
+
+    const handleNewTicket = async () => {
+        try {
+            const { data } = await api.post('/support/new');
+            setSupportTicket(data.ticket);
+            setShowHistory(false);
+        } catch (e) {
+            toast.error('Failed to create new ticket');
+        }
+    };
+
+    const loadSupportHistory = async () => {
+        try {
+            const { data } = await api.get('/support/my-tickets');
+            setSupportHistory(data.tickets || []);
+            setShowHistory(true);
+        } catch (e) {
+            toast.error('Failed to load history');
+        }
+    };
 
     if (loading) return <div className="flex h-screen items-center justify-center bg-dark-900"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -753,6 +825,136 @@ export default function SettingsPage() {
                                         ))}
                                     </div>
                                 </div>
+                            </motion.div>
+                        )}
+
+                        {/* SUPPORT */}
+                        {tab === 'support' && (
+                            <motion.div key="support" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col" style={{ height: 'calc(100dvh - 120px)' }}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-2xl font-bold flex items-center gap-2"><FiHeadphones className="w-6 h-6 text-indigo-400" /> Support</h3>
+                                    <div className="flex gap-2">
+                                        <button onClick={loadSupportHistory} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white/40 hover:text-white hover:bg-white/5 border border-white/10 transition-all">
+                                            <FiClock className="w-3.5 h-3.5" /> History
+                                        </button>
+                                        <button onClick={handleNewTicket} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-indigo-400 hover:text-white hover:bg-indigo-500/20 border border-indigo-500/20 transition-all">
+                                            <FiPlus className="w-3.5 h-3.5" /> New Chat
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Ticket status banner */}
+                                {supportTicket && supportTicket.status !== 'ai-chat' && (
+                                    <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl mb-3 text-sm font-medium ${
+                                        supportTicket.status === 'escalated' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                        supportTicket.status === 'in-progress' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                        'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                    }`}>
+                                        {supportTicket.status === 'escalated' && <><FiAlertTriangle className="w-4 h-4" /> Waiting for admin response...</>}
+                                        {supportTicket.status === 'in-progress' && <><FiMessageCircle className="w-4 h-4" /> Admin is responding</>}
+                                        {supportTicket.status === 'resolved' && <><FiCheck className="w-4 h-4" /> Ticket resolved</>}
+                                    </div>
+                                )}
+
+                                {/* History Panel */}
+                                {showHistory && (
+                                    <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-4 mb-4 max-h-60 overflow-y-auto">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <p className="text-sm font-semibold text-white/60">Past Conversations</p>
+                                            <button onClick={() => setShowHistory(false)} className="text-white/30 hover:text-white"><FiX className="w-4 h-4" /></button>
+                                        </div>
+                                        {supportHistory.length === 0 ? (
+                                            <p className="text-white/20 text-sm text-center py-4">No past conversations</p>
+                                        ) : supportHistory.map(t => (
+                                            <button key={t._id} onClick={() => { setSupportTicket(t); setShowHistory(false); }}
+                                                className={`w-full text-left px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors mb-1 ${t._id === supportTicket?._id ? 'bg-indigo-500/10 border border-indigo-500/20' : ''}`}>
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-sm font-medium text-white/70 truncate flex-1">{t.subject || 'Support Request'}</p>
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                                        t.status === 'ai-chat' ? 'bg-indigo-500/10 text-indigo-400' :
+                                                        t.status === 'escalated' ? 'bg-amber-500/10 text-amber-400' :
+                                                        t.status === 'in-progress' ? 'bg-blue-500/10 text-blue-400' :
+                                                        'bg-emerald-500/10 text-emerald-400'
+                                                    }`}>{t.status === 'ai-chat' ? 'AI' : t.status}</span>
+                                                </div>
+                                                <p className="text-[11px] text-white/20 mt-0.5">{new Date(t.lastActivity || t.createdAt).toLocaleDateString()}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Chat Messages */}
+                                <div className="flex-1 bg-white/[0.02] rounded-2xl border border-white/5 overflow-y-auto p-4 space-y-3 mb-3" style={{ minHeight: 200 }}>
+                                    {supportLoading ? (
+                                        <div className="flex items-center justify-center py-12">
+                                            <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+                                        </div>
+                                    ) : supportTicket?.messages?.map((msg, i) => (
+                                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-[85%] sm:max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                                                msg.role === 'user'
+                                                    ? 'bg-indigo-500 text-white rounded-br-md'
+                                                    : msg.role === 'admin'
+                                                    ? 'bg-amber-500/10 border border-amber-500/20 text-amber-100 rounded-bl-md'
+                                                    : 'bg-white/[0.06] text-white/80 rounded-bl-md border border-white/5'
+                                            }`}>
+                                                {msg.role === 'admin' && (
+                                                    <p className="text-[10px] font-bold text-amber-400/70 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                                        <FiShield className="w-3 h-3" /> Admin
+                                                    </p>
+                                                )}
+                                                {msg.role === 'ai' && (
+                                                    <p className="text-[10px] font-bold text-indigo-400/70 uppercase tracking-wider mb-1">🤖 AI Assistant</p>
+                                                )}
+                                                <p className="whitespace-pre-wrap">{msg.content}</p>
+                                                <p className="text-[10px] mt-1.5 opacity-40">{new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {supportSending && (
+                                        <div className="flex justify-start">
+                                            <div className="bg-white/[0.06] border border-white/5 px-4 py-3 rounded-2xl rounded-bl-md">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={supportChatEndRef} />
+                                </div>
+
+                                {/* Input Area */}
+                                {supportTicket && !['resolved', 'closed'].includes(supportTicket.status) ? (
+                                    <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                            <input
+                                                value={supportMsg}
+                                                onChange={e => setSupportMsg(e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSupportSend()}
+                                                placeholder={supportTicket.status === 'ai-chat' ? 'Describe your issue...' : 'Reply to admin...'}
+                                                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all placeholder-white/20"
+                                                disabled={supportSending}
+                                            />
+                                            <button onClick={handleSupportSend} disabled={supportSending || !supportMsg.trim()}
+                                                className="px-4 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
+                                                <FiSend className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        {supportTicket.status === 'ai-chat' && (
+                                            <button onClick={handleEscalate}
+                                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-amber-400 hover:bg-amber-500/10 border border-amber-500/20 transition-all w-full justify-center">
+                                                <FiAlertTriangle className="w-3.5 h-3.5" /> Not satisfied? Talk to a Human Admin
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : supportTicket?.status === 'resolved' || supportTicket?.status === 'closed' ? (
+                                    <button onClick={handleNewTicket}
+                                        className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-sm font-semibold transition-colors">
+                                        <FiPlus className="w-4 h-4" /> Start New Conversation
+                                    </button>
+                                ) : null}
                             </motion.div>
                         )}
 

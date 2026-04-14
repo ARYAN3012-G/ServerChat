@@ -1,46 +1,55 @@
 const mongoose = require('mongoose');
 
-const messageSchema = new mongoose.Schema({
-    sender: {
-        type: String, // 'user', 'ai', 'admin'
-        required: true,
-        enum: ['user', 'ai', 'admin']
-    },
-    userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: function() { return this.sender !== 'ai'; }
-    },
-    text: {
+const supportMessageSchema = new mongoose.Schema({
+    role: {
         type: String,
-        required: true
+        enum: ['user', 'ai', 'admin'],
+        required: true,
+    },
+    content: {
+        type: String,
+        required: true,
     },
     timestamp: {
         type: Date,
-        default: Date.now
-    }
+        default: Date.now,
+    },
 });
 
 const supportTicketSchema = new mongoose.Schema({
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true
+        required: true,
     },
     status: {
         type: String,
-        enum: ['open', 'escalated', 'closed'],
-        default: 'open'
+        enum: ['ai-chat', 'escalated', 'in-progress', 'resolved', 'closed'],
+        default: 'ai-chat',
     },
     subject: {
         type: String,
-        required: true
+        default: 'Support Request',
     },
-    messages: [messageSchema],
-    assignedTo: {
+    messages: [supportMessageSchema],
+    assignedAdmin: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User' // Admin handling the ticket
-    }
+        ref: 'User',
+    },
+    priority: {
+        type: String,
+        enum: ['low', 'medium', 'high'],
+        default: 'medium',
+    },
+    resolvedAt: Date,
+    lastActivity: {
+        type: Date,
+        default: Date.now,
+    },
 }, { timestamps: true });
+
+supportTicketSchema.index({ user: 1, status: 1 });
+supportTicketSchema.index({ status: 1, lastActivity: -1 });
+supportTicketSchema.index({ assignedAdmin: 1 });
 
 module.exports = mongoose.model('SupportTicket', supportTicketSchema);

@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUsers, FiShield, FiSearch, FiBarChart2, FiAlertTriangle, FiTrendingUp, FiActivity, FiFileText, FiPlay, FiMenu } from 'react-icons/fi';
+import { FiArrowLeft, FiUsers, FiShield, FiSearch, FiBarChart2, FiAlertTriangle, FiTrendingUp, FiActivity, FiFileText, FiPlay, FiMenu, FiHeadphones, FiSend, FiMessageCircle, FiCheck, FiEye, FiX } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
 import { useSelector } from 'react-redux';
+import { useRef } from 'react';
 
 const ADMIN_EMAIL = 'aryanrajeshgadam.3012@gmail.com';
 
@@ -23,6 +24,15 @@ export default function AdminPage() {
     const [gameActivity, setGameActivity] = useState([]);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
+    // Support state
+    const [supportTickets, setSupportTickets] = useState([]);
+    const [supportEscalatedCount, setSupportEscalatedCount] = useState(0);
+    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [adminReply, setAdminReply] = useState('');
+    const [replying, setReplying] = useState(false);
+    const [supportFilter, setSupportFilter] = useState('');
+    const adminChatEndRef = useRef(null);
+
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
     useEffect(() => { if (!loading && isAuthenticated && user?.email !== ADMIN_EMAIL) router.push('/channels'); }, [isAuthenticated, loading, user]);
     useEffect(() => { if (isAuthenticated) { fetchStats(); fetchUsers(); } }, [isAuthenticated]);
@@ -32,13 +42,27 @@ export default function AdminPage() {
     const fetchActivityLogs = async () => { try { const { data } = await api.get('/admin/logs/login'); setActivityLogs(data.logs || []); } catch (e) { console.error(e); } };
     const fetchAdminLogs = async () => { try { const { data } = await api.get('/admin/logs/admin'); setAdminLogs(data.logs || []); } catch (e) { console.error(e); } };
     const fetchGameActivity = async () => { try { const { data } = await api.get('/admin/logs/games'); setGameActivity(data.games || []); } catch (e) { console.error(e); } };
+    const fetchSupportTickets = async (status = '') => {
+        try {
+            const { data } = await api.get(`/support/admin/tickets${status ? `?status=${status}` : ''}`);
+            setSupportTickets(data.tickets || []);
+            setSupportEscalatedCount(data.escalatedCount || 0);
+        } catch (e) { console.error(e); }
+    };
+    const fetchTicketDetail = async (id) => {
+        try {
+            const { data } = await api.get(`/support/admin/tickets/${id}`);
+            setSelectedTicket(data.ticket);
+        } catch (e) { console.error(e); }
+    };
 
     useEffect(() => {
         if (!isAuthenticated) return;
         if (tab === 'activity') fetchActivityLogs();
         if (tab === 'audit') fetchAdminLogs();
         if (tab === 'games') fetchGameActivity();
-    }, [tab, isAuthenticated]);
+        if (tab === 'support') fetchSupportTickets(supportFilter);
+    }, [tab, isAuthenticated, supportFilter]);
 
     const handleBanUser = async (userId, isBanned) => {
         if (!confirm(isBanned ? 'Unban this user?' : 'Ban this user?')) return;
@@ -50,6 +74,32 @@ export default function AdminPage() {
     };
 
     const filteredUsers = users.filter(u => (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) || (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()));
+
+    // Admin reply handler
+    const handleAdminReply = async () => {
+        if (!adminReply.trim() || !selectedTicket || replying) return;
+        setReplying(true);
+        try {
+            const { data } = await api.post(`/support/admin/tickets/${selectedTicket._id}/reply`, { message: adminReply });
+            setSelectedTicket(data.ticket);
+            setAdminReply('');
+            fetchSupportTickets(supportFilter);
+        } catch (e) { console.error(e); }
+        setReplying(false);
+    };
+
+    const handleAdminResolve = async (ticketId) => {
+        try {
+            await api.post(`/support/admin/tickets/${ticketId}/resolve`);
+            fetchSupportTickets(supportFilter);
+            if (selectedTicket?._id === ticketId) fetchTicketDetail(ticketId);
+        } catch (e) { console.error(e); }
+    };
+
+    // Scroll to bottom of admin chat
+    useEffect(() => {
+        if (adminChatEndRef.current) adminChatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }, [selectedTicket?.messages?.length]);
 
     const statCards = stats ? [
         { label: 'Total Users', value: stats.totalUsers || 0, color: 'from-white/10 to-white/5', shadow: 'shadow-white/5', icon: FiUsers },
@@ -69,6 +119,7 @@ export default function AdminPage() {
         { id: 'activity', label: 'Activity Logs', icon: FiActivity },
         { id: 'audit', label: 'Admin Audit', icon: FiFileText },
         { id: 'games', label: 'Game Activity', icon: FiPlay },
+        { id: 'support', label: 'Support', icon: FiHeadphones, badge: supportEscalatedCount },
     ];
 
     const actionColors = {
@@ -109,6 +160,7 @@ export default function AdminPage() {
                     {tabs.map(t => (
                         <button key={t.id} onClick={() => { setTab(t.id); setSidebarOpen(false); }} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === t.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
                             <t.icon className="w-4 h-4" /> {t.label}
+                            {t.badge > 0 && <span className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white min-w-[18px] text-center">{t.badge}</span>}
                         </button>
                     ))}
                 </div>
@@ -322,6 +374,133 @@ export default function AdminPage() {
                                     </tbody>
                                 </table>
                                 {gameActivity.length === 0 && <div className="text-center py-10 text-white/30">No game sessions recorded yet — play games to generate data!</div>}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* SUPPORT TICKETS */}
+                    {tab === 'support' && (
+                        <motion.div key="support" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-2xl font-bold flex items-center gap-2">
+                                    <FiHeadphones className="w-6 h-6 text-indigo-400" /> Support Tickets
+                                    {supportEscalatedCount > 0 && <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-500 text-white">{supportEscalatedCount} new</span>}
+                                </h3>
+                                <div className="flex gap-2">
+                                    {['', 'escalated', 'in-progress', 'resolved'].map(f => (
+                                        <button key={f} onClick={() => setSupportFilter(f)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all border ${
+                                                supportFilter === f ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' : 'text-white/40 border-white/10 hover:bg-white/5'
+                                            }`}>
+                                            {f || 'All'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4" style={{ height: 'calc(100dvh - 200px)' }}>
+                                {/* Ticket List */}
+                                <div className="w-80 flex-shrink-0 bg-white/[0.03] rounded-2xl border border-white/5 overflow-y-auto">
+                                    {supportTickets.length === 0 ? (
+                                        <div className="text-center py-16 text-white/20">
+                                            <FiHeadphones className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                                            <p className="text-sm">No tickets found</p>
+                                        </div>
+                                    ) : supportTickets.map(t => (
+                                        <button key={t._id} onClick={() => fetchTicketDetail(t._id)}
+                                            className={`w-full text-left px-4 py-4 border-b border-white/5 hover:bg-white/[0.04] transition-colors ${
+                                                selectedTicket?._id === t._id ? 'bg-indigo-500/10 border-l-2 border-l-indigo-500' : ''
+                                            }`}>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <p className="text-sm font-semibold text-white/80 truncate flex-1 mr-2">{t.user?.username || 'Unknown'}</p>
+                                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider flex-shrink-0 ${
+                                                    t.status === 'escalated' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                                                    t.status === 'in-progress' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                }`}>{t.status}</span>
+                                            </div>
+                                            <p className="text-xs text-white/40 truncate">{t.subject || 'Support Request'}</p>
+                                            <p className="text-[10px] text-white/20 mt-1">{new Date(t.lastActivity || t.createdAt).toLocaleString()}</p>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Chat View */}
+                                <div className="flex-1 flex flex-col bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden">
+                                    {selectedTicket ? (
+                                        <>
+                                            {/* Header */}
+                                            <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-full bg-indigo-500/20 flex items-center justify-center text-sm font-bold text-indigo-400">
+                                                        {(selectedTicket.user?.username || '?')[0].toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-semibold text-sm">{selectedTicket.user?.username}</p>
+                                                        <p className="text-[11px] text-white/30">{selectedTicket.user?.email} • {selectedTicket.status}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    {selectedTicket.status !== 'resolved' && (
+                                                        <button onClick={() => handleAdminResolve(selectedTicket._id)}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all">
+                                                            <FiCheck className="w-3.5 h-3.5" /> Resolve
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => setSelectedTicket(null)} className="p-1.5 rounded-lg text-white/30 hover:text-white hover:bg-white/10 transition-colors">
+                                                        <FiX className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Messages */}
+                                            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                                {selectedTicket.messages?.map((msg, i) => (
+                                                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                                        <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                                                            msg.role === 'user'
+                                                                ? 'bg-indigo-500/20 text-indigo-100 rounded-br-md border border-indigo-500/20'
+                                                                : msg.role === 'admin'
+                                                                ? 'bg-amber-500/10 text-amber-100 rounded-bl-md border border-amber-500/20'
+                                                                : 'bg-white/[0.06] text-white/70 rounded-bl-md border border-white/5'
+                                                        }`}>
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider mb-1 opacity-50">
+                                                                {msg.role === 'user' ? '👤 User' : msg.role === 'admin' ? '🛡️ Admin' : '🤖 AI'}
+                                                            </p>
+                                                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                                                            <p className="text-[10px] mt-1.5 opacity-30">{new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                <div ref={adminChatEndRef} />
+                                            </div>
+
+                                            {/* Reply */}
+                                            {selectedTicket.status !== 'resolved' && (
+                                                <div className="p-3 border-t border-white/5 flex gap-2">
+                                                    <input
+                                                        value={adminReply}
+                                                        onChange={e => setAdminReply(e.target.value)}
+                                                        onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAdminReply()}
+                                                        placeholder="Reply as admin..."
+                                                        className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none text-white focus:ring-2 focus:ring-amber-500/50 transition-all placeholder-white/20"
+                                                        disabled={replying}
+                                                    />
+                                                    <button onClick={handleAdminReply} disabled={replying || !adminReply.trim()}
+                                                        className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white rounded-xl transition-colors">
+                                                        <FiSend className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className="flex-1 flex flex-col items-center justify-center text-white/20">
+                                            <FiEye className="w-12 h-12 mb-3 opacity-30" />
+                                            <p className="text-sm">Select a ticket to view the conversation</p>
+                                            <p className="text-xs mt-1 text-white/10">You'll see the full AI + user chat history</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </motion.div>
                     )}
