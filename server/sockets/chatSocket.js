@@ -160,6 +160,31 @@ module.exports = (io, socket) => {
         }
     });
 
+    // Invite users to a voice channel call
+    socket.on('voice:invite', async ({ channelId, targetUserIds, callType }) => {
+        try {
+            const channel = await Channel.findById(channelId).populate('server');
+            const channelName = channel?.name || 'Voice Channel';
+            const serverName = channel?.server?.name || 'Server';
+
+            (targetUserIds || []).forEach(userId => {
+                io.to(`user:${userId}`).emit('voice:call-invite', {
+                    channelId,
+                    channelName,
+                    serverName,
+                    callType: callType || 'voice',
+                    from: {
+                        userId: socket.userId,
+                        username: socket.username,
+                    },
+                });
+            });
+
+            logger.debug(`${socket.username} invited ${targetUserIds?.length} users to voice channel ${channelId}`);
+        } catch (error) {
+            logger.error(`Voice invite error: ${error.message}`);
+        }
+    });
 
     // Send a message
     socket.on('message:send', async (data) => {

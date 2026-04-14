@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMic, FiMicOff, FiVideo, FiVideoOff, FiMonitor, FiPhoneOff, FiMinimize2, FiUsers, FiMoreVertical, FiVolume2, FiVolumeX } from 'react-icons/fi';
+import { FiMic, FiMicOff, FiVideo, FiVideoOff, FiMonitor, FiPhoneOff, FiMinimize2, FiUsers, FiMoreVertical, FiVolume2, FiVolumeX, FiUserPlus, FiCheck, FiX } from 'react-icons/fi';
 import { useVoice } from '../../../components/VoiceProvider';
 import { useAuth } from '../../../hooks/useAuth';
 import api from '../../../services/api';
@@ -25,7 +25,7 @@ export default function CallPage() {
         startVideo, stopVideo, switchCamera, facingMode,
         isScreenSharing, localScreenStream, peerScreenStreams,
         startScreenShare, stopScreenShare,
-        peerStreams, adminMuteUser,
+        peerStreams, adminMuteUser, sendCallInvite,
     } = voice;
 
     const [channelInfo, setChannelInfo] = useState(null);
@@ -34,6 +34,8 @@ export default function CallPage() {
     const [showParticipants, setShowParticipants] = useState(false);
     const [showAdminMenu, setShowAdminMenu] = useState(null);
     const [spotlightUser, setSpotlightUser] = useState(null);
+    const [showAddPeople, setShowAddPeople] = useState(false);
+    const [addPeopleSelected, setAddPeopleSelected] = useState([]);
     const joinedRef = useRef(false);
     const timerRef = useRef(null);
     const videoRefs = useRef({}); // { userId: HTMLVideoElement }
@@ -405,6 +407,11 @@ export default function CallPage() {
                         {isDeafened ? <FiVolumeX className="w-5 h-5 sm:w-6 sm:h-6" /> : <FiVolume2 className="w-5 h-5 sm:w-6 sm:h-6" />}
                     </button>
 
+                    <button onClick={(e) => { e.stopPropagation(); setShowAddPeople(true); }}
+                        className="p-3 sm:p-4 rounded-2xl bg-white/5 text-white hover:bg-white/10 transition-all duration-200" title="Add People">
+                        <FiUserPlus className="w-5 h-5 sm:w-6 sm:h-6" />
+                    </button>
+
                     <div className="w-px h-8 bg-white/10 mx-1" />
 
                     <button onClick={handleMinimize}
@@ -418,6 +425,91 @@ export default function CallPage() {
                     </button>
                 </div>
             </div>
+
+            {/* Add People Modal */}
+            <AnimatePresence>
+                {showAddPeople && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[110]"
+                        onClick={() => { setShowAddPeople(false); setAddPeopleSelected([]); }}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-dark-800 border border-white/10 rounded-2xl w-full max-w-[400px] mx-4 overflow-hidden shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="p-5 border-b border-white/5 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                                        <FiUserPlus className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-bold text-white">Add People</h2>
+                                        <p className="text-xs text-white/40">Invite members to join this call</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => { setShowAddPeople(false); setAddPeopleSelected([]); }}
+                                    className="p-2 rounded-lg hover:bg-white/10 text-white/30 hover:text-white transition-colors">
+                                    <FiX className="w-5 h-5" />
+                                </button>
+                            </div>
+                            <div className="max-h-64 overflow-y-auto p-2">
+                                {(serverInfo?.members || []).filter(m => {
+                                    const mId = m.user?._id || m.user;
+                                    // Exclude yourself and people already in the call
+                                    return mId !== user?._id && !allParticipants.find(p => p.userId === mId);
+                                }).map((m, i) => {
+                                    const mId = m.user?._id || m.user;
+                                    const mName = m.user?.username || 'User';
+                                    const isSelected = addPeopleSelected.includes(mId);
+                                    return (
+                                        <div key={mId || i}
+                                            onClick={() => setAddPeopleSelected(prev => isSelected ? prev.filter(id => id !== mId) : [...prev, mId])}
+                                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${isSelected ? 'bg-indigo-500/10 border border-indigo-500/30' : 'border border-transparent hover:bg-white/5'}`}
+                                        >
+                                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-white/20'}`}>
+                                                {isSelected && <FiCheck className="w-3 h-3 text-white" />}
+                                            </div>
+                                            <div className="w-9 h-9 rounded-full bg-indigo-500/60 flex items-center justify-center text-sm font-bold">
+                                                {mName[0].toUpperCase()}
+                                            </div>
+                                            <span className="text-sm text-white/80 flex-1">{mName}</span>
+                                        </div>
+                                    );
+                                })}
+                                {(serverInfo?.members || []).filter(m => {
+                                    const mId = m.user?._id || m.user;
+                                    return mId !== user?._id && !allParticipants.find(p => p.userId === mId);
+                                }).length === 0 && (
+                                    <p className="text-center text-white/30 text-sm py-6">Everyone is already in the call</p>
+                                )}
+                            </div>
+                            <div className="p-4 border-t border-white/5 flex gap-2">
+                                <button onClick={() => { setShowAddPeople(false); setAddPeopleSelected([]); }}
+                                    className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-sm text-white/50 hover:text-white transition-colors">Cancel</button>
+                                <button
+                                    disabled={addPeopleSelected.length === 0}
+                                    onClick={() => {
+                                        sendCallInvite?.(channelId, addPeopleSelected, 'voice');
+                                        toast.success(`Invited ${addPeopleSelected.length} member${addPeopleSelected.length > 1 ? 's' : ''}`);
+                                        setShowAddPeople(false);
+                                        setAddPeopleSelected([]);
+                                    }}
+                                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 ${addPeopleSelected.length > 0 ? 'bg-indigo-500 hover:bg-indigo-600 text-white' : 'bg-white/5 text-white/20 cursor-not-allowed'}`}
+                                >
+                                    <FiUserPlus className="w-4 h-4" />
+                                    Invite{addPeopleSelected.length > 0 ? ` (${addPeopleSelected.length})` : ''}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

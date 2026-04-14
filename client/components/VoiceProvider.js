@@ -65,6 +65,8 @@ export default function VoiceProvider({ children }) {
     const [localVideoStream, setLocalVideoStream] = useState(null);
     const [localScreenStream, setLocalScreenStream] = useState(null);
     const [facingMode, setFacingMode] = useState('user');
+    const [callInvite, setCallInvite] = useState(null);
+    const callInviteTimeoutRef = useRef(null);
 
     // Get local audio stream (retry on failure)
     const getLocalAudio = useCallback(async () => {
@@ -471,6 +473,20 @@ export default function VoiceProvider({ children }) {
         });
     }, []);
 
+    // Send call invite to users
+    const sendCallInvite = useCallback((channelId, targetUserIds, callType = 'voice') => {
+        const socket = getSocket();
+        if (socket) {
+            socket.emit('voice:invite', { channelId, targetUserIds, callType });
+        }
+    }, []);
+
+    // Dismiss incoming invite
+    const dismissCallInvite = useCallback(() => {
+        clearTimeout(callInviteTimeoutRef.current);
+        setCallInvite(null);
+    }, []);
+
     // ─── Socket event handlers — wait for socket to be available ───
     useEffect(() => {
         let socket = null;
@@ -609,6 +625,15 @@ export default function VoiceProvider({ children }) {
                 }
             };
 
+            // Handle incoming call invite
+            const handleCallInvite = (data) => {
+                console.log('[VP] Call invite received:', data);
+                setCallInvite(data);
+                // Auto-dismiss after 30s
+                if (callInviteTimeoutRef.current) clearTimeout(callInviteTimeoutRef.current);
+                callInviteTimeoutRef.current = setTimeout(() => setCallInvite(null), 30000);
+            };
+
             s.on('voice:existing-users', handleExistingUsers);
             s.on('voice:user-joined', handleUserJoined);
             s.on('voice:offer', handleVoiceOffer);
@@ -617,6 +642,7 @@ export default function VoiceProvider({ children }) {
             s.on('voice:peer-left', handlePeerLeft);
             s.on('voice:user-state', handleUserState);
             s.on('voice:admin-muted', handleAdminMuted);
+            s.on('voice:call-invite', handleCallInvite);
 
             // On reconnect, re-join the channel if we were connected
             s.on('connect', () => {
@@ -637,6 +663,7 @@ export default function VoiceProvider({ children }) {
                 s.off('voice:peer-left', handlePeerLeft);
                 s.off('voice:user-state', handleUserState);
                 s.off('voice:admin-muted', handleAdminMuted);
+                s.off('voice:call-invite', handleCallInvite);
             };
         };
 
@@ -686,12 +713,49 @@ export default function VoiceProvider({ children }) {
         isScreenSharing, localScreenStream, peerScreenStreams,
         startScreenShare, stopScreenShare,
         adminMuteUser,
+        callInvite, dismissCallInvite, sendCallInvite,
     };
 
     return (
         <VoiceContext.Provider value={value}>
             {children}
             {audioElements}
+
+            {/* Global Incoming Call Invite */}
+            {callInvite && (
+                <div className="fixed top-4 right-4 z-[200] animate-in slide-in-from-top-2">
+                    <div className="bg-dark-800 border border-white/10 rounded-2xl shadow-2xl p-4 w-80">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                                <span className="text-lg">{callInvite.callType === 'video' ? '📹' : '📞'}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-white truncate">
+                                    {callInvite.from?.username} is calling
+                                </p>
+                                <p className="text-xs text-white/40">{callInvite.serverName} • {callInvite.channelName}</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => dismissCallInvite()}
+                                className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-white/50 hover:text-red-400 text-sm transition-colors"
+                            >
+                                Decline
+                            </button>
+                            <button
+                                onClick={() => {
+                                    window.location.href = `/call/${callInvite.channelId}`;
+                                    dismissCallInvite();
+                                }}
+                                className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition-colors"
+                            >
+                                Join Call
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </VoiceContext.Provider>
     );
 }

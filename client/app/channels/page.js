@@ -88,7 +88,8 @@ export default function ChannelsPage() {
         isMuted: voiceIsMuted, isDeafened: voiceIsDeafened, connectedChannel: voiceConnectedChannel,
         voiceUsers: vcUsers, isVideoOn, isScreenSharing, localVideoStream, localScreenStream,
         peerVideoStreams, startVideo, stopVideo, switchCamera, facingMode,
-        startScreenShare, stopScreenShare } = voice;
+        startScreenShare, stopScreenShare,
+        sendCallInvite, callInvite, dismissCallInvite } = voice;
     const { typingUsers, onlineUsers } = useSelector((s) => s.chat);
     const [connectedVoice, setConnectedVoice] = useState(null);
     const isMuted = voiceIsMuted;
@@ -1474,9 +1475,16 @@ export default function ChannelsPage() {
                                 <button
                                     disabled={selectedCallMembers.length === 0}
                                     onClick={() => {
-                                        selectedCallMembers.forEach(memberId => {
-                                            initiateCall?.(memberId, currentChannel?._id, showCallPicker);
-                                        });
+                                        // Find the first voice channel in this server
+                                        const voiceCh = channels.find(c => c.type === 'voice');
+                                        if (voiceCh) {
+                                            // Send invites to selected members
+                                            sendCallInvite?.(voiceCh._id, selectedCallMembers, showCallPicker);
+                                            // Navigate to the call page
+                                            router.push(`/call/${voiceCh._id}`);
+                                        } else {
+                                            toast.error('No voice channel found. Create one first.');
+                                        }
                                         setShowCallPicker(null);
                                         setSelectedCallMembers([]);
                                     }}
@@ -1486,6 +1494,48 @@ export default function ChannelsPage() {
                                 </button>
                             </div>
                         </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Incoming Call Invite Overlay */}
+            <AnimatePresence>
+                {callInvite && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="fixed top-4 right-4 z-[200] bg-dark-800 border border-white/10 rounded-2xl shadow-2xl p-4 w-80"
+                    >
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center animate-pulse">
+                                {callInvite.callType === 'video' ? <FiVideo className="w-5 h-5 text-white" /> : <FiPhone className="w-5 h-5 text-white" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-white truncate">
+                                    {callInvite.from?.username} is calling
+                                </p>
+                                <p className="text-xs text-white/40">{callInvite.serverName} • {callInvite.channelName}</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => { dismissCallInvite?.(); }}
+                                className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-white/50 hover:text-red-400 text-sm transition-colors"
+                            >
+                                Decline
+                            </button>
+                            <button
+                                onClick={() => {
+                                    router.push(`/call/${callInvite.channelId}`);
+                                    dismissCallInvite?.();
+                                }}
+                                className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5"
+                            >
+                                {callInvite.callType === 'video' ? <FiVideo className="w-3.5 h-3.5" /> : <FiPhone className="w-3.5 h-3.5" />}
+                                Join
+                            </button>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>
