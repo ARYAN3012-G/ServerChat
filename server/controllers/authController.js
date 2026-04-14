@@ -439,18 +439,31 @@ exports.faceLogin = async (req, res, next) => {
         }
         const loginFaceToken = detect1.faces[0].face_token;
 
-        // Step 2: Detect face in stored photo
-        const detectForm2 = new FormData();
-        detectForm2.append('api_key', apiKey);
-        detectForm2.append('api_secret', apiSecret);
-        detectForm2.append('image_base64', storedBase64);
+        // Delay to avoid Face++ free-tier concurrency limit
+        await new Promise(r => setTimeout(r, 1000));
 
-        const detectRes2 = await fetch('https://api-us.faceplusplus.com/facepp/v3/detect', {
-            method: 'POST',
-            body: detectForm2,
-        });
-        const detect2 = await detectRes2.json();
-        logger.info(`Face++ detect stored photo: ${JSON.stringify({ faces: detect2.faces?.length || 0, error: detect2.error_message || 'none' })}`);
+        // Step 2: Detect face in stored photo (with retry for concurrency limit)
+        let detect2;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const detectForm2 = new FormData();
+            detectForm2.append('api_key', apiKey);
+            detectForm2.append('api_secret', apiSecret);
+            detectForm2.append('image_base64', storedBase64);
+
+            const detectRes2 = await fetch('https://api-us.faceplusplus.com/facepp/v3/detect', {
+                method: 'POST',
+                body: detectForm2,
+            });
+            detect2 = await detectRes2.json();
+            logger.info(`Face++ detect stored photo (attempt ${attempt + 1}): ${JSON.stringify({ faces: detect2.faces?.length || 0, error: detect2.error_message || 'none' })}`);
+
+            if (detect2.error_message && detect2.error_message.includes('CONCURRENCY_LIMIT_EXCEEDED')) {
+                logger.info(`Face++ concurrency limit hit, retrying in ${(attempt + 1) * 1500}ms...`);
+                await new Promise(r => setTimeout(r, (attempt + 1) * 1500));
+                continue;
+            }
+            break;
+        }
 
         if (detect2.error_message) {
             logger.error(`Face++ stored image detect error: ${detect2.error_message}`);
@@ -460,6 +473,9 @@ exports.faceLogin = async (req, res, next) => {
             return res.status(400).json({ message: 'Stored face image is invalid. Please re-register your face in Settings > Security.' });
         }
         const storedFaceToken = detect2.faces[0].face_token;
+
+        // Delay before compare call
+        await new Promise(r => setTimeout(r, 1000));
 
         // Step 3: Compare face_tokens (most reliable method)
         const compareForm = new FormData();
