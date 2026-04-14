@@ -404,13 +404,25 @@ exports.faceLogin = async (req, res, next) => {
 
         const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
 
-        // Face++ Compare: send login photo (base64) vs stored photo (URL) in one call
+        // Download the stored face image from Cloudinary and convert to base64
+        let storedBase64;
+        try {
+            const imgResponse = await fetch(user.faceImageUrl);
+            if (!imgResponse.ok) throw new Error('Failed to fetch stored face image');
+            const imgBuffer = await imgResponse.arrayBuffer();
+            storedBase64 = Buffer.from(imgBuffer).toString('base64');
+        } catch (dlErr) {
+            logger.error(`Face image download error: ${dlErr.message} | URL: ${user.faceImageUrl}`);
+            return res.status(400).json({ message: 'Could not load stored face. Try re-registering your face in Settings.' });
+        }
+
+        // Face++ Compare: send both as base64 (more reliable than URL)
         const FormData = require('form-data');
         const compareForm = new FormData();
         compareForm.append('api_key', apiKey);
         compareForm.append('api_secret', apiSecret);
         compareForm.append('image_base64_1', base64Data);
-        compareForm.append('image_url_2', user.faceImageUrl);
+        compareForm.append('image_base64_2', storedBase64);
 
         const compareRes = await fetch('https://api-us.faceplusplus.com/facepp/v3/compare', {
             method: 'POST',
@@ -418,15 +430,22 @@ exports.faceLogin = async (req, res, next) => {
         });
         const compareResult = await compareRes.json();
 
+        logger.info(`Face++ full response: ${JSON.stringify(compareResult)} for user ${user.email}`);
+
         if (compareResult.error_message) {
             logger.error(`Face++ compare error: ${compareResult.error_message}`);
-            return res.status(400).json({ message: compareResult.error_message.includes('No face') ? 'No face detected. Look at the camera.' : 'Face verification failed' });
+            const msg = compareResult.error_message.includes('NO_FACE_DETECTED')
+                ? 'No face detected. Make sure your face is clearly visible and well-lit.'
+                : compareResult.error_message.includes('INVALID_IMAGE')
+                ? 'Image quality too low. Try again with better lighting.'
+                : `Face verification failed: ${compareResult.error_message}`;
+            return res.status(400).json({ message: msg });
         }
 
         // Face++ returns confidence 0-100 (threshold ~60+ is a good match)
         logger.info(`Face++ compare confidence: ${compareResult.confidence} for user ${user.email}`);
         if (!compareResult.confidence || compareResult.confidence < 60) {
-            return res.status(401).json({ message: `Face not recognized (confidence: ${Math.round(compareResult.confidence || 0)}%)` });
+            return res.status(401).json({ message: `Face not recognized (confidence: ${Math.round(compareResult.confidence || 0)}%). Try better lighting or re-register your face.` });
         }
 
         if (user.isBanned) {
