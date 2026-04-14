@@ -378,7 +378,7 @@ export default function ChannelsPage() {
     // ── Threads ──
     const openThread = async (msg) => {
         setThreadView(msg);
-        try { const { data } = await api.get(`/messages/thread/${msg._id}`); setThreadMessages(data.messages || data || []); } catch (e) { setThreadMessages([]); }
+        try { const { data } = await api.get(`/messages/thread/${msg._id}`); setThreadMessages(data.replies || []); } catch (e) { setThreadMessages([]); }
     };
 
     const sendThreadReply = () => {
