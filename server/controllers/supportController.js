@@ -113,7 +113,7 @@ exports.sendMessage = async (req, res, next) => {
         }
 
         try {
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+            const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
             const chat = model.startChat({
                 history: [
                     { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
