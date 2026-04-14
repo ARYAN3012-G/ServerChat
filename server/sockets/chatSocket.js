@@ -221,65 +221,68 @@ module.exports = (io, socket) => {
                     console.log(`[Socket] Emitting DM message to user:${member.user.toString()}`);
                     io.to(`user:${member.user.toString()}`).emit('message:new', populated);
                 });
-            } else {
+            } else if (!threadId) {
+                // Only broadcast to main channel if NOT a thread reply
                 console.log(`[Socket] Emitting Channel message to channel:${channelId}`);
                 io.to(`channel:${channelId}`).emit('message:new', populated);
+            } else {
+                // For thread replies, emit only to the sender so they see the reply
+                socket.emit('message:new', populated);
+            }
 
-                // --- Bot Integration Logic ---
-                if (channel.name === 'integration' && type !== 'system' && socket.userId) {
-                    setTimeout(async () => {
-                        let botReply = '';
-                        const msgContent = content.toLowerCase().trim();
+            // --- Bot Integration Logic ---
+            if (!threadId && channel.name === 'integration' && type !== 'system' && socket.userId) {
+                setTimeout(async () => {
+                    let botReply = '';
+                    const msgContent = content.toLowerCase().trim();
 
-                        if (msgContent === '/help') {
-                            botReply = `🤖 **Available Commands:**\n\`/help\` - This menu\n\`/joke\` - Random joke\n\`/quote\` - Inspiration\n\`/flip\` - Flip a coin\n\`/roll\` - Roll a dice`;
-                        } else if (msgContent === '/joke') {
-                            const jokes = [
-                                "Why do programmers prefer dark mode? Because light attracts bugs.",
-                                "There are 10 types of people in the world: those who understand binary, and those who don't.",
-                                "A SQL query goes into a bar, walks up to two tables and asks... 'Can I join you?'"
-                            ];
-                            botReply = `🤖 ${jokes[Math.floor(Math.random() * jokes.length)]}`;
-                        } else if (msgContent === '/quote') {
-                            const quotes = [
-                                "The only way to do great work is to love what you do. - Steve Jobs",
-                                "Life is what happens when you're busy making other plans. - John Lennon",
-                                "The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt"
-                            ];
-                            botReply = `💬 *"${quotes[Math.floor(Math.random() * quotes.length)]}"*`;
-                        } else if (msgContent === '/flip') {
-                            botReply = `🪙 The coin landed on: **${Math.random() > 0.5 ? 'Heads' : 'Tails'}**`;
-                        } else if (msgContent.startsWith('/roll')) {
-                            const sides = parseInt(msgContent.split(' ')[1]) || 6;
-                            botReply = `🎲 You rolled a **${Math.floor(Math.random() * sides) + 1}** (1-${sides})`;
-                        } else if (msgContent.includes('hello') || msgContent.includes('hi')) {
-                            botReply = `👋 Hello there <@${socket.userId}>! How can I help you today? Type \`/help\` to see what I can do.`;
-                        } else {
-                            botReply = `🤖 I'm a simple integration bot. I don't understand "${content}". Try \`/help\` for a list of commands I do know!`;
-                        }
+                    if (msgContent === '/help') {
+                        botReply = `🤖 **Available Commands:**\n\`/help\` - This menu\n\`/joke\` - Random joke\n\`/quote\` - Inspiration\n\`/flip\` - Flip a coin\n\`/roll\` - Roll a dice`;
+                    } else if (msgContent === '/joke') {
+                        const jokes = [
+                            "Why do programmers prefer dark mode? Because light attracts bugs.",
+                            "There are 10 types of people in the world: those who understand binary, and those who don't.",
+                            "A SQL query goes into a bar, walks up to two tables and asks... 'Can I join you?'"
+                        ];
+                        botReply = `🤖 ${jokes[Math.floor(Math.random() * jokes.length)]}`;
+                    } else if (msgContent === '/quote') {
+                        const quotes = [
+                            "The only way to do great work is to love what you do. - Steve Jobs",
+                            "Life is what happens when you're busy making other plans. - John Lennon",
+                            "The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt"
+                        ];
+                        botReply = `💬 *"${quotes[Math.floor(Math.random() * quotes.length)]}"*`;
+                    } else if (msgContent === '/flip') {
+                        botReply = `🪙 The coin landed on: **${Math.random() > 0.5 ? 'Heads' : 'Tails'}**`;
+                    } else if (msgContent.startsWith('/roll')) {
+                        const sides = parseInt(msgContent.split(' ')[1]) || 6;
+                        botReply = `🎲 You rolled a **${Math.floor(Math.random() * sides) + 1}** (1-${sides})`;
+                    } else if (msgContent.includes('hello') || msgContent.includes('hi')) {
+                        botReply = `👋 Hello there <@${socket.userId}>! How can I help you today? Type \`/help\` to see what I can do.`;
+                    } else {
+                        botReply = `🤖 I'm a simple integration bot. I don't understand "${content}". Try \`/help\` for a list of commands I do know!`;
+                    }
 
-                        try {
-                            const botMsg = await Message.create({
-                                content: botReply,
-                                sender: socket.userId, // We'll just use system style for now, since we don't have a specific bot user ID
-                                channel: channelId,
-                                type: 'system', // System type makes it render differently (usually center/no avatar)
-                            });
+                    try {
+                        const botMsg = await Message.create({
+                            content: botReply,
+                            sender: socket.userId,
+                            channel: channelId,
+                            type: 'system',
+                        });
 
-                            // We need a sender for the UI to not crash if it expects one, but type is system
-                            const popBotMsg = await Message.findById(botMsg._id).populate('sender', 'username avatar status');
-                            
-                            io.to(`channel:${channelId}`).emit('message:new', popBotMsg);
-                            
-                            await Channel.findByIdAndUpdate(channelId, {
-                                lastMessage: botMsg._id,
-                                lastActivity: new Date(),
-                            });
-                        } catch (err) {
-                            logger.error(`Failed to send bot response: ${err.message}`);
-                        }
-                    }, 800); // Small delay to feel "natural"
-                }
+                        const popBotMsg = await Message.findById(botMsg._id).populate('sender', 'username avatar status');
+                        
+                        io.to(`channel:${channelId}`).emit('message:new', popBotMsg);
+                        
+                        await Channel.findByIdAndUpdate(channelId, {
+                            lastMessage: botMsg._id,
+                            lastActivity: new Date(),
+                        });
+                    } catch (err) {
+                        logger.error(`Failed to send bot response: ${err.message}`);
+                    }
+                }, 800);
             }
         } catch (error) {
             logger.error(`Message send error: ${error.message}`);
