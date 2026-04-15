@@ -201,10 +201,10 @@ export default function GamesPage() {
                     {activeGame === 'minesweeper' && <MinesweeperGame key="mine" goBack={goBack} saveScoreToDb={saveScoreToDb} />}
                     {activeGame === 'flappy' && <FlappyBirdGame key="flappy" goBack={goBack} saveScoreToDb={saveScoreToDb} />}
                     {activeGame === 'tetris' && <TetrisGame key="tetris" goBack={goBack} saveScoreToDb={saveScoreToDb} />}
-                    {activeGame === 'connect4' && <Connect4Game key="c4" goBack={goBack} saveScoreToDb={saveScoreToDb} />}
-                    {activeGame === 'pong' && <PongGame key="pong" goBack={goBack} saveScoreToDb={saveScoreToDb} />}
-                    {activeGame === 'chess' && <ChessGame key="chess" goBack={goBack} saveScoreToDb={saveScoreToDb} />}
-                    {activeGame === 'checkers' && <CheckersGame key="chk" goBack={goBack} saveScoreToDb={saveScoreToDb} />}
+                    {activeGame === 'connect4' && <Connect4Game key="c4" goBack={goBack} mode={gameMode} saveScoreToDb={saveScoreToDb} />}
+                    {activeGame === 'pong' && <PongGame key="pong" goBack={goBack} mode={gameMode} saveScoreToDb={saveScoreToDb} />}
+                    {activeGame === 'chess' && <ChessGame key="chess" goBack={goBack} mode={gameMode} saveScoreToDb={saveScoreToDb} />}
+                    {activeGame === 'checkers' && <CheckersGame key="chk" goBack={goBack} mode={gameMode} saveScoreToDb={saveScoreToDb} />}
                     {activeGame === 'battleship' && <BattleshipGame key="bs" goBack={goBack} saveScoreToDb={saveScoreToDb} />}
                     {activeGame === 'ludo' && <LudoGame key="ludo" goBack={goBack} saveScoreToDb={saveScoreToDb} />}
                 </AnimatePresence>

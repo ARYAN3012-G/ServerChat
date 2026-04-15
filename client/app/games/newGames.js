@@ -349,7 +349,7 @@ export function FlappyBirdGame({ goBack, saveScoreToDb }) {
 }
 
 // ═══ CONNECT 4 ═══
-export function Connect4Game({ goBack, saveScoreToDb }) {
+export function Connect4Game({ goBack, mode, saveScoreToDb }) {
     const ROWS = 6, COLS = 7;
     const [board, setBoard] = useState(Array(ROWS).fill(null).map(() => Array(COLS).fill(null)));
     const [turn, setTurn] = useState('R');
@@ -367,25 +367,67 @@ export function Connect4Game({ goBack, saveScoreToDb }) {
         return false;
     };
 
+    const getDropRow = (b, col) => {
+        for (let r = ROWS - 1; r >= 0; r--) { if (!b[r][col]) return r; }
+        return -1;
+    };
+
+    const cpuMove = (b) => {
+        // Try to win
+        for (let c = 0; c < COLS; c++) {
+            const r = getDropRow(b, c); if (r === -1) continue;
+            const t = b.map(row => [...row]); t[r][c] = 'Y';
+            if (checkWin(t, r, c, 'Y')) return c;
+        }
+        // Block player win
+        for (let c = 0; c < COLS; c++) {
+            const r = getDropRow(b, c); if (r === -1) continue;
+            const t = b.map(row => [...row]); t[r][c] = 'R';
+            if (checkWin(t, r, c, 'R')) return c;
+        }
+        // Prefer center
+        if (getDropRow(b, 3) !== -1) return 3;
+        // Random valid column
+        const valid = [];
+        for (let c = 0; c < COLS; c++) { if (getDropRow(b, c) !== -1) valid.push(c); }
+        return valid[Math.floor(Math.random() * valid.length)];
+    };
+
     const drop = (col) => {
-        if (winner) return;
+        if (winner || (mode === 'cpu' && turn === 'Y')) return;
         const b = board.map(r => [...r]);
-        let row = -1;
-        for (let r = ROWS - 1; r >= 0; r--) { if (!b[r][col]) { row = r; break; } }
+        const row = getDropRow(b, col);
         if (row === -1) return;
         b[row][col] = turn;
-        if (checkWin(b, row, col, turn)) { setWinner(turn); setScores(s => ({...s, [turn]: s[turn]+1})); setHighScore('connect4', scores[turn]+1); saveScoreToDb?.('connect4', 1, true); }
-        else if (b[0].every(c => c)) { setWinner('draw'); }
-        setBoard(b); setTurn(turn === 'R' ? 'Y' : 'R');
+        if (checkWin(b, row, col, turn)) { setWinner(turn); setScores(s => ({...s, [turn]: s[turn]+1})); setHighScore('connect4', scores[turn]+1); if (turn === 'R') saveScoreToDb?.('connect4', 1, true); setBoard(b); return; }
+        if (b[0].every(c => c)) { setWinner('draw'); setBoard(b); return; }
+        setBoard(b);
+        if (mode === 'cpu') {
+            setTurn('Y');
+            setTimeout(() => {
+                const cpuCol = cpuMove(b);
+                if (cpuCol === undefined) return;
+                const nb = b.map(r => [...r]);
+                const cpuRow = getDropRow(nb, cpuCol);
+                if (cpuRow === -1) return;
+                nb[cpuRow][cpuCol] = 'Y';
+                if (checkWin(nb, cpuRow, cpuCol, 'Y')) { setWinner('Y'); setScores(s => ({...s, Y: s.Y+1})); }
+                else if (nb[0].every(c => c)) { setWinner('draw'); }
+                setBoard(nb);
+                setTurn('R');
+            }, 400);
+        } else {
+            setTurn(turn === 'R' ? 'Y' : 'R');
+        }
     };
 
     const reset = () => { setBoard(Array(ROWS).fill(null).map(() => Array(COLS).fill(null))); setTurn('R'); setWinner(null); };
 
     return (
         <GameHeader title="Connect 4" gradient="from-red-400 to-pink-400" goBack={goBack} onReset={reset}>
-            <ScorePanel items={[{ label: '🔴 Red', value: scores.R, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' }, { label: '🟡 Yellow', value: scores.Y, color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' }]} />
-            {winner && <div className={`mb-4 p-4 rounded-xl font-bold text-center ${winner === 'draw' ? 'bg-white/10 text-white/60' : winner === 'R' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{winner === 'draw' ? '🤝 Draw!' : `${winner === 'R' ? '🔴 Red' : '🟡 Yellow'} Wins!`}<button onClick={reset} className="block mx-auto mt-2 px-6 py-2 bg-white/10 rounded-lg text-xs text-white">Again</button></div>}
-            {!winner && <p className="text-white/30 text-sm mb-3 font-medium">{turn === 'R' ? '🔴 Red' : '🟡 Yellow'}'s turn</p>}
+            <ScorePanel items={[{ label: mode === 'cpu' ? '🔴 You' : '🔴 Red', value: scores.R, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' }, { label: mode === 'cpu' ? '🟡 CPU' : '🟡 Yellow', value: scores.Y, color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' }]} />
+            {winner && <div className={`mb-4 p-4 rounded-xl font-bold text-center ${winner === 'draw' ? 'bg-white/10 text-white/60' : winner === 'R' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{winner === 'draw' ? '🤝 Draw!' : `${winner === 'R' ? (mode === 'cpu' ? '🎉 You Win!' : '🔴 Red Wins!') : (mode === 'cpu' ? '💻 CPU Wins!' : '🟡 Yellow Wins!')}`}<button onClick={reset} className="block mx-auto mt-2 px-6 py-2 bg-white/10 rounded-lg text-xs text-white">Again</button></div>}
+            {!winner && <p className="text-white/30 text-sm mb-3 font-medium">{mode === 'cpu' ? (turn === 'R' ? '🔴 Your turn' : '🟡 CPU thinking...') : `${turn === 'R' ? '🔴 Red' : '🟡 Yellow'}'s turn`}</p>}
             <div className="inline-grid gap-1.5 bg-indigo-900/40 backdrop-blur-sm rounded-2xl p-3 border border-indigo-500/20" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
                 {board.flat().map((cell, i) => { const c = i % COLS; return (
                     <button key={i} onClick={() => drop(c)} className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full border-2 transition-all ${cell === 'R' ? 'bg-red-500 border-red-400 shadow-lg shadow-red-500/30' : cell === 'Y' ? 'bg-yellow-400 border-yellow-300 shadow-lg shadow-yellow-500/30' : 'bg-white/5 border-white/10 hover:bg-white/15 cursor-pointer'}`} />
@@ -396,7 +438,7 @@ export function Connect4Game({ goBack, saveScoreToDb }) {
 }
 
 // ═══ PING PONG ═══
-export function PongGame({ goBack, saveScoreToDb }) {
+export function PongGame({ goBack, mode, saveScoreToDb }) {
     const W = 600, H = 420, MAX_SPEED = 10;
     const canvasRef = useRef(null);
     const stateRef = useRef({ p1: H/2-30, p2: H/2-30, ball: { x: W/2, y: H/2, vx: 3, vy: 2 }, s1: 0, s2: 0, running: false });
@@ -405,7 +447,9 @@ export function PongGame({ goBack, saveScoreToDb }) {
     const keysRef = useRef({});
     const rafRef = useRef(null);
     const saveRef = useRef(saveScoreToDb);
+    const modeRef = useRef(mode);
     saveRef.current = saveScoreToDb;
+    modeRef.current = mode;
 
     const drawRoundRect = (ctx, x, y, w, h, r) => {
         ctx.beginPath(); ctx.moveTo(x + r, y);
@@ -427,12 +471,19 @@ export function PongGame({ goBack, saveScoreToDb }) {
     const loop = useCallback(() => {
         const s = stateRef.current; if (!s.running) return;
         const k = keysRef.current;
-        if (k['w'] || k['ArrowUp']) s.p1 = Math.max(0, s.p1 - 5);
-        if (k['s'] || k['ArrowDown']) s.p1 = Math.min(H - 60, s.p1 + 5);
-        // CPU AI with slight delay for fairness
-        const cpuTarget = s.ball.y - 30;
-        if (s.p2 < cpuTarget) s.p2 = Math.min(H - 60, s.p2 + 3.5);
-        else if (s.p2 > cpuTarget) s.p2 = Math.max(0, s.p2 - 3.5);
+        // Player 1: W/S
+        if (k['w'] || k['W']) s.p1 = Math.max(0, s.p1 - 5);
+        if (k['s'] || k['S']) s.p1 = Math.min(H - 60, s.p1 + 5);
+        // Player 2: Arrow keys (2player) or CPU AI
+        if (modeRef.current === '2player') {
+            if (k['ArrowUp']) s.p2 = Math.max(0, s.p2 - 5);
+            if (k['ArrowDown']) s.p2 = Math.min(H - 60, s.p2 + 5);
+        } else {
+            // CPU AI with slight delay for fairness
+            const cpuTarget = s.ball.y - 30;
+            if (s.p2 < cpuTarget) s.p2 = Math.min(H - 60, s.p2 + 3.5);
+            else if (s.p2 > cpuTarget) s.p2 = Math.max(0, s.p2 - 3.5);
+        }
         s.ball.x += s.ball.vx; s.ball.y += s.ball.vy;
         if (s.ball.y <= 0 || s.ball.y >= H) s.ball.vy *= -1;
         // Left paddle collision
@@ -476,7 +527,7 @@ export function PongGame({ goBack, saveScoreToDb }) {
                 <canvas ref={canvasRef} width={W} height={H} onClick={() => { if (!started) start(); }} className="cursor-pointer block" style={{ maxWidth: '100%', height: 'auto' }} />
                 {!started && <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm"><button onClick={start} className="px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-2xl font-bold text-white shadow-xl text-lg">▶ Start</button></div>}
             </div>
-            <p className="text-white/20 text-xs mt-4">W/S or ↑/↓ to move paddle</p>
+            <p className="text-white/20 text-xs mt-4">{mode === '2player' ? 'P1: W/S  •  P2: ↑/↓' : 'W/S or ↑/↓ to move paddle'}</p>
         </GameHeader>
     );
 }

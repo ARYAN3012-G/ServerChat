@@ -99,7 +99,7 @@ export function TetrisGame({ goBack, saveScoreToDb }) {
 }
 
 // ═══ CHESS — Full featured with settings, timers, move history ═══
-export function ChessGame({ goBack, saveScoreToDb }) {
+export function ChessGame({ goBack, mode, saveScoreToDb }) {
     const INIT = [
         ['br','bn','bb','bq','bk','bb','bn','br'],
         ['bp','bp','bp','bp','bp','bp','bp','bp'],
@@ -192,7 +192,8 @@ export function ChessGame({ goBack, saveScoreToDb }) {
     };
 
     const handleClick = (r, c) => {
-        if (turn !== 'w' || status) return;
+        if (status) return;
+        if (mode === 'cpu' && turn !== 'w') return;
         const piece = board[r][c];
         if (selected) {
             const [sr, sc] = selected;
@@ -202,17 +203,27 @@ export function ChessGame({ goBack, saveScoreToDb }) {
                 const nb = board.map(row => [...row]);
                 const target = nb[r][c];
                 const movingPiece = nb[sr][sc];
-                if (target && side(target) === 'b') setCaptured(p => ({...p, w: [...p.w, target]}));
-                if (target?.[1] === 'k') { setStatus('🏆 White wins!'); saveScoreToDb?.('chess', 1, true); }
+                if (target && side(target) !== turn) {
+                    if (turn === 'w') setCaptured(p => ({...p, w: [...p.w, target]}));
+                    else setCaptured(p => ({...p, b: [...p.b, target]}));
+                }
+                if (target?.[1] === 'k') {
+                    if (turn === 'w') { setStatus('🏆 White wins!'); saveScoreToDb?.('chess', 1, true); }
+                    else setStatus('🏆 Black wins!');
+                }
                 nb[r][c] = nb[sr][sc]; nb[sr][sc] = null;
                 if (nb[r][c] === 'wp' && r === 0) nb[r][c] = 'wq';
+                if (nb[r][c] === 'bp' && r === 7) nb[r][c] = 'bq';
                 const notation = addMoveNotation(movingPiece, sr, sc, r, c, target);
                 setMoveHistory(h => [...h, notation]);
-                setBoard(nb); setSelected(null); setValidMoves([]); setTurn('b');
-                setTimeout(() => cpuMove(nb), settings?.difficulty === 2 ? 600 : 300);
-            } else if (isOwn(piece, 'w')) { setSelected([r, c]); setValidMoves(getValidMoves(board, r, c)); }
+                const nextTurn = turn === 'w' ? 'b' : 'w';
+                setBoard(nb); setSelected(null); setValidMoves([]); setTurn(nextTurn);
+                if (mode === 'cpu' && nextTurn === 'b') {
+                    setTimeout(() => cpuMove(nb), settings?.difficulty === 2 ? 600 : 300);
+                }
+            } else if (isOwn(piece, turn)) { setSelected([r, c]); setValidMoves(getValidMoves(board, r, c)); }
             else { setSelected(null); setValidMoves([]); }
-        } else if (piece && isOwn(piece, 'w')) { setSelected([r, c]); setValidMoves(getValidMoves(board, r, c)); }
+        } else if (piece && isOwn(piece, turn)) { setSelected([r, c]); setValidMoves(getValidMoves(board, r, c)); }
     };
 
     const cpuMove = (b) => {
@@ -291,7 +302,7 @@ export function ChessGame({ goBack, saveScoreToDb }) {
                     </div>
                     {/* Time control */}
                     <div>
-                        <p className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-3">⏱ Time Control</p>
+                        <p className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-3">{mode === '2player' ? '⏱ Time Control' : '⏱ Time Control'}</p>
                         <div className="grid grid-cols-5 gap-2">
                             {TIME_OPTS.map((t, i) => (
                                 <button key={i} onClick={() => setSelTime(i)}
@@ -302,8 +313,8 @@ export function ChessGame({ goBack, saveScoreToDb }) {
                             ))}
                         </div>
                     </div>
-                    {/* Difficulty */}
-                    <div>
+                    {/* Difficulty — only for CPU mode */}
+                    {mode === 'cpu' && <div>
                         <p className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-3">🎯 CPU Difficulty</p>
                         <div className="grid grid-cols-3 gap-3">
                             {DIFF_OPTS.map((d, i) => (
@@ -314,7 +325,7 @@ export function ChessGame({ goBack, saveScoreToDb }) {
                                 </button>
                             ))}
                         </div>
-                    </div>
+                    </div>}
                     {/* Start */}
                     <button onClick={() => startGame(TIME_OPTS[selTime], DIFF_OPTS[selDiff])}
                         className="w-full py-4 bg-gradient-to-r from-violet-500 to-indigo-500 hover:from-violet-400 hover:to-indigo-400 rounded-2xl font-bold text-white text-lg shadow-xl shadow-violet-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
@@ -359,7 +370,7 @@ export function ChessGame({ goBack, saveScoreToDb }) {
                     <div className="flex justify-between w-full max-w-[420px] sm:max-w-[500px] mb-3 gap-4">
                         <div className={`flex-1 flex items-center gap-2 rounded-xl px-4 py-2 border ${turn === 'b' && settings.time > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-white/[0.03] border-white/[0.06]'}`}>
                             <span className="text-amber-400 text-lg">♚</span>
-                            <span className="text-xs text-white/40">CPU</span>
+                            <span className="text-xs text-white/40">{mode === '2player' ? 'Black' : 'CPU'}</span>
                             {settings.time > 0 && <span className={`ml-auto font-mono font-bold text-sm ${turn === 'b' ? 'text-amber-400' : 'text-white/30'}`}>{formatTime(blackTime)}</span>}
                         </div>
                         <div className={`flex-1 flex items-center gap-2 rounded-xl px-4 py-2 border ${turn === 'w' && settings.time > 0 ? 'bg-violet-500/10 border-violet-500/20' : 'bg-white/[0.03] border-white/[0.06]'}`}>
@@ -382,7 +393,7 @@ export function ChessGame({ goBack, saveScoreToDb }) {
                         </div>
                     </div>
                     {/* Turn indicator */}
-                    <div className={`mb-3 text-sm font-semibold px-5 py-2 rounded-full ${turn === 'w' ? 'bg-violet-500/15 text-violet-300 border border-violet-500/20' : 'bg-amber-500/15 text-amber-300 border border-amber-500/20'}`}>{turn === 'w' ? '♔ Your turn' : '♚ CPU thinking...'}</div>
+                    <div className={`mb-3 text-sm font-semibold px-5 py-2 rounded-full ${turn === 'w' ? 'bg-violet-500/15 text-violet-300 border border-violet-500/20' : 'bg-amber-500/15 text-amber-300 border border-amber-500/20'}`}>{turn === 'w' ? (mode === '2player' ? '♔ White\'s turn' : '♔ Your turn') : (mode === '2player' ? '♚ Black\'s turn' : '♚ CPU thinking...')}</div>
                     {/* Board */}
                     <div className="relative">
                         <div className="inline-grid grid-cols-8 gap-0 rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl shadow-violet-500/10" style={{ boxShadow: '0 0 60px rgba(124,58,237,0.08), 0 25px 50px rgba(0,0,0,0.4)' }}>
@@ -429,7 +440,7 @@ export function ChessGame({ goBack, saveScoreToDb }) {
 }
 
 // ═══ CHECKERS ═══
-export function CheckersGame({ goBack, saveScoreToDb }) {
+export function CheckersGame({ goBack, mode, saveScoreToDb }) {
     const initBoard = () => {
         const b = Array(8).fill(null).map(() => Array(8).fill(null));
         for (let r = 0; r < 3; r++) for (let c = 0; c < 8; c++) { if ((r+c)%2===1) b[r][c] = 'b'; }
@@ -458,8 +469,10 @@ export function CheckersGame({ goBack, saveScoreToDb }) {
     };
 
     const handleClick = (r, c) => {
-        if (turn !== 'r' || status) return;
+        if (status) return;
+        if (mode === 'cpu' && turn !== 'r') return;
         const piece = board[r][c];
+        const myColor = turn;
         if (selected) {
             const move = validMoves.find(m => m.tr === r && m.tc === c);
             if (move) {
@@ -467,13 +480,18 @@ export function CheckersGame({ goBack, saveScoreToDb }) {
                 nb[r][c] = nb[selected[0]][selected[1]]; nb[selected[0]][selected[1]] = null;
                 if (move.jump) nb[move.mr][move.mc] = null;
                 if (r === 0 && nb[r][c].toLowerCase() === 'r') nb[r][c] = 'R';
+                if (r === 7 && nb[r][c] === 'b') nb[r][c] = 'B';
                 setBoard(nb); setSelected(null); setValidMoves([]);
-                if (!nb.flat().some(p => p && p.toLowerCase() === 'b')) { setStatus('🏆 You win!'); saveScoreToDb?.('checkers', 1, true); return; }
-                setTurn('b'); setTimeout(() => cpuMove(nb), 400);
-            } else if (piece && piece.toLowerCase() === 'r') {
+                if (!nb.flat().some(p => p && p.toLowerCase() === (myColor === 'r' ? 'b' : 'r'))) {
+                    setStatus(myColor === 'r' ? '🏆 Red wins!' : '🏆 Black wins!'); if (myColor === 'r') saveScoreToDb?.('checkers', 1, true); return;
+                }
+                const nextTurn = myColor === 'r' ? 'b' : 'r';
+                setTurn(nextTurn);
+                if (mode === 'cpu' && nextTurn === 'b') setTimeout(() => cpuMove(nb), 400);
+            } else if (piece && piece.toLowerCase() === myColor) {
                 setSelected([r, c]); setValidMoves(getMoves(board, r, c));
             } else { setSelected(null); setValidMoves([]); }
-        } else if (piece && piece.toLowerCase() === 'r') { setSelected([r, c]); setValidMoves(getMoves(board, r, c)); }
+        } else if (piece && piece.toLowerCase() === myColor) { setSelected([r, c]); setValidMoves(getMoves(board, r, c)); }
     };
 
     const cpuMove = (b) => {
@@ -500,7 +518,7 @@ export function CheckersGame({ goBack, saveScoreToDb }) {
     return (
         <GameHeader title="Checkers" gradient="from-rose-400 to-orange-400" goBack={goBack} onReset={reset}>
             {status && <div className={`mb-5 py-4 px-8 rounded-2xl font-bold text-center text-lg backdrop-blur-sm border ${status.includes('You') ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/15 text-rose-400 border-rose-500/20'}`}>{status}<button onClick={reset} className="block mx-auto mt-3 px-6 py-2 bg-white/10 hover:bg-white/15 rounded-lg text-sm text-white transition-colors">New Game</button></div>}
-            <div className={`mb-4 text-sm font-semibold px-5 py-2 rounded-full ${turn === 'r' ? 'bg-rose-500/15 text-rose-300 border border-rose-500/20' : 'bg-slate-500/15 text-slate-300 border border-slate-500/20'}`}>{turn === 'r' ? '🔴 Your turn' : '⚫ CPU thinking...'}</div>
+            <div className={`mb-4 text-sm font-semibold px-5 py-2 rounded-full ${turn === 'r' ? 'bg-rose-500/15 text-rose-300 border border-rose-500/20' : 'bg-slate-500/15 text-slate-300 border border-slate-500/20'}`}>{turn === 'r' ? (mode === '2player' ? '🔴 Red\'s turn' : '🔴 Your turn') : (mode === '2player' ? '⚫ Black\'s turn' : '⚫ CPU thinking...')}</div>
             <div className="inline-grid grid-cols-8 gap-0 rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl" style={{ boxShadow: '0 0 60px rgba(244,63,94,0.06), 0 25px 50px rgba(0,0,0,0.4)' }}>
                 {board.flat().map((cell, i) => { const r = Math.floor(i/8), c = i%8; const isDark = (r+c)%2===1;
                     const isValid = isValidTarget(r, c); const isSel = selected?.[0]===r&&selected?.[1]===c;
