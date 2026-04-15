@@ -196,7 +196,11 @@ export default function SettingsPage() {
             }
             setCurrentPw(''); setNewPw(''); setConfirmPw(''); setSaved(true); setTimeout(() => setSaved(false), 2000);
             toast.success(user?.hasPassword ? 'Password changed!' : 'Password set! You can now login with email + password.');
-        } catch (e) { setError(e.response?.data?.message || 'Failed'); }
+        } catch (e) { 
+            const errData = e.response?.data;
+            const msg = errData?.errors?.join('. ') || errData?.message || 'Failed to set password';
+            setError(msg); 
+        }
     };
 
     const proFeatures = [
