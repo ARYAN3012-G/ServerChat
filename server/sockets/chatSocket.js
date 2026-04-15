@@ -228,6 +228,30 @@ module.exports = (io, socket) => {
             }
             // Thread replies: don't emit message:new — client refreshes thread panel via openThread()
 
+            // --- @Mention Notifications ---
+            if (content) {
+                const mentionRegex = /@(\w+)/g;
+                let match;
+                const mentionedUsernames = [];
+                while ((match = mentionRegex.exec(content)) !== null) {
+                    mentionedUsernames.push(match[1]);
+                }
+                if (mentionedUsernames.length > 0) {
+                    const User = require('../models/User');
+                    const mentionedUsers = await User.find({ username: { $in: mentionedUsernames } }).select('_id username');
+                    for (const mentioned of mentionedUsers) {
+                        if (mentioned._id.toString() !== socket.userId) {
+                            io.to(`user:${mentioned._id.toString()}`).emit('notification:mention', {
+                                message: populated,
+                                channelId,
+                                mentionedBy: socket.username,
+                                type: 'mention',
+                            });
+                        }
+                    }
+                }
+            }
+
             // --- Bot Integration Logic ---
             if (!threadId && channel.name === 'integration' && type !== 'system' && socket.userId) {
                 setTimeout(async () => {
@@ -412,7 +436,7 @@ module.exports = (io, socket) => {
     socket.on('message:pin', async (data) => {
         try {
             const { messageId, channelId } = data;
-            const message = await Message.findByIdAndUpdate(messageId, { isPinned: true }, { new: true });
+            await Message.findByIdAndUpdate(messageId, { isPinned: true }, { new: true });
 
             await Channel.findByIdAndUpdate(channelId, {
                 $addToSet: { pinnedMessages: messageId }
@@ -421,6 +445,22 @@ module.exports = (io, socket) => {
             io.to(`channel:${channelId}`).emit('message:pinned', { messageId, channelId });
         } catch (error) {
             logger.error(`Pin error: ${error.message}`);
+        }
+    });
+
+    // Unpin message
+    socket.on('message:unpin', async (data) => {
+        try {
+            const { messageId, channelId } = data;
+            await Message.findByIdAndUpdate(messageId, { isPinned: false }, { new: true });
+
+            await Channel.findByIdAndUpdate(channelId, {
+                $pull: { pinnedMessages: messageId }
+            });
+
+            io.to(`channel:${channelId}`).emit('message:unpinned', { messageId, channelId });
+        } catch (error) {
+            logger.error(`Unpin error: ${error.message}`);
         }
     });
 

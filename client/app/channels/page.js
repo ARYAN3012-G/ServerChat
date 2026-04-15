@@ -363,6 +363,15 @@ export default function ChannelsPage() {
         setTimeout(() => fetchPinnedMessages(currentChannel._id), 500);
     };
 
+    const handleUnpinMessage = async (msgId) => {
+        const socket = getSocket();
+        if (socket) socket.emit('message:unpin', { messageId: msgId, channelId: currentChannel._id });
+        toast.success('Message unpinned!');
+        setTimeout(() => fetchPinnedMessages(currentChannel._id), 500);
+        // Also update the local message state
+        dispatch(updateMessage({ _id: msgId, isPinned: false }));
+    };
+
     // ── Read Receipts ──
     const markMessagesRead = async (channelId) => {
         if (messages.length > 0) {
@@ -929,9 +938,12 @@ export default function ChannelsPage() {
                                             <FiX className="w-3.5 h-3.5 text-white/30 cursor-pointer hover:text-white" onClick={() => setShowPinned(false)} />
                                         </div>
                                         {pinnedMessages.length > 0 ? pinnedMessages.map((pm, i) => (
-                                            <div key={pm._id || i} className="flex items-start gap-2 py-1.5 text-sm">
+                                            <div key={pm._id || i} className="flex items-start gap-2 py-1.5 text-sm group/pin">
                                                 <span className="font-medium text-white/70">{pm.sender?.username || 'User'}</span>
                                                 <span className="text-white/40 truncate flex-1">{pm.content}</span>
+                                                <button onClick={() => handleUnpinMessage(pm._id)}
+                                                    className="opacity-0 group-hover/pin:opacity-100 text-red-400/60 hover:text-red-400 text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20 transition-all flex-shrink-0"
+                                                    title="Unpin">✕ Unpin</button>
                                             </div>
                                         )) : <p className="text-xs text-white/20 py-1">No pinned messages yet</p>}
                                     </div>
@@ -1092,8 +1104,9 @@ export default function ChannelsPage() {
                                                     className="p-1.5 hover:bg-white/10 rounded-l-lg text-white/30 hover:text-white transition-colors" title="React"><FiSmile className="w-4 h-4" /></button>
                                                 <button onClick={() => openThread(msg)}
                                                     className="p-1.5 hover:bg-white/10 text-white/30 hover:text-indigo-400 transition-colors" title="Thread"><FiMessageCircle className="w-4 h-4" /></button>
-                                                <button onClick={() => handlePinMessage(msg._id)}
-                                                    className="p-1.5 hover:bg-white/10 text-white/30 hover:text-amber-400 transition-colors" title="Pin"><FiBookmark className="w-4 h-4" /></button>
+                                                <button onClick={() => msg.isPinned ? handleUnpinMessage(msg._id) : handlePinMessage(msg._id)}
+                                                    className={`p-1.5 hover:bg-white/10 transition-colors ${msg.isPinned ? 'text-amber-400 hover:text-red-400' : 'text-white/30 hover:text-amber-400'}`}
+                                                    title={msg.isPinned ? 'Unpin' : 'Pin'}><FiBookmark className="w-4 h-4" /></button>
                                                 {(msg.sender?._id === user?._id || msg.sender === user?._id) && (
                                                     <button onClick={() => { setEditingMsg(msg._id); setEditContent(msg.content); }}
                                                         className="p-1.5 hover:bg-white/10 text-white/30 hover:text-white transition-colors" title="Edit"><FiEdit2 className="w-4 h-4" /></button>
