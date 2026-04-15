@@ -244,6 +244,8 @@ module.exports = (io, socket) => {
                             io.to(`user:${mentioned._id.toString()}`).emit('notification:mention', {
                                 message: populated,
                                 channelId,
+                                channelName: channel?.name || 'general',
+                                serverId: channel?.server?.toString() || null,
                                 mentionedBy: socket.username,
                                 type: 'mention',
                             });
