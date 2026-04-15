@@ -36,7 +36,7 @@ const userSchema = new mongoose.Schema({
         prebuilt: { type: Boolean, default: false },
     },
     banner: {
-        type: String,
+        type: mongoose.Schema.Types.Mixed,
         default: '',
     },
     accentColor: {
