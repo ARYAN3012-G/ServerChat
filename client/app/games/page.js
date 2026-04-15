@@ -222,8 +222,22 @@ function TicTacToe({ goBack, mode, saveScoreToDb }) {
     const [scores, setScores] = useState({ X: 0, O: 0, draws: 0 });
     const [winLine, setWinLine] = useState(null);
     const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-    const check = (b) => { for (const [a,c,d] of LINES) { if (b[a]&&b[a]===b[c]&&b[a]===b[d]) { setWinLine([a,c,d]); return b[a]; } } return b.every(Boolean)?'draw':null; };
-    const cpuMove = (b) => { const empty = b.map((v,i)=>v===null?i:null).filter(v=>v!==null); if(!empty.length) return b; for(const i of empty){const t=[...b];t[i]='O';if(check(t)==='O'){b[i]='O';return[...b];}} setWinLine(null); for(const i of empty){const t=[...b];t[i]='X';for(const[a,c,d]of LINES){if(t[a]&&t[a]===t[c]&&t[a]===t[d]){b[i]='O';return[...b];}}} if(b[4]===null){b[4]='O';return[...b];} b[empty[Math.floor(Math.random()*empty.length)]]='O'; return[...b]; };
+    // Pure check — no side effects (used by CPU analysis)
+    const checkWinner = (b) => { for (const [a,c,d] of LINES) { if (b[a]&&b[a]===b[c]&&b[a]===b[d]) return { winner: b[a], line: [a,c,d] }; } return b.every(Boolean) ? { winner: 'draw', line: null } : null; };
+    // UI check — sets win line for rendering
+    const check = (b) => { const result = checkWinner(b); if (result) { setWinLine(result.line); return result.winner; } return null; };
+    const cpuMove = (b) => {
+        const nb = [...b]; const empty = nb.map((v,i)=>v===null?i:null).filter(v=>v!==null);
+        if (!empty.length) return nb;
+        // Try to win
+        for (const i of empty) { const t=[...nb]; t[i]='O'; const r=checkWinner(t); if (r?.winner==='O') { nb[i]='O'; return nb; } }
+        // Block player
+        for (const i of empty) { const t=[...nb]; t[i]='X'; const r=checkWinner(t); if (r?.winner==='X') { nb[i]='O'; return nb; } }
+        // Center
+        if (nb[4]===null) { nb[4]='O'; return nb; }
+        // Random
+        nb[empty[Math.floor(Math.random()*empty.length)]]='O'; return nb;
+    };
     const handleClick = (i) => { if(board[i]||winner) return; const nb=[...board];nb[i]=turn; let w=check(nb); if(w){setBoard(nb);setWinner(w);if(w==='draw')setScores(s=>({...s,draws:s.draws+1}));else{setScores(s=>({...s,[w]:s[w]+1}));if(w==='X')saveScoreToDb?.('tic-tac-toe',1,true);} return;} if(mode==='cpu'){setWinLine(null);const after=cpuMove(nb);setBoard(after);w=check(after);if(w){setWinner(w);if(w==='draw')setScores(s=>({...s,draws:s.draws+1}));else setScores(s=>({...s,[w]:s[w]+1}));}}else{setBoard(nb);setTurn(turn==='X'?'O':'X');} };
     const reset = () => { setBoard(Array(9).fill(null));setTurn('X');setWinner(null);setWinLine(null); };
     return (
@@ -232,7 +246,7 @@ function TicTacToe({ goBack, mode, saveScoreToDb }) {
             {winner&&<motion.div initial={{scale:0}} animate={{scale:1}} className={`mb-4 p-3 rounded-xl font-bold ${winner==='draw'?'bg-white/5 text-white/60':winner==='X'?'bg-emerald-500/15 text-emerald-400':'bg-rose-500/15 text-rose-400'}`}>{winner==='draw'?'🤝 Draw!':winner==='X'?'🎉 X Wins!':'🏆 O Wins!'}<button onClick={reset} className="block mx-auto mt-2 px-4 py-1 bg-white/10 rounded-lg text-sm text-white">Again</button></motion.div>}
             {!winner&&<p className="text-white/30 mb-3 text-sm">{mode==='2player'?`${turn}'s turn`:'Your turn (X)'}</p>}
             <div className="grid grid-cols-3 gap-2.5 max-w-[280px] mx-auto">
-                {board.map((cell,i)=>{const isWin=winLine?.includes(i);return(<motion.button key={i} whileHover={!cell&&!winner?{scale:1.08}:{}} onClick={()=>handleClick(i)} className={`aspect-square rounded-xl text-3xl font-black flex items-center justify-center transition-all ${isWin?'bg-emerald-500/20 border-2 border-emerald-400/50':'cell'?'bg-white/5 border border-white/10':'bg-white/[0.03] border border-white/5 hover:bg-white/10 cursor-pointer'} ${cell==='X'?'text-indigo-400':'text-rose-400'}`}>{cell}</motion.button>);})}
+                {board.map((cell,i)=>{const isWin=winLine?.includes(i);return(<motion.button key={i} whileHover={!cell&&!winner?{scale:1.08}:{}} onClick={()=>handleClick(i)} className={`aspect-square rounded-xl text-3xl font-black flex items-center justify-center transition-all ${isWin?'bg-emerald-500/20 border-2 border-emerald-400/50':cell?'bg-white/5 border border-white/10':'bg-white/[0.03] border border-white/5 hover:bg-white/10 cursor-pointer'} ${cell==='X'?'text-indigo-400':'text-rose-400'}`}>{cell}</motion.button>);})}
             </div>
         </GameHeader>
     );
@@ -260,7 +274,7 @@ function MemoryMatch({ goBack, saveScoreToDb }) {
     const createBoard = () => [...MEMORY_ICONS,...MEMORY_ICONS].sort(()=>Math.random()-0.5).map((icon,i)=>({id:i,icon,flipped:false,matched:false}));
     const [cards, setCards] = useState(createBoard); const [flipped, setFlipped] = useState([]); const [moves, setMoves] = useState(0); const [won, setWon] = useState(false); const [lockBoard, setLockBoard] = useState(false);
     const handleFlip = (idx) => { if(lockBoard||cards[idx].flipped||cards[idx].matched) return; const nc=[...cards];nc[idx].flipped=true;setCards(nc); const nf=[...flipped,idx];setFlipped(nf);
-        if(nf.length===2){setMoves(m=>m+1);setLockBoard(true);const[a,b]=nf; if(cards[a].icon===cards[b].icon){setTimeout(()=>{const mc=[...cards];mc[a].matched=true;mc[b].matched=true;setCards(mc);setFlipped([]);setLockBoard(false);if(mc.every(c=>c.matched)){setWon(true);const s=1000-(moves+1)*10;setHighScore('memory',s);saveScoreToDb?.('quiz',s,true);}},400);}else{setTimeout(()=>{const uf=[...cards];uf[a].flipped=false;uf[b].flipped=false;setCards(uf);setFlipped([]);setLockBoard(false);},700);}} };
+        if(nf.length===2){setMoves(m=>m+1);setLockBoard(true);const[a,b]=nf; if(cards[a].icon===cards[b].icon){setTimeout(()=>{const mc=[...cards];mc[a].matched=true;mc[b].matched=true;setCards(mc);setFlipped([]);setLockBoard(false);if(mc.every(c=>c.matched)){setWon(true);const s=1000-(moves+1)*10;setHighScore('memory',s);saveScoreToDb?.('memory',s,true);}},400);}else{setTimeout(()=>{const uf=[...cards];uf[a].flipped=false;uf[b].flipped=false;setCards(uf);setFlipped([]);setLockBoard(false);},700);}} };
     const reset = () => { setCards(createBoard());setFlipped([]);setMoves(0);setWon(false);setLockBoard(false); };
     return (
         <GameHeader title="Memory Match" gradient="from-emerald-400 to-cyan-400" goBack={goBack} onReset={reset}>

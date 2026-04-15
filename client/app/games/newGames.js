@@ -347,13 +347,24 @@ export function Connect4Game({ goBack, saveScoreToDb }) {
 
 // ═══ PING PONG ═══
 export function PongGame({ goBack, saveScoreToDb }) {
-    const W = 600, H = 420;
+    const W = 600, H = 420, MAX_SPEED = 10;
     const canvasRef = useRef(null);
     const stateRef = useRef({ p1: H/2-30, p2: H/2-30, ball: { x: W/2, y: H/2, vx: 3, vy: 2 }, s1: 0, s2: 0, running: false });
     const [scores, setScores] = useState([0, 0]);
     const [started, setStarted] = useState(false);
     const keysRef = useRef({});
     const rafRef = useRef(null);
+    const saveRef = useRef(saveScoreToDb);
+    saveRef.current = saveScoreToDb;
+
+    const drawRoundRect = (ctx, x, y, w, h, r) => {
+        ctx.beginPath(); ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath(); ctx.fill();
+    };
 
     const start = useCallback(() => { stateRef.current = { ...stateRef.current, ball: { x: W/2, y: H/2, vx: 3*(Math.random()>0.5?1:-1), vy: 2*(Math.random()>0.5?1:-1) }, running: true }; setStarted(true); if (rafRef.current) cancelAnimationFrame(rafRef.current); rafRef.current = requestAnimationFrame(loop); }, []);
 
@@ -368,24 +379,36 @@ export function PongGame({ goBack, saveScoreToDb }) {
         const k = keysRef.current;
         if (k['w'] || k['ArrowUp']) s.p1 = Math.max(0, s.p1 - 5);
         if (k['s'] || k['ArrowDown']) s.p1 = Math.min(H - 60, s.p1 + 5);
-        if (s.ball.y < s.p2 + 30) s.p2 = Math.max(0, s.p2 - 3.5);
-        else s.p2 = Math.min(H - 60, s.p2 + 3.5);
+        // CPU AI with slight delay for fairness
+        const cpuTarget = s.ball.y - 30;
+        if (s.p2 < cpuTarget) s.p2 = Math.min(H - 60, s.p2 + 3.5);
+        else if (s.p2 > cpuTarget) s.p2 = Math.max(0, s.p2 - 3.5);
         s.ball.x += s.ball.vx; s.ball.y += s.ball.vy;
         if (s.ball.y <= 0 || s.ball.y >= H) s.ball.vy *= -1;
-        if (s.ball.x <= 18 && s.ball.y >= s.p1 && s.ball.y <= s.p1 + 60) { s.ball.vx = Math.abs(s.ball.vx) * 1.05; }
-        if (s.ball.x >= W - 18 && s.ball.y >= s.p2 && s.ball.y <= s.p2 + 60) { s.ball.vx = -Math.abs(s.ball.vx) * 1.05; }
+        // Left paddle collision
+        if (s.ball.x <= 18 && s.ball.y >= s.p1 && s.ball.y <= s.p1 + 60) {
+            const speed = Math.min(Math.abs(s.ball.vx) * 1.05, MAX_SPEED);
+            s.ball.vx = speed;
+            s.ball.x = 19; // prevent double-hit
+        }
+        // Right paddle collision
+        if (s.ball.x >= W - 18 && s.ball.y >= s.p2 && s.ball.y <= s.p2 + 60) {
+            const speed = Math.min(Math.abs(s.ball.vx) * 1.05, MAX_SPEED);
+            s.ball.vx = -speed;
+            s.ball.x = W - 19; // prevent double-hit
+        }
         if (s.ball.x < 0) { s.s2++; setScores([s.s1, s.s2]); s.ball = { x: W/2, y: H/2, vx: 3, vy: 2*(Math.random()>0.5?1:-1) }; }
-        if (s.ball.x > W) { s.s1++; setScores([s.s1, s.s2]); s.ball = { x: W/2, y: H/2, vx: -3, vy: 2*(Math.random()>0.5?1:-1) }; setHighScore('pong', s.s1); saveScoreToDb?.('pong', s.s1, true); }
+        if (s.ball.x > W) { s.s1++; setScores([s.s1, s.s2]); s.ball = { x: W/2, y: H/2, vx: -3, vy: 2*(Math.random()>0.5?1:-1) }; setHighScore('pong', s.s1); saveRef.current?.('pong', s.s1, true); }
         const ctx = canvasRef.current?.getContext('2d');
         if (ctx) {
             const bg = ctx.createLinearGradient(0, 0, 0, H);
             bg.addColorStop(0, '#0c0e1a'); bg.addColorStop(1, '#111827');
             ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
             ctx.setLineDash([6, 6]); ctx.strokeStyle = '#ffffff15'; ctx.beginPath(); ctx.moveTo(W/2, 0); ctx.lineTo(W/2, H); ctx.stroke(); ctx.setLineDash([]);
-            // Paddles with glow
+            // Paddles with glow (using cross-browser drawRoundRect)
             ctx.shadowColor = '#6366f1'; ctx.shadowBlur = 15;
-            ctx.fillStyle = '#6366f1'; ctx.beginPath(); ctx.roundRect(6, s.p1, 12, 60, 6); ctx.fill();
-            ctx.shadowColor = '#ef4444'; ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.roundRect(W - 18, s.p2, 12, 60, 6); ctx.fill();
+            ctx.fillStyle = '#6366f1'; drawRoundRect(ctx, 6, s.p1, 12, 60, 6);
+            ctx.shadowColor = '#ef4444'; ctx.fillStyle = '#ef4444'; drawRoundRect(ctx, W - 18, s.p2, 12, 60, 6);
             ctx.shadowBlur = 0;
             // Ball with trail
             ctx.fillStyle = 'rgba(255,255,255,0.15)';

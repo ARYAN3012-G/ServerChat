@@ -171,7 +171,7 @@ export function ChessGame({ goBack, saveScoreToDb }) {
         const addIf = (tr, tc) => { if (tr < 0 || tr > 7 || tc < 0 || tc > 7) return false; if (isOwn(b[tr][tc], t)) return false; moves.push([tr, tc]); return !b[tr][tc]; };
         if (type === 'p') {
             const d = t === 'w' ? -1 : 1; const startRow = t === 'w' ? 6 : 1;
-            if (r+d>=0 && r+d<=7 && !b[r+d][c]) { moves.push([r+d,c]); if (r===startRow && !b[r+d*2]?.[c] === undefined ? false : !b[r+d*2][c]) moves.push([r+d*2,c]); }
+            if (r+d>=0 && r+d<=7 && !b[r+d][c]) { moves.push([r+d,c]); if (r===startRow && r+d*2>=0 && r+d*2<=7 && !b[r+d*2][c]) moves.push([r+d*2,c]); }
             if (c>0 && isEnemy(b[r+d]?.[c-1], t)) moves.push([r+d,c-1]);
             if (c<7 && isEnemy(b[r+d]?.[c+1], t)) moves.push([r+d,c+1]);
         }
@@ -444,14 +444,14 @@ export function CheckersGame({ goBack, saveScoreToDb }) {
 
     const getMoves = (b, r, c) => {
         const p = b[r][c]; if (!p) return [];
-        const moves = []; const isKing = p === p.toUpperCase();
-        const dirs = p.toLowerCase() === 'r' ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]];
+        const moves = []; const pLower = p.toLowerCase(); const isKing = p !== pLower;
+        const dirs = pLower === 'r' ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]];
         const allDirs = isKing ? [[-1,-1],[-1,1],[1,-1],[1,1]] : dirs;
         for (const [dr, dc] of allDirs) {
             const nr = r+dr, nc = c+dc;
             if (nr>=0&&nr<8&&nc>=0&&nc<8&&!b[nr][nc]) moves.push({ tr: nr, tc: nc, jump: false });
             const jr = r+dr*2, jc = c+dc*2;
-            if (jr>=0&&jr<8&&jc>=0&&jc<8&&!b[jr][jc]&&nr>=0&&nr<8&&nc>=0&&nc<8&&b[nr][nc]&&b[nr][nc].toLowerCase()!==p.toLowerCase())
+            if (jr>=0&&jr<8&&jc>=0&&jc<8&&!b[jr][jc]&&nr>=0&&nr<8&&nc>=0&&nc<8&&b[nr][nc]&&b[nr][nc].toLowerCase()!==pLower)
                 moves.push({ tr: jr, tc: jc, mr: nr, mc: nc, jump: true });
         }
         return moves;
@@ -459,20 +459,21 @@ export function CheckersGame({ goBack, saveScoreToDb }) {
 
     const handleClick = (r, c) => {
         if (turn !== 'r' || status) return;
+        const piece = board[r][c];
         if (selected) {
             const move = validMoves.find(m => m.tr === r && m.tc === c);
             if (move) {
                 const nb = board.map(row => [...row]);
                 nb[r][c] = nb[selected[0]][selected[1]]; nb[selected[0]][selected[1]] = null;
                 if (move.jump) nb[move.mr][move.mc] = null;
-                if (r === 0 && nb[r][c] === 'r') nb[r][c] = 'R';
+                if (r === 0 && nb[r][c].toLowerCase() === 'r') nb[r][c] = 'R';
                 setBoard(nb); setSelected(null); setValidMoves([]);
                 if (!nb.flat().some(p => p && p.toLowerCase() === 'b')) { setStatus('🏆 You win!'); saveScoreToDb?.('checkers', 1, true); return; }
                 setTurn('b'); setTimeout(() => cpuMove(nb), 400);
-            } else if (board[r][c]?.toLowerCase() === 'r') {
+            } else if (piece && piece.toLowerCase() === 'r') {
                 setSelected([r, c]); setValidMoves(getMoves(board, r, c));
             } else { setSelected(null); setValidMoves([]); }
-        } else if (board[r][c]?.toLowerCase() === 'r') { setSelected([r, c]); setValidMoves(getMoves(board, r, c)); }
+        } else if (piece && piece.toLowerCase() === 'r') { setSelected([r, c]); setValidMoves(getMoves(board, r, c)); }
     };
 
     const cpuMove = (b) => {

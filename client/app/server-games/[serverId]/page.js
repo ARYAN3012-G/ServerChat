@@ -588,14 +588,15 @@ function Connect4Board({ session, myIndex, isMyTurn, isFinished, makeMove }) {
     );
 }
 
-// ── CHESS BOARD ──
+// ── CHESS BOARD (Enhanced — matches Account Chess quality) ──
 function ChessBoard({ session, myIndex, isMyTurn, isFinished, makeMove, userId }) {
     const [selected, setSelected] = useState(null);
     const fen = session.state?.fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
     const lastMove = session.state?.lastMove;
     const myColor = myIndex === 0 ? 'w' : 'b';
+    const colLabels = 'abcdefgh';
+    const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
-    // Parse FEN to board
     const parseFen = (fen) => {
         const rows = fen.split(' ')[0].split('/');
         const board = [];
@@ -611,7 +612,6 @@ function ChessBoard({ session, myIndex, isMyTurn, isFinished, makeMove, userId }
     };
 
     const board = parseFen(fen);
-    // Flip board for black
     const displayBoard = myColor === 'b' ? [...board].reverse().map(r => [...r].reverse()) : board;
 
     const pieceUnicode = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙', k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
@@ -619,7 +619,7 @@ function ChessBoard({ session, myIndex, isMyTurn, isFinished, makeMove, userId }
     const getSquare = (row, col) => {
         const actualRow = myColor === 'b' ? 7 - row : row;
         const actualCol = myColor === 'b' ? 7 - col : col;
-        return `${'abcdefgh'[actualCol]}${8 - actualRow}`;
+        return `${colLabels[actualCol]}${8 - actualRow}`;
     };
 
     const isWhite = (piece) => piece && piece === piece.toUpperCase();
@@ -634,63 +634,173 @@ function ChessBoard({ session, myIndex, isMyTurn, isFinished, makeMove, userId }
         const square = getSquare(row, col);
 
         if (selected) {
-            // Try move
+            if (selected === square) { setSelected(null); return; }
             const move = { from: selected, to: square };
-            // Check for pawn promotion
             const actualRow = myColor === 'b' ? 7 - row : row;
-            const selectedPiece = board[myColor === 'b' ? 7 - parseInt(selected[1]) + 1 : 8 - parseInt(selected[1])]?.['abcdefgh'.indexOf(selected[0])];
+            const selRow = myColor === 'b' ? 7 - (8 - parseInt(selected[1])) : 8 - parseInt(selected[1]);
+            const selCol = colLabels.indexOf(selected[0]);
+            const selectedPiece = board[selRow]?.[selCol];
             if (selectedPiece && selectedPiece.toLowerCase() === 'p' && (actualRow === 0 || actualRow === 7)) {
                 move.promotion = 'q';
             }
-            makeMove(move);
-            setSelected(null);
+            if (isMyPiece(piece)) {
+                setSelected(square);
+            } else {
+                makeMove(move);
+                setSelected(null);
+            }
         } else if (isMyPiece(piece)) {
             setSelected(square);
         }
     };
 
+    // Captured pieces & material
+    const myCaptured = session.state?.captured?.[myColor] || [];
+    const oppColor = myColor === 'w' ? 'b' : 'w';
+    const oppCaptured = session.state?.captured?.[oppColor] || [];
+    const myMaterial = myCaptured.reduce((s, p) => s + (pieceValues[p.toLowerCase()] || 0), 0);
+    const oppMaterial = oppCaptured.reduce((s, p) => s + (pieceValues[p.toLowerCase()] || 0), 0);
+    const advantage = myMaterial - oppMaterial;
+    const moves = session.state?.moves || [];
+
+    // Display labels based on perspective
+    const fileLabels = myColor === 'b' ? [...colLabels].reverse() : colLabels.split('');
+    const rankLabels = myColor === 'b' ? [1,2,3,4,5,6,7,8] : [8,7,6,5,4,3,2,1];
+
+    // Opponent info
+    const opponentPlayer = session.players?.find((p, i) => i !== myIndex);
+    const opponentName = opponentPlayer?.user?.username || 'Opponent';
+
     return (
-        <div>
-            {!isFinished && <p className="text-center text-white/30 mb-3 text-sm">You are <span className="font-bold text-indigo-400">{myColor === 'w' ? '⬜ White' : '⬛ Black'}</span></p>}
-            {session.state?.inCheck && !isFinished && <p className="text-center text-red-400 mb-2 text-sm font-bold animate-pulse">⚠️ Check!</p>}
-            {/* Captured pieces */}
-            {session.state?.captured && (
-                <div className="flex justify-between mb-2 px-2 text-xs">
-                    <div className="text-white/30">Captured: {(session.state.captured[myColor === 'w' ? 'w' : 'b'] || []).map((p, i) => <span key={i}>{pieceUnicode[myColor === 'w' ? p : p.toUpperCase()] || p}</span>)}</div>
+        <div className="w-full">
+            {/* Check indicator */}
+            {session.state?.inCheck && !isFinished && (
+                <div className="text-center mb-3">
+                    <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-red-500/15 text-red-400 text-sm font-bold animate-pulse border border-red-500/20">
+                        ⚠️ Check!
+                    </span>
                 </div>
             )}
-            <div className="inline-block mx-auto rounded-lg overflow-hidden border border-white/10">
-                {displayBoard.map((row, ri) => (
-                    <div key={ri} className="flex">
-                        {row.map((piece, ci) => {
-                            const sq = getSquare(ri, ci);
-                            const isLight = (ri + ci) % 2 === 0;
-                            const isSelected = selected === sq;
-                            const isLastMove = lastMove && (sq === lastMove.from || sq === lastMove.to);
-                            return (
-                                <div key={ci} onClick={() => handleClick(ri, ci)}
-                                    className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-2xl sm:text-3xl cursor-pointer transition-all ${
-                                        isSelected ? 'bg-indigo-500/50' :
-                                        isLastMove ? 'bg-amber-500/30' :
-                                        isLight ? 'bg-amber-100/80' : 'bg-amber-800/60'
-                                    }`}>
-                                    {piece && <span className={`${isWhite(piece) ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : 'text-gray-900'}`}>
-                                        {pieceUnicode[piece] || piece}
-                                    </span>}
-                                </div>
-                            );
-                        })}
+
+            <div className="flex flex-col lg:flex-row items-start justify-center gap-4 w-full">
+                {/* Left panel — captured & info (desktop) */}
+                <div className="hidden lg:flex flex-col gap-3 w-48 shrink-0">
+                    <div className="bg-white/[0.03] backdrop-blur-sm rounded-xl p-3 border border-white/[0.06]">
+                        <p className="text-[10px] uppercase tracking-wider text-white/30 font-semibold mb-1">♔ You captured</p>
+                        <div className="flex flex-wrap gap-0.5">
+                            {myCaptured.length ? myCaptured.map((p, i) => (
+                                <span key={i} className="text-xl" style={{ color: myColor === 'w' ? '#f5c542' : '#e8e8f0' }}>
+                                    {pieceUnicode[myColor === 'w' ? p : p.toUpperCase()] || p}
+                                </span>
+                            )) : <span className="text-white/10 text-xs">None yet</span>}
+                        </div>
+                        {advantage > 0 && <p className="text-emerald-400 text-xs mt-1.5 font-bold">+{advantage} material</p>}
                     </div>
-                ))}
+                    <div className="bg-white/[0.03] backdrop-blur-sm rounded-xl p-3 border border-white/[0.06]">
+                        <p className="text-[10px] uppercase tracking-wider text-white/30 font-semibold mb-1">♚ {opponentName} captured</p>
+                        <div className="flex flex-wrap gap-0.5">
+                            {oppCaptured.length ? oppCaptured.map((p, i) => (
+                                <span key={i} className="text-xl" style={{ color: myColor === 'w' ? '#e8e8f0' : '#f5c542' }}>
+                                    {pieceUnicode[myColor === 'w' ? p.toUpperCase() : p] || p}
+                                </span>
+                            )) : <span className="text-white/10 text-xs">None yet</span>}
+                        </div>
+                        {advantage < 0 && <p className="text-rose-400 text-xs mt-1.5 font-bold">+{Math.abs(advantage)} material</p>}
+                    </div>
+                </div>
+
+                {/* Center — board */}
+                <div className="flex flex-col items-center">
+                    {/* Mobile captured bar */}
+                    <div className="lg:hidden flex justify-center gap-3 mb-3 w-full">
+                        <div className="flex items-center gap-1.5 bg-white/[0.03] rounded-lg px-3 py-1.5 border border-white/[0.06]">
+                            <span className="text-[10px] text-white/30">YOU</span>
+                            <div className="flex gap-0.5">{myCaptured.map((p, i) => <span key={i} className="text-base" style={{ color: myColor === 'w' ? '#f5c542' : '#e8e8f0' }}>{pieceUnicode[myColor === 'w' ? p : p.toUpperCase()]}</span>)}</div>
+                            {advantage > 0 && <span className="text-emerald-400 text-[10px] font-bold">+{advantage}</span>}
+                        </div>
+                        <div className="flex items-center gap-1.5 bg-white/[0.03] rounded-lg px-3 py-1.5 border border-white/[0.06]">
+                            <span className="text-[10px] text-white/30">{opponentName.slice(0,6).toUpperCase()}</span>
+                            <div className="flex gap-0.5">{oppCaptured.map((p, i) => <span key={i} className="text-base" style={{ color: myColor === 'w' ? '#e8e8f0' : '#f5c542' }}>{pieceUnicode[myColor === 'w' ? p.toUpperCase() : p]}</span>)}</div>
+                            {advantage < 0 && <span className="text-rose-400 text-[10px] font-bold">+{Math.abs(advantage)}</span>}
+                        </div>
+                    </div>
+
+                    {/* Board with coordinates */}
+                    <div className="relative" style={{ boxShadow: '0 0 60px rgba(99,102,241,0.08), 0 25px 50px rgba(0,0,0,0.4)' }}>
+                        <div className="inline-block rounded-2xl overflow-hidden border border-white/[0.08]">
+                            {displayBoard.map((row, ri) => (
+                                <div key={ri} className="flex">
+                                    {/* Rank label */}
+                                    <div className="w-5 flex items-center justify-center text-[9px] text-white/20 font-mono select-none bg-[#1a1c2e]">
+                                        {rankLabels[ri]}
+                                    </div>
+                                    {row.map((piece, ci) => {
+                                        const sq = getSquare(ri, ci);
+                                        const isDark = (ri + ci) % 2 === 1;
+                                        const isSelected = selected === sq;
+                                        const isLastMoveSquare = lastMove && (sq === lastMove.from || sq === lastMove.to);
+                                        const isPossibleTarget = selected && isMyTurn && !isFinished && !isMyPiece(piece);
+                                        return (
+                                            <div key={ci} onClick={() => handleClick(ri, ci)}
+                                                className={`w-[44px] h-[44px] sm:w-[56px] sm:h-[56px] md:w-[60px] md:h-[60px] flex items-center justify-center text-2xl sm:text-3xl md:text-[2.1rem] transition-all duration-150 relative cursor-pointer ${
+                                                    isSelected ? 'brightness-150 ring-1 ring-inset ring-indigo-400/60' :
+                                                    isLastMoveSquare ? 'bg-amber-500/30' :
+                                                    isDark ? 'bg-[#2d3250]' : 'bg-[#424769]'
+                                                } hover:brightness-125`}
+                                                style={isSelected ? { boxShadow: 'inset 0 0 20px rgba(139,92,246,0.3)', background: isDark ? '#3d4070' : '#525990' } : {}}>
+                                                {piece && <span className="relative z-0 select-none" style={{
+                                                    color: isWhite(piece) ? '#e8e8f0' : '#f5c542',
+                                                    textShadow: isWhite(piece) ? '0 0 12px rgba(200,200,255,0.4), 0 2px 4px rgba(0,0,0,0.5)' : '0 0 10px rgba(245,197,66,0.3), 0 2px 4px rgba(0,0,0,0.5)',
+                                                    filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.4))',
+                                                }}>{pieceUnicode[piece]}</span>}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ))}
+                            {/* File labels */}
+                            <div className="flex">
+                                <div className="w-5 bg-[#1a1c2e]" />
+                                {fileLabels.map((f, i) => (
+                                    <div key={i} className="w-[44px] sm:w-[56px] md:w-[60px] h-4 flex items-center justify-center text-[9px] text-white/20 font-mono select-none bg-[#1a1c2e]">
+                                        {f}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right panel — move history (desktop) */}
+                <div className="hidden lg:block w-52 shrink-0">
+                    <div className="bg-white/[0.03] backdrop-blur-sm rounded-xl border border-white/[0.06] overflow-hidden">
+                        <div className="px-3 py-2 border-b border-white/[0.06]">
+                            <p className="text-[10px] uppercase tracking-wider text-white/30 font-semibold">📜 Move History</p>
+                        </div>
+                        <div className="max-h-[360px] overflow-y-auto p-2 space-y-0.5 scrollbar-thin scrollbar-thumb-white/10">
+                            {moves.length === 0 && <p className="text-white/10 text-xs text-center py-4">No moves yet</p>}
+                            {moves.map((m, i) => (
+                                <div key={i} className={`flex items-center gap-2 px-2 py-1 rounded-lg text-xs ${i === moves.length - 1 ? 'bg-indigo-500/10' : ''} ${m.color === 'w' ? 'text-violet-300' : 'text-amber-300/70'}`}>
+                                    <span className="text-white/20 w-5 text-right font-mono">{Math.floor(i/2)+1}{i%2===0 ? '.' : '…'}</span>
+                                    <span className="font-medium">{m.san}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </div>
-            {/* Move history */}
-            {session.state?.moves?.length > 0 && (
-                <div className="mt-3 max-h-20 overflow-y-auto bg-white/5 rounded-lg p-2 text-[10px] text-white/40">
-                    {session.state.moves.map((m, i) => (
-                        <span key={i} className={`inline-block mr-1 ${m.color === 'w' ? 'text-white/50' : 'text-white/30'}`}>
-                            {i % 2 === 0 && <span className="text-white/20 mr-0.5">{Math.floor(i/2)+1}.</span>}{m.san}
-                        </span>
-                    ))}
+
+            {/* Mobile move history */}
+            {moves.length > 0 && (
+                <div className="lg:hidden mt-3 max-h-24 overflow-y-auto bg-white/[0.03] backdrop-blur-sm rounded-xl p-2.5 text-[10px] text-white/40 border border-white/[0.06]">
+                    <p className="text-[9px] uppercase tracking-wider text-white/20 font-semibold mb-1.5">📜 Moves</p>
+                    <div className="flex flex-wrap gap-x-1 gap-y-0.5">
+                        {moves.map((m, i) => (
+                            <span key={i} className={`${m.color === 'w' ? 'text-violet-300/80' : 'text-amber-300/50'}`}>
+                                {i % 2 === 0 && <span className="text-white/15 mr-0.5">{Math.floor(i/2)+1}.</span>}{m.san}
+                            </span>
+                        ))}
+                    </div>
                 </div>
             )}
         </div>
