@@ -104,19 +104,64 @@ export function Game2048({ goBack, saveScoreToDb }) {
 
 // ═══ WORDLE ═══
 const WORDS = ['CRANE', 'BRAVE', 'GHOST', 'FLAME', 'PROUD', 'SHEEP', 'PIANO', 'GRAPE', 'OCEAN', 'STONE', 'RIVER', 'CLOUD', 'TIGER', 'DREAM', 'LIGHT', 'PLANT', 'QUEEN', 'BEACH', 'WORLD', 'CHAIR', 'DANCE', 'EARTH', 'FEAST', 'GUARD', 'HEART', 'JUICE', 'MAGIC', 'PAINT', 'SMELL', 'TRAIN'];
+const VALID_WORDS = new Set([...WORDS, 'APPLE', 'ARISE', 'AUDIO', 'BAKER', 'BASIC', 'BLACK', 'BLADE', 'BLANK', 'BLAST', 'BLAZE', 'BLEED', 'BLEND', 'BLESS', 'BLIND', 'BLOCK', 'BLOOM', 'BLOWN', 'BOARD', 'BOUND', 'BRAIN', 'BRAND', 'BREAD', 'BREAK', 'BREED', 'BRICK', 'BRIEF', 'BRING', 'BROAD', 'BRUSH', 'BUILD', 'BUNCH', 'BURST', 'CANDY', 'CARRY', 'CAUSE', 'CHAIN', 'CHASE', 'CHEAP', 'CHECK', 'CHESS', 'CHIEF', 'CHILD', 'CHOSE', 'CIVIL', 'CLAIM', 'CLASS', 'CLEAN', 'CLEAR', 'CLIMB', 'CLOCK', 'CLOSE', 'CLOTH', 'COACH', 'COAST', 'COLOR', 'COUCH', 'COUNT', 'COURT', 'COVER', 'CRACK', 'CRAFT', 'CRASH', 'CRAZY', 'CREAM', 'CRIME', 'CROSS', 'CROWD', 'CRUSH', 'CURVE', 'CYCLE', 'DAIRY', 'DEATH', 'DELAY', 'DEPTH', 'DIRTY', 'DOUBT', 'DRAFT', 'DRAIN', 'DRAMA', 'DRAWN', 'DRESS', 'DRIED', 'DRINK', 'DRIVE', 'DROVE', 'DYING', 'EAGER', 'EARLY', 'EIGHT', 'ELECT', 'ELITE', 'EMPTY', 'ENEMY', 'ENJOY', 'ENTER', 'EQUAL', 'ERROR', 'EVENT', 'EVERY', 'EXACT', 'EXIST', 'EXTRA', 'FAITH', 'FALSE', 'FAULT', 'FENCE', 'FEWER', 'FIBER', 'FIELD', 'FIFTH', 'FIFTY', 'FIGHT', 'FINAL', 'FIRST', 'FIXED', 'FLASH', 'FLEET', 'FLESH', 'FLOAT', 'FLOOD', 'FLOOR', 'FLUID', 'FLUSH', 'FOCUS', 'FORCE', 'FORGE', 'FORTH', 'FORUM', 'FOUND', 'FRAME', 'FRANK', 'FRAUD', 'FRESH', 'FRONT', 'FROZE', 'FRUIT', 'FULLY', 'FUNDS', 'GIVEN', 'GLASS', 'GLOBE', 'GOING', 'GRACE', 'GRADE', 'GRAIN', 'GRAND', 'GRANT', 'GRASS', 'GRAVE', 'GREAT', 'GREEN', 'GREET', 'GROSS', 'GROUP', 'GROWN', 'GUESS', 'GUEST', 'GUIDE', 'HABIT', 'HAPPY', 'HARSH', 'HAVEN', 'HEARD', 'HEAVY', 'HENCE', 'HORSE', 'HOTEL', 'HOUSE', 'HUMAN', 'HUMOR', 'IDEAL', 'IMAGE', 'IMPLY', 'INDEX', 'INNER', 'INPUT', 'IRONY', 'ISSUE', 'IVORY', 'JOINT', 'JONES', 'JUDGE', 'JUICE', 'KNOWN', 'LABEL', 'LABOR', 'LARGE', 'LASER', 'LATER', 'LAUGH', 'LAYER', 'LEARN', 'LEASE', 'LEAST', 'LEAVE', 'LEGAL', 'LEVEL', 'LEWIS', 'LIMIT', 'LINEN', 'LIVER', 'LOOSE', 'LOVER', 'LOWER', 'LUCKY', 'LUNCH', 'LYING', 'MAGIC', 'MAJOR', 'MAKER', 'MARCH', 'MATCH', 'MAYOR', 'MEDIA', 'MERCY', 'MERIT', 'METAL', 'MIGHT', 'MINOR', 'MINUS', 'MIXED', 'MODEL', 'MONEY', 'MONTH', 'MORAL', 'MOTOR', 'MOUNT', 'MOUSE', 'MOUTH', 'MOVED', 'MOVIE', 'MUSIC', 'NAVAL', 'NERVE', 'NEVER', 'NEWLY', 'NIGHT', 'NOBLE', 'NOISE', 'NORTH', 'NOTED', 'NOVEL', 'NURSE', 'OCCUR', 'OFFER', 'OFTEN', 'ORDER', 'OTHER', 'OUGHT', 'OUTER', 'OWNED', 'OWNER', 'OXIDE', 'PANEL', 'PANIC', 'PAPER', 'PARTY', 'PATCH', 'PAUSE', 'PEACE', 'PENNY', 'PHASE', 'PHONE', 'PHOTO', 'PIECE', 'PILOT', 'PITCH', 'PLACE', 'PLAIN', 'PLANE', 'PLATE', 'PLAZA', 'POINT', 'POUND', 'POWER', 'PRESS', 'PRICE', 'PRIDE', 'PRIME', 'PRINCE', 'PRINT', 'PRIOR', 'PRIZE', 'PROOF', 'PROUD', 'PROVE', 'PSALM', 'QUALM', 'QUERY', 'QUEUE', 'QUICK', 'QUIET', 'QUITE', 'QUOTA', 'QUOTE', 'RADAR', 'RADIO', 'RAISE', 'RANGE', 'RAPID', 'RATIO', 'REACH', 'READY', 'REALM', 'REBEL', 'REFER', 'REIGN', 'RELAX', 'REPLY', 'RIGHT', 'RIGID', 'RIVAL', 'ROBIN', 'ROBOT', 'ROGER', 'ROMAN', 'ROUGH', 'ROUND', 'ROUTE', 'ROYAL', 'RURAL', 'SADLY', 'SAINT', 'SALAD', 'SAUCE', 'SCALE', 'SCENE', 'SCOPE', 'SCORE', 'SENSE', 'SERVE', 'SEVEN', 'SHALL', 'SHAME', 'SHAPE', 'SHARE', 'SHARP', 'SHEER', 'SHEET', 'SHELF', 'SHELL', 'SHIFT', 'SHINE', 'SHIRT', 'SHOCK', 'SHOOT', 'SHORT', 'SHOUT', 'SIGHT', 'SINCE', 'SIXTH', 'SIXTY', 'SIZED', 'SKILL', 'SLAVE', 'SLEEP', 'SLICE', 'SLIDE', 'SLOPE', 'SMALL', 'SMART', 'SMILE', 'SMITH', 'SMOKE', 'SNAKE', 'SOLAR', 'SOLID', 'SOLVE', 'SORRY', 'SOUND', 'SOUTH', 'SPACE', 'SPARE', 'SPEAK', 'SPEED', 'SPEND', 'SPENT', 'SPLIT', 'SPOKE', 'SPORT', 'SPRAY', 'SQUAD', 'STACK', 'STAFF', 'STAGE', 'STAKE', 'STAND', 'START', 'STATE', 'STAYS', 'STEAM', 'STEEL', 'STEEP', 'STERN', 'STICK', 'STILL', 'STOCK', 'STOOD', 'STORM', 'STORY', 'STOVE', 'STRAW', 'STRIP', 'STUCK', 'STUDY', 'STUFF', 'STYLE', 'SUGAR', 'SUITE', 'SUPER', 'SURGE', 'SWEAR', 'SWEEP', 'SWEET', 'SWEPT', 'SWIFT', 'SWING', 'Swiss', 'SWORD', 'SWORE', 'SWORN', 'STUCK', 'TABLE', 'TASTE', 'TEACH', 'TEETH', 'TEMPO', 'TENSE', 'TENTH', 'THEME', 'THERE', 'THICK', 'THING', 'THINK', 'THIRD', 'THOSE', 'THREE', 'THREW', 'THROW', 'THUMB', 'TIGHT', 'TIRED', 'TITLE', 'TODAY', 'TOKEN', 'TOPIC', 'TOTAL', 'TOUCH', 'TOUGH', 'TOWER', 'TOXIC', 'TRACE', 'TRACK', 'TRADE', 'TRAIT', 'TRASH', 'TREAT', 'TREND', 'TRIAL', 'TRIBE', 'TRICK', 'TRIED', 'TROOP', 'TRUCK', 'TRULY', 'TRUST', 'TRUTH', 'TUMOR', 'TWICE', 'TWIST', 'ULTRA', 'UNCLE', 'UNDER', 'UNION', 'UNITE', 'UNITY', 'UNTIL', 'UPPER', 'UPSET', 'URBAN', 'USAGE', 'USUAL', 'VALID', 'VALUE', 'VIDEO', 'VIGOR', 'VIRUS', 'VISIT', 'VITAL', 'VIVID', 'VOCAL', 'VOICE', 'VOTER', 'WASTE', 'WATCH', 'WATER', 'WEAVE', 'WEIGH', 'WEIRD', 'WHEAT', 'WHEEL', 'WHERE', 'WHICH', 'WHILE', 'WHITE', 'WHOLE', 'WHOSE', 'WIDER', 'WOMAN', 'WOMEN', 'WORDS', 'WORLD', 'WORRY', 'WORSE', 'WORST', 'WORTH', 'WOULD', 'WOUND', 'WRITE', 'WRONG', 'WROTE', 'YACHT', 'YIELD', 'YOUNG', 'YOUTH', 'ZEBRA']);
 export function WordleGame({ goBack, saveScoreToDb }) {
     const [target] = useState(() => WORDS[Math.floor(Math.random() * WORDS.length)]);
     const [guesses, setGuesses] = useState([]);
     const [current, setCurrent] = useState('');
     const [gameOver, setGameOver] = useState(false);
     const [won, setWon] = useState(false);
+    const [shake, setShake] = useState(false);
     const MAX = 6;
+
+    // Properly color tiles — handles duplicate letters correctly
+    const getRowColors = (guess) => {
+        const colors = Array(5).fill('absent'); // gray
+        const targetCounts = {};
+        for (const ch of target) targetCounts[ch] = (targetCounts[ch] || 0) + 1;
+        // First pass: mark greens
+        for (let i = 0; i < 5; i++) {
+            if (guess[i] === target[i]) { colors[i] = 'correct'; targetCounts[guess[i]]--; }
+        }
+        // Second pass: mark yellows (only if letter count allows)
+        for (let i = 0; i < 5; i++) {
+            if (colors[i] === 'correct') continue;
+            if (targetCounts[guess[i]] > 0) { colors[i] = 'present'; targetCounts[guess[i]]--; }
+        }
+        return colors;
+    };
+
+    const colorClass = (c) => {
+        if (c === 'correct') return 'bg-emerald-500 border-emerald-400';
+        if (c === 'present') return 'bg-amber-500 border-amber-400';
+        return 'bg-white/10 border-white/20';
+    };
+
+    // Build keyboard state from all guesses
+    const keyboardColors = {};
+    guesses.forEach(guess => {
+        const colors = getRowColors(guess);
+        for (let i = 0; i < 5; i++) {
+            const letter = guess[i];
+            const status = colors[i];
+            const prev = keyboardColors[letter];
+            // Priority: correct > present > absent
+            if (status === 'correct') keyboardColors[letter] = 'correct';
+            else if (status === 'present' && prev !== 'correct') keyboardColors[letter] = 'present';
+            else if (!prev) keyboardColors[letter] = 'absent';
+        }
+    });
 
     const submit = useCallback(() => {
         if (current.length !== 5 || gameOver) return;
-        const g = [...guesses, current.toUpperCase()];
+        const upper = current.toUpperCase();
+        if (!VALID_WORDS.has(upper)) {
+            setShake(true); setTimeout(() => setShake(false), 600);
+            return;
+        }
+        const g = [...guesses, upper];
         setGuesses(g); setCurrent('');
-        if (current.toUpperCase() === target) { setWon(true); setGameOver(true); const sc = (MAX - g.length + 1) * 100; setHighScore('wordle', sc); saveScoreToDb?.('wordle', sc, true); }
+        if (upper === target) { setWon(true); setGameOver(true); const sc = (MAX - g.length + 1) * 100; setHighScore('wordle', sc); saveScoreToDb?.('wordle', sc, true); }
         else if (g.length >= MAX) { setGameOver(true); saveScoreToDb?.('wordle', 0, false); }
     }, [current, gameOver, guesses, target]);
 
@@ -125,24 +170,29 @@ export function WordleGame({ goBack, saveScoreToDb }) {
         window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
     }, [current, gameOver, submit]);
 
-    const getColor = (letter, idx) => {
-        if (target[idx] === letter) return 'bg-emerald-500 border-emerald-400';
-        if (target.includes(letter)) return 'bg-amber-500 border-amber-400';
-        return 'bg-white/10 border-white/20';
-    };
     const reset = () => { window.location.reload(); };
     const kb = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+
+    const kbKeyClass = (k) => {
+        const s = keyboardColors[k];
+        if (s === 'correct') return 'bg-emerald-500 text-white';
+        if (s === 'present') return 'bg-amber-500 text-white';
+        if (s === 'absent') return 'bg-white/[0.04] text-white/30';
+        return 'bg-white/10 hover:bg-white/20';
+    };
 
     return (
         <GameHeader title="Wordle" gradient="from-emerald-400 to-teal-400" goBack={goBack} onReset={reset}>
             {gameOver && <div className={`mb-4 p-4 rounded-xl font-bold text-center ${won ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>{won ? `🎉 Got it in ${guesses.length}!` : `💀 Answer: ${target}`}<button onClick={reset} className="block mx-auto mt-2 px-6 py-2 bg-white/10 rounded-lg text-xs text-white">Play Again</button></div>}
+            {shake && <p className="text-amber-400 text-xs text-center mb-2 animate-pulse">Not a valid word!</p>}
             <div className="space-y-2 mb-6">
                 {Array(MAX).fill(null).map((_, ri) => {
                     const g = guesses[ri]; const isCurrent = ri === guesses.length && !gameOver;
-                    return (<div key={ri} className="flex justify-center gap-2">
+                    const rowColors = g ? getRowColors(g) : null;
+                    return (<div key={ri} className={`flex justify-center gap-2 ${isCurrent && shake ? 'animate-[shake_0.5s_ease-in-out]' : ''}`}>
                         {Array(5).fill(null).map((_, ci) => {
                             const letter = g ? g[ci] : (isCurrent ? current[ci] : '');
-                            return (<div key={ci} className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center text-xl font-black border-2 transition-all ${g ? getColor(g[ci], ci) : isCurrent && current[ci] ? 'border-indigo-400 bg-white/5' : 'border-white/10 bg-white/[0.03]'}`}>{letter || ''}</div>);
+                            return (<div key={ci} className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center text-xl font-black border-2 transition-all ${rowColors ? colorClass(rowColors[ci]) : isCurrent && current[ci] ? 'border-indigo-400 bg-white/5' : 'border-white/10 bg-white/[0.03]'}`}>{letter || ''}</div>);
                         })}
                     </div>);
                 })}
@@ -150,7 +200,7 @@ export function WordleGame({ goBack, saveScoreToDb }) {
             <div className="space-y-1.5 w-full max-w-md">
                 {kb.map((row, ri) => (<div key={ri} className="flex justify-center gap-1">
                     {ri === 2 && <button onClick={submit} className="px-3 py-3 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-xs font-bold transition-colors">ENT</button>}
-                    {row.split('').map(k => (<button key={k} onClick={() => { if (!gameOver && current.length < 5) setCurrent(p => p + k); }} className="w-8 h-11 sm:w-9 sm:h-12 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold transition-colors">{k}</button>))}
+                    {row.split('').map(k => (<button key={k} onClick={() => { if (!gameOver && current.length < 5) setCurrent(p => p + k); }} className={`w-8 h-11 sm:w-9 sm:h-12 rounded-lg text-xs font-bold transition-colors ${kbKeyClass(k)}`}>{k}</button>))}
                     {ri === 2 && <button onClick={() => setCurrent(p => p.slice(0, -1))} className="px-3 py-3 bg-white/10 hover:bg-white/15 rounded-lg text-xs font-bold transition-colors">⌫</button>}
                 </div>))}
             </div>
