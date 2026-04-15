@@ -146,6 +146,13 @@ const userSchema = new mongoose.Schema({
     // User preferences
     preferences: {
         background: { type: String, default: '' },
+        theme: { type: String, enum: ['dark', 'light'], default: 'dark' },
+        notifications: {
+            messages: { type: Boolean, default: true },
+            friends: { type: Boolean, default: true },
+            mentions: { type: Boolean, default: true },
+            sounds: { type: Boolean, default: true },
+        },
     },
 
     // Music favorites

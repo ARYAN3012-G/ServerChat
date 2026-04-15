@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUser, FiLock, FiMoon, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap, FiMenu, FiSmartphone, FiShield, FiSlash, FiLogOut, FiX, FiHeadphones, FiSend, FiAlertTriangle, FiMessageCircle, FiPlus, FiClock } from 'react-icons/fi';
+import { FiArrowLeft, FiUser, FiLock, FiMoon, FiSun, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap, FiMenu, FiSmartphone, FiShield, FiSlash, FiLogOut, FiX, FiHeadphones, FiSend, FiAlertTriangle, FiMessageCircle, FiPlus, FiClock } from 'react-icons/fi';
 import dynamic from 'next/dynamic';
 const AvatarPicker = dynamic(() => import('../../components/AvatarPicker'), { ssr: false });
 import { useAuth } from '../../hooks/useAuth';
@@ -21,6 +21,7 @@ export default function SettingsPage() {
     const [banner, setBanner] = useState('');
     const [accentColor, setAccentColor] = useState('#6366f1');
     const [background, setBackground] = useState('');
+    const [theme, setThemeState] = useState('dark');
     const [currentPw, setCurrentPw] = useState('');
     const [newPw, setNewPw] = useState('');
     const [confirmPw, setConfirmPw] = useState('');
@@ -71,7 +72,7 @@ export default function SettingsPage() {
     }, [searchParams]);
 
     useEffect(() => { if (!loading && !isAuthenticated) router.push('/login'); }, [isAuthenticated, loading]);
-    useEffect(() => { if (user) { setUsername(user.username || ''); setBio(user.bio || ''); setCustomStatus(typeof user.customStatus === 'string' ? user.customStatus : (user.customStatus?.text || '')); setBackground(user.preferences?.background || ''); setPhoneNumber(user.phone || ''); if (user.phone) setPhoneSaved(true); if (user.hasFaceId) setFaceRegistered(true); setAvatarData(user.avatar || null); setBanner(user.banner || ''); setAccentColor(user.accentColor || '#6366f1'); } }, [user]);
+    useEffect(() => { if (user) { setUsername(user.username || ''); setBio(user.bio || ''); setCustomStatus(typeof user.customStatus === 'string' ? user.customStatus : (user.customStatus?.text || '')); setBackground(user.preferences?.background || ''); setThemeState(user.preferences?.theme || 'dark'); if (user.preferences?.notifications) setNotifSettings(prev => ({ ...prev, ...user.preferences.notifications })); setPhoneNumber(user.phone || ''); if (user.phone) setPhoneSaved(true); if (user.hasFaceId) setFaceRegistered(true); setAvatarData(user.avatar || null); setBanner(user.banner || ''); setAccentColor(user.accentColor || '#6366f1'); } }, [user]);
     useEffect(() => { if (isAuthenticated) fetchSubscription(); }, [isAuthenticated]);
 
     // Debounced username availability check
@@ -176,7 +177,7 @@ export default function SettingsPage() {
         }
 
         setError(''); setSaved(false);
-        try { await api.put('/users/profile', { username, bio, customStatus: { text: customStatus }, banner, accentColor, preferences: { background } }); setSaved(true); setTimeout(() => setSaved(false), 2000); }
+        try { await api.put('/users/profile', { username, bio, customStatus: { text: customStatus }, banner, accentColor, preferences: { background, theme, notifications: notifSettings } }); setSaved(true); setTimeout(() => setSaved(false), 2000); }
         catch (e) { setError(e.response?.data?.message || 'Failed'); }
     };
 
@@ -291,10 +292,10 @@ export default function SettingsPage() {
         }
     };
 
-    if (loading) return <div className="flex h-screen items-center justify-center bg-dark-900"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
+    if (loading) return <div className="flex h-screen items-center justify-center bg-[var(--sc-bg-base)]"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
 
     return (
-        <div className="flex h-[100dvh] bg-dark-900 text-white overflow-hidden relative">
+        <div className="flex h-[100dvh] bg-[var(--sc-bg-base)] text-[var(--sc-text)] overflow-hidden relative">
             {/* Mobile Sidebar Overlay */}
             {sidebarOpen && (
                 <div
@@ -304,19 +305,19 @@ export default function SettingsPage() {
             )}
 
             {/* Sidebar */}
-            <div className={`fixed inset-y-0 left-0 z-50 w-56 bg-dark-800 border-r border-white/5 flex flex-col transform transition-transform duration-300 md:relative md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-                <div className="p-4 border-b border-white/5">
-                    <button onClick={() => router.push('/channels')} className="flex items-center gap-2 text-white/40 hover:text-white text-sm transition-colors mb-4"><FiArrowLeft className="w-4 h-4" /> Back to Chat</button>
+            <div className={`fixed inset-y-0 left-0 z-50 w-56 bg-[var(--sc-bg-surface)] border-r border-[var(--sc-border)] flex flex-col transform transition-transform duration-300 md:relative md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                <div className="p-4 border-b border-[var(--sc-border)]">
+                    <button onClick={() => router.push('/channels')} className="flex items-center gap-2 text-[var(--sc-text-muted)] hover:text-[var(--sc-text)] text-sm transition-colors mb-4"><FiArrowLeft className="w-4 h-4" /> Back to Chat</button>
                     <h2 className="text-lg font-bold">Settings</h2>
                 </div>
                 <div className="p-2 space-y-1 overflow-y-auto flex-none">
                     {tabs.map(t => (
                         <button key={t.id} onClick={() => { setTab(t.id); setError(''); setSaved(false); setSidebarOpen(false); }}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === t.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === t.id ? 'bg-indigo-500/10 text-indigo-500' : 'text-[var(--sc-text-muted)] hover:text-[var(--sc-text)] hover:bg-[var(--sc-bg-elevated)]'}`}>
                             <t.icon className="w-4 h-4" /> {t.label}
                         </button>
                     ))}
-                    <div className="my-2 border-t border-white/5" />
+                    <div className="my-2 border-t border-[var(--sc-border)]" />
                     <button onClick={handleLogout}
                         className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:text-white hover:bg-red-500/20 transition-all">
                         <FiLogOut className="w-4 h-4" /> Log Out
@@ -636,41 +637,43 @@ export default function SettingsPage() {
                         {tab === 'appearance' && (
                             <motion.div key="appearance" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                                 <h3 className="text-2xl font-bold mb-8">Appearance</h3>
-                                <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8">
+                                <div className="bg-[var(--sc-bg-surface)] rounded-2xl border border-[var(--sc-border)] p-8">
                                     <h4 className="text-lg font-semibold mb-5">Theme</h4>
                                     <div className="flex gap-4">
-                                        <div className="flex-1 p-5 rounded-xl border-2 border-indigo-500 bg-indigo-500/10 cursor-pointer text-center">
-                                            <div className="w-16 h-10 bg-dark-900 rounded-lg mx-auto mb-3 border border-white/10" />
+                                        <button onClick={() => { setThemeState('dark'); document.documentElement.setAttribute('data-theme', 'dark'); document.documentElement.classList.add('dark'); localStorage.setItem('sc_theme', 'dark'); }}
+                                            className={`flex-1 p-5 rounded-xl border-2 text-center transition-all ${theme === 'dark' ? 'border-indigo-500 bg-indigo-500/10' : 'border-[var(--sc-border)] hover:border-indigo-500/50'}`}>
+                                            <div className="w-16 h-10 bg-[#09090f] rounded-lg mx-auto mb-3 border border-white/10 flex items-center justify-center"><FiMoon className="w-4 h-4 text-indigo-400" /></div>
                                             <p className="text-sm font-semibold">Dark</p>
-                                            <p className="text-xs text-indigo-300 mt-1">Active</p>
-                                        </div>
-                                        <div className="flex-1 p-5 rounded-xl border border-white/10 cursor-not-allowed opacity-40 text-center">
-                                            <div className="w-16 h-10 bg-white rounded-lg mx-auto mb-3 border border-gray-200" />
+                                            {theme === 'dark' && <p className="text-xs text-indigo-300 mt-1">Active</p>}
+                                        </button>
+                                        <button onClick={() => { setThemeState('light'); document.documentElement.setAttribute('data-theme', 'light'); document.documentElement.classList.remove('dark'); localStorage.setItem('sc_theme', 'light'); }}
+                                            className={`flex-1 p-5 rounded-xl border-2 text-center transition-all ${theme === 'light' ? 'border-indigo-500 bg-indigo-500/10' : 'border-[var(--sc-border)] hover:border-indigo-500/50'}`}>
+                                            <div className="w-16 h-10 bg-white rounded-lg mx-auto mb-3 border border-gray-200 flex items-center justify-center"><FiSun className="w-4 h-4 text-amber-500" /></div>
                                             <p className="text-sm font-semibold">Light</p>
-                                            <p className="text-xs text-white/30 mt-1">Coming soon</p>
-                                        </div>
+                                            {theme === 'light' && <p className="text-xs text-indigo-300 mt-1">Active</p>}
+                                        </button>
                                     </div>
 
-                                    <div className="mt-8 pt-8 border-t border-white/5">
+                                    <div className="mt-8 pt-8 border-t border-[var(--sc-border)]">
                                         <h4 className="text-lg font-semibold mb-2 flex items-center gap-2">Custom Background {!subscription || subscription?.tier !== 'pro' ? <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">PRO</span> : ''}</h4>
-                                        <p className="text-sm text-white/40 mb-4">Paste an image or GIF URL to use as your app background.</p>
+                                        <p className="text-sm text-[var(--sc-text-muted)] mb-4">Paste an image or GIF URL to use as your app background.</p>
                                         <div className="relative">
                                             <input
                                                 value={background}
                                                 onChange={(e) => setBackground(e.target.value)}
                                                 disabled={subscription?.tier !== 'pro'}
                                                 placeholder={subscription?.tier === 'pro' ? "https://example.com/animated-bg.gif" : "Subscribe to Pro to use custom URLs"}
-                                                className={`w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all placeholder-white/20 ${subscription?.tier !== 'pro' ? 'opacity-50 cursor-not-allowed pr-10' : ''}`}
+                                                className={`w-full bg-[var(--sc-bg-elevated)] border border-[var(--sc-border)] rounded-xl px-4 py-3 text-sm outline-none text-[var(--sc-text)] focus:ring-2 focus:ring-indigo-500 transition-all placeholder-[var(--sc-text-muted)] ${subscription?.tier !== 'pro' ? 'opacity-50 cursor-not-allowed pr-10' : ''}`}
                                             />
                                             {subscription?.tier !== 'pro' && <FiLock className="absolute right-3 top-3.5 text-amber-400/50" />}
                                         </div>
 
                                         <div className="mt-6">
-                                            <p className="text-[10px] font-bold text-white/40 mb-2 uppercase tracking-wider">Free Presets</p>
+                                            <p className="text-[10px] font-bold text-[var(--sc-text-muted)] mb-2 uppercase tracking-wider">Free Presets</p>
                                             <div className="flex flex-wrap gap-3 mb-4">
                                                 {['none', 'stars', 'matrix', 'cyberpunk'].map(preset => (
                                                     <button key={preset} onClick={() => setBackground(preset === 'none' ? '' : preset)}
-                                                        className={`px-4 py-2 rounded-lg text-xs font-semibold capitalize border transition-all ${background === preset || (preset === 'none' && !background) ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300' : 'border-white/10 text-white/40 hover:bg-white/5'}`}>
+                                                        className={`px-4 py-2 rounded-lg text-xs font-semibold capitalize border transition-all ${background === preset || (preset === 'none' && !background) ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300' : 'border-[var(--sc-border)] text-[var(--sc-text-muted)] hover:bg-[var(--sc-bg-elevated)]'}`}>
                                                         {preset}
                                                     </button>
                                                 ))}
@@ -680,7 +683,7 @@ export default function SettingsPage() {
                                             <div className="flex flex-wrap gap-3">
                                                 {['aurora', 'particles', 'waves'].map(preset => (
                                                     <button key={preset} onClick={() => subscription?.tier === 'pro' ? setBackground(preset) : toast('ServerChat Pro required!', { icon: '🔒' })}
-                                                        className={`flex items-center gap-1 px-4 py-2 rounded-lg text-xs font-semibold capitalize border transition-all ${background === preset ? 'border-amber-500 bg-amber-500/20 text-amber-300' : 'border-white/5 text-white/40'} ${subscription?.tier === 'pro' ? 'hover:bg-amber-500/10 cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
+                                                        className={`flex items-center gap-1 px-4 py-2 rounded-lg text-xs font-semibold capitalize border transition-all ${background === preset ? 'border-amber-500 bg-amber-500/20 text-amber-300' : 'border-[var(--sc-border-light)] text-[var(--sc-text-muted)]'} ${subscription?.tier === 'pro' ? 'hover:bg-amber-500/10 cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
                                                         {preset} {subscription?.tier !== 'pro' && <FiLock className="w-3 h-3 text-amber-400/50" />}
                                                     </button>
                                                 ))}
@@ -700,17 +703,20 @@ export default function SettingsPage() {
                         {tab === 'notifications' && (
                             <motion.div key="notifications" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                                 <h3 className="text-2xl font-bold mb-8">Notifications</h3>
-                                <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-8 space-y-5">
+                                <div className="bg-[var(--sc-bg-surface)] rounded-2xl border border-[var(--sc-border)] p-8 space-y-5">
                                     {Object.entries(notifSettings).map(([key, val]) => (
                                         <div key={key} className="flex items-center justify-between py-2">
-                                            <div><p className="font-medium capitalize">{key}</p><p className="text-sm text-white/30">{key === 'messages' ? 'Get notified for new messages' : key === 'friends' ? 'Friend request notifications' : key === 'mentions' ? '@mention alerts' : 'Notification sounds'}</p></div>
+                                            <div><p className="font-medium capitalize">{key}</p><p className="text-sm text-[var(--sc-text-muted)]">{key === 'messages' ? 'Get notified for new messages' : key === 'friends' ? 'Friend request notifications' : key === 'mentions' ? '@mention alerts' : 'Notification sounds'}</p></div>
                                             <button onClick={() => setNotifSettings(s => ({ ...s, [key]: !val }))}
-                                                className={`w-12 h-7 rounded-full transition-all duration-200 ${val ? 'bg-indigo-500' : 'bg-white/10'}`}>
-                                                <div className={`w-5 h-5 bg-white rounded-full transition-transform duration-200 ml-1 ${val ? 'translate-x-5' : ''}`} />
+                                                className={`w-12 h-7 rounded-full transition-all duration-200 ${val ? 'bg-indigo-500' : 'bg-[var(--sc-bg-elevated)]'}`}>
+                                                <div className={`w-5 h-5 bg-white rounded-full transition-transform duration-200 ml-1 shadow ${val ? 'translate-x-5' : ''}`} />
                                             </button>
                                         </div>
                                     ))}
                                 </div>
+                                <button onClick={handleSaveProfile} className="mt-6 flex items-center gap-2 px-6 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/20">
+                                    {saved ? <><FiCheck className="w-4 h-4" /> Saved!</> : <><FiSave className="w-4 h-4" /> Save Notifications</>}
+                                </button>
                             </motion.div>
                         )}
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Provider } from 'react-redux';
+import { Provider, useSelector } from 'react-redux';
 import { store } from '../redux/store';
 import { Toaster } from 'react-hot-toast';
 import NotificationProvider from '../components/NotificationProvider';
@@ -13,10 +13,35 @@ import MiniPlayer from '../components/MiniPlayer';
 import VoiceCallMini from '../components/VoiceCallMini';
 import './globals.css';
 
+// Syncs user's theme preference from Redux to HTML attributes
+function ThemeApplier() {
+    const { user } = useSelector(state => state.auth);
+
+    useEffect(() => {
+        const saved = localStorage.getItem('sc_theme');
+        const theme = user?.preferences?.theme || saved || 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+        if (theme === 'light') {
+            document.documentElement.classList.remove('dark');
+        } else {
+            document.documentElement.classList.add('dark');
+        }
+        localStorage.setItem('sc_theme', theme);
+    }, [user?.preferences?.theme]);
+
+    return null;
+}
+
 export default function RootLayout({ children }) {
     const [toastPosition, setToastPosition] = useState('top-right');
 
     useEffect(() => {
+        // Apply saved theme immediately to prevent flash
+        const saved = localStorage.getItem('sc_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', saved);
+        if (saved === 'light') document.documentElement.classList.remove('dark');
+        else document.documentElement.classList.add('dark');
+
         const handleResize = () => {
             setToastPosition(window.innerWidth < 768 ? 'top-center' : 'top-right');
         };
@@ -60,8 +85,9 @@ export default function RootLayout({ children }) {
                 {/* Razorpay Checkout */}
                 <script src="https://checkout.razorpay.com/v1/checkout.js" async />
             </head>
-            <body className="bg-transparent text-[var(--text-primary)] antialiased">
+            <body className="bg-transparent text-[var(--sc-text)] antialiased">
                 <Provider store={store}>
+                    <ThemeApplier />
                     <CallProvider>
                         <VoiceProvider>
                             <MusicPlayerProvider>
