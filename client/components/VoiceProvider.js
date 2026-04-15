@@ -128,6 +128,9 @@ export default function VoiceProvider({ children }) {
         };
 
         // ─── CRITICAL: ontrack — handle incoming audio & video ───
+        // Track how many video tracks we've received from this peer
+        let videoTrackCount = 0;
+
         pc.ontrack = ({ track, streams }) => {
             console.log(`[VP] ontrack from ${targetUserId}: kind=${track.kind}, streams=${streams.length}`);
 
@@ -136,19 +139,32 @@ export default function VoiceProvider({ children }) {
                 const audioStream = streams[0] || new MediaStream([track]);
                 setPeerStreams(prev => ({ ...prev, [targetUserId]: audioStream }));
             } else if (track.kind === 'video') {
-                // Create a dedicated MediaStream for this video track
-                // This ensures React re-renders when the video stream changes
+                videoTrackCount++;
                 const videoStream = new MediaStream([track]);
-                setPeerVideoStreams(prev => ({ ...prev, [targetUserId]: videoStream }));
 
-                // Listen for track end (remote user turned off video)
-                track.onended = () => {
-                    setPeerVideoStreams(prev => {
-                        const n = { ...prev };
-                        delete n[targetUserId];
-                        return n;
-                    });
-                };
+                // First video track = camera, second video track = screen share
+                if (videoTrackCount <= 1) {
+                    // Camera video
+                    setPeerVideoStreams(prev => ({ ...prev, [targetUserId]: videoStream }));
+                    track.onended = () => {
+                        setPeerVideoStreams(prev => {
+                            const n = { ...prev };
+                            delete n[targetUserId];
+                            return n;
+                        });
+                    };
+                } else {
+                    // Screen share (2nd video track)
+                    setPeerScreenStreams(prev => ({ ...prev, [targetUserId]: videoStream }));
+                    track.onended = () => {
+                        videoTrackCount = Math.max(0, videoTrackCount - 1);
+                        setPeerScreenStreams(prev => {
+                            const n = { ...prev };
+                            delete n[targetUserId];
+                            return n;
+                        });
+                    };
+                }
             }
         };
 

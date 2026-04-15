@@ -151,16 +151,22 @@ export default function CallPage() {
     };
 
     // Attach stream to video element reliably
-    const attachVideoRef = useCallback((userId) => (el) => {
+    const attachVideoRef = useCallback((userId, forceScreen = false) => (el) => {
         if (!el) return;
-        const stream = allParticipants.find(p => p.userId === userId)?.isMe
-            ? localVideoStream
-            : peerVideoStreams?.[userId];
+        const participant = allParticipants.find(p => p.userId === userId);
+        const isMe = participant?.isMe;
+        let stream;
+        if (forceScreen || participant?.isScreenSharing) {
+            stream = isMe ? localScreenStream : peerScreenStreams?.[userId];
+        }
+        if (!stream) {
+            stream = isMe ? localVideoStream : peerVideoStreams?.[userId];
+        }
         if (stream && el.srcObject !== stream) {
             el.srcObject = stream;
             el.play().catch(() => {});
         }
-    }, [localVideoStream, peerVideoStreams]); // eslint-disable-line
+    }, [localVideoStream, localScreenStream, peerVideoStreams, peerScreenStreams]); // eslint-disable-line
 
     // Render a single participant tile
     const renderParticipant = (p, isSmall = false) => {
@@ -293,11 +299,12 @@ export default function CallPage() {
                                 {(() => {
                                     const p = allParticipants.find(p => p.userId === activeSpotlight);
                                     if (!p) return null;
+                                    const isSharing = p.isMe ? isScreenSharing : p.isScreenSharing;
                                     const stream = p.isMe ? (isScreenSharing ? localScreenStream : localVideoStream) : (p.isScreenSharing ? peerScreenStreams?.[p.userId] : peerVideoStreams?.[p.userId]);
                                     return (
                                         <div className="relative rounded-2xl overflow-hidden bg-dark-800 border border-white/5 w-full h-full">
                                             {stream ? (
-                                                <video ref={attachVideoRef(p.userId)} autoPlay playsInline muted={p.isMe}
+                                                <video ref={attachVideoRef(p.userId, isSharing)} autoPlay playsInline muted={p.isMe}
                                                     className={`w-full h-full object-contain bg-black ${p.isMe && !p.isScreenSharing ? 'scale-x-[-1]' : ''}`} />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center">
