@@ -157,3 +157,28 @@ exports.getGameHistory = async (req, res, next) => {
         next(error);
     }
 };
+
+// Get user's best scores per game (for high score persistence)
+exports.getMyBestScores = async (req, res, next) => {
+    try {
+        const pipeline = [
+            { $match: { status: 'finished', 'players.user': req.user._id } },
+            { $unwind: '$players' },
+            { $match: { 'players.user': req.user._id } },
+            {
+                $group: {
+                    _id: '$game',
+                    bestScore: { $max: '$players.score' },
+                }
+            },
+        ];
+        const results = await GameSession.aggregate(pipeline);
+        const scores = {};
+        for (const r of results) {
+            scores[r._id] = r.bestScore;
+        }
+        res.json({ scores });
+    } catch (error) {
+        next(error);
+    }
+};

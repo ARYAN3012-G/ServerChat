@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiArrowLeft, FiRotateCw, FiUsers, FiCpu, FiAward, FiZap, FiTrendingUp, FiMenu, FiSearch } from 'react-icons/fi';
 import { IoGameControllerOutline } from 'react-icons/io5';
 import api from '../../services/api';
-import { GAMES, CATEGORIES, MEMORY_ICONS, getHighScore, setHighScore } from './gameData';
+import { GAMES, CATEGORIES, MEMORY_ICONS, getHighScore, setHighScore, syncHighScoresFromServer } from './gameData';
 import { GameHeader, ScorePanel, Game2048, WordleGame, MinesweeperGame, FlappyBirdGame, Connect4Game, PongGame } from './newGames';
 import { TetrisGame, ChessGame, CheckersGame, BattleshipGame, LudoGame } from './moreGames';
 
@@ -20,7 +20,7 @@ export default function GamesPage() {
     const [activeCategory, setActiveCategory] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
-    useEffect(() => { setMounted(true); }, []);
+    useEffect(() => { setMounted(true); syncHighScoresFromServer(api); }, []);
 
     const handlePick = (g) => {
         if (!g.modes || g.modes.length === 0) { setActiveGame(g.id); setGameMode('solo'); setSelectingMode(null); }

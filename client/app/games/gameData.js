@@ -38,3 +38,21 @@ export const setHighScore = (game, score) => {
     if (score > current) { localStorage.setItem(`hs_${game}`, score.toString()); return true; }
     return false;
 };
+
+// Sync high scores from backend DB into localStorage (survives storage clears)
+export const syncHighScoresFromServer = async (api) => {
+    try {
+        const { data } = await api.get('/games/my-best-scores');
+        if (data?.scores) {
+            for (const [game, score] of Object.entries(data.scores)) {
+                const local = getHighScore(game);
+                if (score > local) {
+                    localStorage.setItem(`hs_${game}`, score.toString());
+                }
+            }
+        }
+        return data?.scores || {};
+    } catch (e) {
+        return {};
+    }
+};
