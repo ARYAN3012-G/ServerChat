@@ -20,11 +20,18 @@ dist/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
 
 # Debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Build error logs
+client/build_err*
+
+# Server logs
+server/logs/*.log
 
 # OS files
 .DS_Store
@@ -38,9 +45,13 @@ Thumbs.db
 
 # Uploads
 server/uploads/
+!server/uploads/.gitkeep
 
 # Redis dump
 dump.rdb
 
 # Docker volumes
 data/
+
+# Test files
+test_*
