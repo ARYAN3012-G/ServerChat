@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiUser, FiLock, FiMoon, FiSun, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap, FiMenu, FiSmartphone, FiShield, FiSlash, FiLogOut, FiX, FiHeadphones, FiSend, FiAlertTriangle, FiMessageCircle, FiPlus, FiClock } from 'react-icons/fi';
+import { FiArrowLeft, FiUser, FiLock, FiMoon, FiSun, FiBell, FiSave, FiCheck, FiCamera, FiStar, FiZap, FiMenu, FiSmartphone, FiShield, FiSlash, FiLogOut, FiX, FiHeadphones, FiSend, FiAlertTriangle, FiMessageCircle, FiPlus, FiClock, FiEye, FiEyeOff } from 'react-icons/fi';
 import dynamic from 'next/dynamic';
 const AvatarPicker = dynamic(() => import('../../components/AvatarPicker'), { ssr: false });
 import { useAuth } from '../../hooks/useAuth';
@@ -25,6 +25,7 @@ export default function SettingsPage() {
     const [currentPw, setCurrentPw] = useState('');
     const [newPw, setNewPw] = useState('');
     const [confirmPw, setConfirmPw] = useState('');
+    const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false });
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState('');
     const [notifSettings, setNotifSettings] = useState({ messages: true, friends: true, mentions: true, sounds: true });
@@ -463,12 +464,22 @@ export default function SettingsPage() {
                                     <div className="space-y-4">
                                         {user?.hasPassword && (
                                             <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Current Password</label>
-                                                <input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" /></div>
+                                                <div className="relative mt-2">
+                                                    <input type={showPw.current ? 'text' : 'password'} value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} placeholder="Enter current password" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-12 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" />
+                                                    <button type="button" onClick={() => setShowPw(p => ({...p, current: !p.current}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">{showPw.current ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}</button>
+                                                </div></div>
                                         )}
                                         <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">New Password</label>
-                                            <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" /></div>
+                                            <div className="relative mt-2">
+                                                <input type={showPw.new ? 'text' : 'password'} value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="Min 6 characters (e.g. MyPass123)" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-12 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" />
+                                                <button type="button" onClick={() => setShowPw(p => ({...p, new: !p.new}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">{showPw.new ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}</button>
+                                            </div>
+                                            <p className="text-[10px] text-white/20 mt-1.5">Minimum 6 characters</p></div>
                                         <div><label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Confirm Password</label>
-                                            <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" /></div>
+                                            <div className="relative mt-2">
+                                                <input type={showPw.confirm ? 'text' : 'password'} value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="Re-enter new password" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-12 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all" />
+                                                <button type="button" onClick={() => setShowPw(p => ({...p, confirm: !p.confirm}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">{showPw.confirm ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}</button>
+                                            </div></div>
                                     </div>
                                     {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
                                     <button onClick={handleChangePassword} className="mt-6 flex items-center gap-2 px-6 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/20">
