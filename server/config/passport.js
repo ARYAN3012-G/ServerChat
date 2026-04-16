@@ -60,7 +60,7 @@ const handleOAuthLogin = async (profile, provider, done) => {
             isEmailVerified: true,
             [`${provider}Id`]: profile.id,
             authProvider: 'oauth',
-            preferences: { theme: 'dark', language: 'en', notifications: true }
+            preferences: { theme: 'dark', notifications: { messages: true, friends: true, mentions: true, sounds: true } }
         });
 
         await user.save();
