@@ -46,30 +46,40 @@ export default function Contact() {
 
     // Debounced username search
     useEffect(() => {
-        if (!inGameUsername || inGameUsername.length < 2) {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        
+        // If no token or not enough characters, don't show dropdown/spinner
+        if (!token || !inGameUsername || inGameUsername.length < 2) {
             setUsernameSuggestions([]);
             setShowSuggestions(false);
+            setCheckingUsername(false);
             return;
         }
+
         setCheckingUsername(true);
         if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current);
+        
         usernameDebounceRef.current = setTimeout(async () => {
             try {
-                const token = localStorage.getItem('token');
-                if (!token) { setCheckingUsername(false); return; }
-                const res = await fetch(`${API_URL}/api/users/search?query=${encodeURIComponent(inGameUsername)}`, {
+                const res = await fetch(`${API_URL}/api/users/search?q=${encodeURIComponent(inGameUsername)}`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
-                if (!res.ok) { setUsernameSuggestions([]); setCheckingUsername(false); return; }
+                if (!res.ok) { 
+                    setUsernameSuggestions([]); 
+                    setCheckingUsername(false); 
+                    return; 
+                }
                 const data = await res.json();
-                const users = data.users || data || [];
+                const users = data.users || [];
                 setUsernameSuggestions(users.slice(0, 6));
                 setShowSuggestions(users.length > 0);
-            } catch {
+            } catch (err) {
                 setUsernameSuggestions([]);
+            } finally {
+                setCheckingUsername(false);
             }
-            setCheckingUsername(false);
         }, 300);
+
         return () => { if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current); };
     }, [inGameUsername]);
 
