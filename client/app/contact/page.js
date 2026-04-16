@@ -14,9 +14,11 @@ export default function Contact() {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [inGameUsername, setInGameUsername] = useState('');
-    const [usernameAvailability, setUsernameAvailability] = useState(null); // null | { available, message }
+    const [usernameSuggestions, setUsernameSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
     const [checkingUsername, setCheckingUsername] = useState(false);
     const usernameDebounceRef = useRef(null);
+    const suggestionsRef = useRef(null);
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
     const [status, setStatus] = useState('idle'); // idle | loading | success | error
@@ -31,10 +33,22 @@ export default function Contact() {
         }
     }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Debounced username availability check
+    // Close dropdown when clicking outside
     useEffect(() => {
-        if (!inGameUsername || inGameUsername.length < 3) {
-            setUsernameAvailability(null);
+        const handleClickOutside = (e) => {
+            if (suggestionsRef.current && !suggestionsRef.current.contains(e.target)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Debounced username search
+    useEffect(() => {
+        if (!inGameUsername || inGameUsername.length < 2) {
+            setUsernameSuggestions([]);
+            setShowSuggestions(false);
             return;
         }
         setCheckingUsername(true);
@@ -42,17 +56,20 @@ export default function Contact() {
         usernameDebounceRef.current = setTimeout(async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/api/users/check-username?username=${encodeURIComponent(inGameUsername)}`, {
-                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                if (!token) { setCheckingUsername(false); return; }
+                const res = await fetch(`${API_URL}/api/users/search?query=${encodeURIComponent(inGameUsername)}`, {
+                    headers: { Authorization: `Bearer ${token}` },
                 });
-                if (!res.ok) { setUsernameAvailability(null); setCheckingUsername(false); return; }
+                if (!res.ok) { setUsernameSuggestions([]); setCheckingUsername(false); return; }
                 const data = await res.json();
-                setUsernameAvailability(data);
+                const users = data.users || data || [];
+                setUsernameSuggestions(users.slice(0, 6));
+                setShowSuggestions(users.length > 0);
             } catch {
-                setUsernameAvailability(null);
+                setUsernameSuggestions([]);
             }
             setCheckingUsername(false);
-        }, 400);
+        }, 300);
         return () => { if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current); };
     }, [inGameUsername]);
 
@@ -151,36 +168,52 @@ export default function Contact() {
                                     className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:ring-2 focus:ring-indigo-500 transition-all placeholder-white/20"
                                 />
                             </div>
-                            <div>
+                            <div ref={suggestionsRef}>
                                 <label className="text-[11px] font-bold text-white/40 uppercase tracking-wider flex items-center gap-2">
                                     In-Game Username
                                     <FiUser className="w-3 h-3 text-indigo-400" />
                                 </label>
                                 <div className="relative mt-2">
                                     <input
-                                        value={inGameUsername} onChange={e => setInGameUsername(e.target.value)}
-                                        placeholder="Enter your username..."
-                                        className={`w-full bg-white/5 border rounded-xl px-4 py-3 text-sm outline-none text-white transition-all placeholder-white/20 pr-10 ${
-                                            usernameAvailability?.available === true ? 'border-emerald-500/40 focus:ring-2 focus:ring-emerald-500' :
-                                            usernameAvailability?.available === false ? 'border-red-500/40 focus:ring-2 focus:ring-red-500' :
-                                            'border-white/10 focus:ring-2 focus:ring-indigo-500'
-                                        }`}
+                                        value={inGameUsername}
+                                        onChange={e => { setInGameUsername(e.target.value); setShowSuggestions(true); }}
+                                        onFocus={() => usernameSuggestions.length > 0 && setShowSuggestions(true)}
+                                        placeholder="Search your username..."
+                                        autoComplete="off"
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white transition-all placeholder-white/20 pr-10 focus:ring-2 focus:ring-indigo-500"
                                     />
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                                         {checkingUsername ? (
                                             <div className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                                        ) : usernameAvailability?.available === true ? (
-                                            <FiCheck className="w-4 h-4 text-emerald-400" />
-                                        ) : usernameAvailability?.available === false ? (
-                                            <FiX className="w-4 h-4 text-red-400" />
-                                        ) : null}
+                                        ) : <FiUser className="w-4 h-4 text-white/20" />}
                                     </div>
+
+                                    {/* Dropdown suggestions */}
+                                    {showSuggestions && usernameSuggestions.length > 0 && (
+                                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a2e] border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 max-h-52 overflow-y-auto">
+                                            {usernameSuggestions.map(u => (
+                                                <button
+                                                    key={u._id}
+                                                    type="button"
+                                                    onClick={() => { setInGameUsername(u.username); setShowSuggestions(false); }}
+                                                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-indigo-500/10 transition-colors text-left"
+                                                >
+                                                    {u.avatar?.url ? (
+                                                        <img src={u.avatar.url} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                                                    ) : (
+                                                        <div className="w-7 h-7 rounded-full bg-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-300 flex-shrink-0">
+                                                            {(u.username || 'U')[0].toUpperCase()}
+                                                        </div>
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm text-white font-medium truncate">{u.username}</p>
+                                                        {u.email && <p className="text-[10px] text-white/30 truncate">{u.email}</p>}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-                                {usernameAvailability && (
-                                    <p className={`text-[11px] mt-1.5 ${usernameAvailability.available ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
-                                        {usernameAvailability.message}
-                                    </p>
-                                )}
                             </div>
                             <div>
                                 <label className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Your Email</label>
