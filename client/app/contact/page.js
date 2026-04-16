@@ -4,11 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiArrowLeft, FiMessageSquare, FiMail, FiPhone, FiSend, FiCheck, FiAlertCircle, FiLoader, FiUser, FiX } from 'react-icons/fi';
+import { useAuth } from '../../hooks/useAuth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export default function Contact() {
     const router = useRouter();
+    const { user } = useAuth();
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [inGameUsername, setInGameUsername] = useState('');
@@ -19,6 +21,15 @@ export default function Contact() {
     const [message, setMessage] = useState('');
     const [status, setStatus] = useState('idle'); // idle | loading | success | error
     const [errorMsg, setErrorMsg] = useState('');
+
+    // Auto-fill from logged-in user
+    useEffect(() => {
+        if (user) {
+            if (!name) setName(user.username || '');
+            if (!email) setEmail(user.email || '');
+            if (!inGameUsername) setInGameUsername(user.username || '');
+        }
+    }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Debounced username availability check
     useEffect(() => {
@@ -34,6 +45,7 @@ export default function Contact() {
                 const res = await fetch(`${API_URL}/api/users/check-username?username=${encodeURIComponent(inGameUsername)}`, {
                     headers: token ? { Authorization: `Bearer ${token}` } : {},
                 });
+                if (!res.ok) { setUsernameAvailability(null); setCheckingUsername(false); return; }
                 const data = await res.json();
                 setUsernameAvailability(data);
             } catch {
