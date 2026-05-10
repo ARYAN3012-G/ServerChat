@@ -4,14 +4,14 @@ const { auth } = require('../middleware/auth');
 
 // Working JioSaavn API endpoints (fallback chain)
 const API_BASES = [
+    'https://jiosavan-api2.vercel.app/api',
     'https://jiosaavn-api-privatecvc2.vercel.app',
-    'https://saavn.dev/api',
 ];
 
 async function fetchFromAPI(path) {
     for (const base of API_BASES) {
         try {
-            const url = base.includes('saavn.dev') ? `${base}${path}` : `${base}${path}`;
+            const url = `${base}${path}`;
             const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
             if (!response.ok) continue;
             const data = await response.json();
@@ -31,7 +31,7 @@ function decodeHtml(str) {
 
 // Normalize song data from different API formats
 function normalizeSong(song, base) {
-    // jiosaavn-api-privatecvc2 format
+    // jiosaavn-api-privatecvc2 format (uses .link for URLs)
     if (base.includes('privatecvc2')) {
         return {
             id: song.id,
@@ -47,7 +47,7 @@ function normalizeSong(song, base) {
             color: '#6366f1',
         };
     }
-    // saavn.dev format (original)
+    // jiosavan-api2 / saavn.dev format (uses .url for URLs)
     return {
         id: song.id,
         title: decodeHtml(song.name),
@@ -204,7 +204,9 @@ router.put('/sessions/:sessionId/end', auth, async (req, res) => {
 router.get('/lyrics/:songId', auth, async (req, res) => {
     try {
         const { songId } = req.params;
-        const result = await fetchFromAPI(`/lyrics?id=${songId}`);
+        // Try the /songs/:id/lyrics path first (jiosavan-api2 format), fall back to /lyrics?id= (older format)
+        let result = await fetchFromAPI(`/songs/${songId}/lyrics`);
+        if (!result) result = await fetchFromAPI(`/lyrics?id=${songId}`);
         if (!result) return res.status(502).json({ message: 'Lyrics API unavailable', lyrics: null });
 
         const { data } = result;
